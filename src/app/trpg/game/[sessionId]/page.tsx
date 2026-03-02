@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useGameScreen } from "@/hooks/useGameScreen";
+import { useGuestProfile } from "@/hooks/useGuestProfile";
 import ChatLog from "@/components/trpg/game/ChatLog";
 import ActionPanel from "@/components/trpg/game/ActionPanel";
 import CharacterStatus from "@/components/trpg/game/CharacterStatus";
@@ -12,11 +12,8 @@ import PlayerList from "@/components/trpg/game/PlayerList";
 export default function GamePage() {
   const params = useParams();
   const sessionId = params.sessionId as string;
-  const [localId, setLocalId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setLocalId(localStorage.getItem("localId"));
-  }, []);
+  const { profile } = useGuestProfile();
+  const localId = profile?.localId ?? null;
 
   const {
     session,
