@@ -57,5 +57,12 @@ JSON 배열로만 응답하세요:
     generationConfig: { responseMimeType: "application/json" },
   });
 
-  return JSON.parse(result.response.text()) as ActionChoice[];
+  const raw = JSON.parse(result.response.text()) as ActionChoice[];
+
+  // Gemini가 dc를 문자열로 반환하는 경우 방어 — 반드시 number로 변환
+  return raw.map((choice) =>
+    choice.dice_check
+      ? { ...choice, dice_check: { ...choice.dice_check, dc: Number(choice.dice_check.dc) || 13 } }
+      : choice
+  );
 }

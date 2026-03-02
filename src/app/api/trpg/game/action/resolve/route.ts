@@ -74,16 +74,17 @@ export async function POST(req: NextRequest) {
     const session = sessionData;
     const player = playerData;
 
-    // ── 클라이언트가 보낸 d20 값 사용 (범위 클램프) ───────────────────
+    // ── 클라이언트가 보낸 값 정규화 ──────────────────────────────────
     const d20 = Math.min(20, Math.max(1, Math.round(rolled)));
+    const dcNum = Number(dc); // 문자열로 넘어올 경우 방어
     const modifier = JOB_MODIFIERS[player.job] ?? 0;
     const total = d20 + modifier;
 
     let outcome: ActionOutcome;
-    if (d20 === 20) outcome = "critical_success";
-    else if (total >= dc + 5) outcome = "success";
-    else if (total >= dc) outcome = "partial";
-    else outcome = "failure";
+    if (d20 === 20)           outcome = "critical_success";
+    else if (total >= dcNum + 5) outcome = "success";
+    else if (total >= dcNum)     outcome = "partial";
+    else                         outcome = "failure";
 
     const diceRoll: DiceRoll = { rolled: d20, modifier, total, label: "판정" };
 
@@ -156,7 +157,7 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", session_id);
-      return NextResponse.json({ rolled: d20, modifier, total, dc, outcome });
+      return NextResponse.json({ rolled: d20, modifier, total, dc: dcNum, outcome });
     }
 
     // ── HP 변환 + GM Action_Log INSERT ────────────────────────────────
@@ -231,7 +232,7 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", session_id);
 
-    return NextResponse.json({ rolled: d20, modifier, total, dc, outcome });
+    return NextResponse.json({ rolled: d20, modifier, total, dc: dcNum, outcome });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
