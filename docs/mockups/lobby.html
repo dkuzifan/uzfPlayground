@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TRPG 로비 & 대기실 — 목업</title>
+  <style>
+    /* ──────────────────────────────────────────
+       Design Tokens (matches src/app/globals.css)
+    ────────────────────────────────────────── */
+    :root {
+      --bg-base:       #0a0a0a;
+      --bg-surface:    rgba(255,255,255,0.05);
+      --bg-hover:      rgba(255,255,255,0.08);
+      --border:        rgba(255,255,255,0.10);
+      --border-strong: rgba(255,255,255,0.20);
+      --text-primary:  #f5f5f5;
+      --text-muted:    #a3a3a3;
+      --gold:          #c9a227;
+      --gold-dim:      rgba(201,162,39,0.15);
+      --forest-bg:     rgba(30,107,60,0.20);
+      --danger-bg:     rgba(192,57,43,0.20);
+      --radius-card:   12px;
+      --radius-btn:    8px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    /* ── Navbar ── */
+    .navbar {
+      position: sticky; top: 0; z-index: 300;
+      height: 56px;
+      background: rgba(23,23,23,0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 24px; gap: 24px;
+    }
+    .navbar-brand { font-weight: 700; font-size: 16px; color: var(--text-primary); }
+    .navbar-links { display: flex; gap: 4px; }
+    .nav-link {
+      padding: 6px 12px; border-radius: 6px;
+      font-size: 14px; color: var(--text-muted);
+      text-decoration: none; transition: background 0.15s;
+    }
+    .nav-link:hover { background: var(--bg-surface); color: var(--text-primary); }
+    .nav-link.active { background: var(--bg-hover); color: var(--text-primary); }
+
+    /* ── Tabs ── */
+    .tabs {
+      position: sticky; top: 56px; z-index: 200;
+      display: flex; gap: 0;
+      background: var(--bg-base);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+    }
+    .tab-btn {
+      padding: 12px 18px;
+      background: transparent; border: none;
+      color: var(--text-muted); font-size: 13px; cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.15s;
+      white-space: nowrap;
+    }
+    .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+    .tab-btn:hover:not(.active) { color: var(--text-primary); }
+
+    /* ── Screens ── */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── Page content area ── */
+    .page-content {
+      max-width: 960px; margin: 0 auto;
+      padding: 32px 24px;
+    }
+
+    /* ── Headings ── */
+    .page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .page-subtitle { font-size: 14px; color: var(--text-muted); margin-bottom: 24px; }
+
+    /* ── Button ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 16px; border-radius: var(--radius-btn);
+      font-size: 14px; font-weight: 500; cursor: pointer;
+      border: none; transition: opacity 0.15s, background 0.15s;
+    }
+    .btn-primary { background: var(--gold); color: #1a1209; }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-secondary {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      color: var(--text-primary);
+    }
+    .btn-secondary:hover { background: var(--bg-hover); }
+    .btn-ghost { background: transparent; color: var(--text-muted); }
+    .btn-ghost:hover { color: var(--text-primary); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Badge ── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 8px; border-radius: 999px;
+      font-size: 12px; font-weight: 500;
+    }
+    .badge-open { background: var(--forest-bg); color: #4ade80; border: 1px solid rgba(74,222,128,0.25); }
+    .badge-full { background: var(--danger-bg); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 20px; }
+    .form-label { display: block; font-size: 13px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; }
+    .form-input {
+      width: 100%; padding: 10px 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      color: var(--text-primary); font-size: 14px;
+      outline: none; transition: border-color 0.15s;
+    }
+    .form-input:focus { border-color: var(--gold); }
+    .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+    /* ── Modal (position:fixed, z-index below tabs) ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100;   /* navbar(300) · tabs(200) 보다 낮아서 탭이 위에 표시됨 */
+      padding: 16px;
+    }
+    .modal-overlay.hidden { display: none; }
+
+    .modal {
+      background: #171717;
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      padding: 28px;
+      width: 100%; max-width: 440px;
+      position: relative; z-index: 101;
+    }
+    .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .modal-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+
+    /* ── Avatar ── */
+    .avatar-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px; }
+    .avatar-option {
+      width: 52px; height: 52px; border-radius: 50%;
+      cursor: pointer; border: 3px solid transparent;
+      transition: border-color 0.15s, transform 0.1s;
+    }
+    .avatar-option:hover { transform: scale(1.07); }
+    .avatar-option.selected { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
+    .av-red    { background: #e74c3c; }
+    .av-orange { background: #e67e22; }
+    .av-yellow { background: #f1c40f; }
+    .av-green  { background: #27ae60; }
+    .av-cyan   { background: #16a085; }
+    .av-blue   { background: #2980b9; }
+    .av-purple { background: #8e44ad; }
+    .av-pink   { background: #e91e8c; }
+
+    /* ── Slider ── */
+    .slider-row { display: flex; align-items: center; gap: 12px; }
+    input[type="range"] {
+      flex: 1; -webkit-appearance: none;
+      height: 4px; background: var(--border-strong);
+      border-radius: 2px; outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px; height: 18px;
+      background: var(--gold); border-radius: 50%; cursor: pointer;
+    }
+    .slider-value { min-width: 24px; text-align: center; font-weight: 700; color: var(--gold); }
+
+    /* ── Room grid ── */
+    .lobby-toolbar {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      margin-bottom: 20px; gap: 12px; flex-wrap: wrap;
+    }
+    .room-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .room-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 20px;
+      display: flex; flex-direction: column; gap: 12px;
+      transition: border-color 0.15s;
+    }
+    .room-card:hover { border-color: var(--border-strong); }
+    .room-card.full { opacity: 0.55; }
+    .room-name { font-size: 16px; font-weight: 600; }
+    .room-meta { display: flex; align-items: center; justify-content: space-between; }
+    .room-capacity { font-size: 13px; color: var(--text-muted); }
+    .room-footer { display: flex; justify-content: flex-end; }
+
+    /* ── Waiting Room ── */
+    .waiting-layout {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 24px; align-items: start;
+    }
+    @media (max-width: 680px) { .waiting-layout { grid-template-columns: 1fr; } }
+
+    .section-label {
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 12px;
+    }
+    .player-list { display: flex; flex-direction: column; gap: 8px; }
+    .player-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .player-item.host { border-color: rgba(201,162,39,0.35); }
+    .player-avatar { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; }
+    .player-info { flex: 1; }
+    .player-name { font-size: 14px; font-weight: 600; }
+    .player-tag { font-size: 12px; color: var(--text-muted); }
+
+    .sidebar-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 20px;
+    }
+    .info-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; }
+    .info-label { color: var(--text-muted); }
+    .info-value { font-weight: 500; }
+
+    .status-dot {
+      display: inline-block; width: 8px; height: 8px;
+      border-radius: 50%; background: #facc15; margin-right: 6px;
+      animation: blink 2s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+    .start-btn {
+      width: 100%; padding: 12px; border-radius: 10px; border: none;
+      background: var(--gold); color: #1a1209;
+      font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    .start-btn:hover { opacity: 0.88; }
+    .leave-btn {
+      display: block; width: 100%; margin-top: 10px;
+      padding: 10px; border-radius: 10px;
+      border: 1px solid var(--border-strong);
+      background: transparent; color: var(--text-muted);
+      font-size: 13px; cursor: pointer; transition: color 0.15s;
+    }
+    .leave-btn:hover { color: #f87171; border-color: rgba(248,113,113,0.4); }
+
+    /* ── Annotation ── */
+    .annotation {
+      margin-top: 24px; padding: 14px 16px;
+      background: var(--gold-dim);
+      border: 1px solid rgba(201,162,39,0.3);
+      border-radius: 8px;
+      font-size: 13px; color: var(--gold); line-height: 1.6;
+    }
+    .annotation strong { font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<!-- ─── Navbar (z-index: 300) ─── -->
+<nav class="navbar">
+  <span class="navbar-brand">UZF Playground</span>
+  <div class="navbar-links">
+    <a href="#" class="nav-link">Home</a>
+    <a href="#" class="nav-link active">TRPG</a>
+  </div>
+</nav>
+
+<!-- ─── Tabs (z-index: 200, sticky) ─── -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="showScreen('screen-profile', this)">① 프로필 설정 모달</button>
+  <button class="tab-btn"        onclick="showScreen('screen-lobby',   this)">② 로비</button>
+  <button class="tab-btn"        onclick="showScreen('screen-waiting', this)">③ 대기실</button>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN 1 — 게스트 프로필 설정
+     모달은 position:fixed + z-index:100
+     → 탭(200) · 네브바(300) 위로는 올라오지 않음
+══════════════════════════════════════════ -->
+<div id="screen-profile" class="screen active">
+
+  <!-- 로비 배경 (dimmed) -->
+  <div class="page-content" style="opacity:0.2; pointer-events:none; user-select:none;">
+    <div class="lobby-toolbar">
+      <div>
+        <h1 class="page-title">TRPG 로비</h1>
+        <p class="page-subtitle">참여할 방을 선택하거나 새로 만드세요</p>
+      </div>
+    </div>
+    <div class="room-grid">
+      <div class="room-card"><div class="room-name">판타지 대모험</div><div class="room-meta"><span class="room-capacity">👥 2 / 4명</span></div></div>
+      <div class="room-card"><div class="room-name">어둠의 던전</div><div class="room-meta"><span class="room-capacity">👥 1 / 5명</span></div></div>
+    </div>
+  </div>
+
+  <!-- 프로필 설정 모달 (z-index:100, 탭 아래) -->
+  <div class="modal-overlay">
+    <div class="modal">
+      <div class="modal-title">환영합니다! 프로필을 설정하세요</div>
+      <div class="modal-subtitle">닉네임과 아바타를 설정하면 바로 시작할 수 있습니다.</div>
+
+      <div class="form-group">
+        <label class="form-label">닉네임 <span style="color:#f87171">*</span></label>
+        <input class="form-input" type="text" placeholder="예: 용사 김철수" maxlength="12" />
+        <div class="form-hint">최대 12자 · 공백 불가</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">아바타 <span style="color:#f87171">*</span></label>
+        <div class="avatar-grid">
+          <div class="avatar-option av-red"    onclick="selectAvatar(this)"></div>
+          <div class="avatar-option av-orange" onclick="selectAvatar(this)"></div>
+          <div class="avatar-option av-yellow selected" onclick="selectAvatar(this)"></div>
+          <div class="avatar-option av-green"  onclick="selectAvatar(this)"></div>
+          <div class="avatar-option av-cyan"   onclick="selectAvatar(this)"></div>
+          <div class="avatar-option av-blue"   onclick="selectAvatar(this)"></div>
+          <div class="avatar-option av-purple" onclick="selectAvatar(this)"></div>
+          <div class="avatar-option av-pink"   onclick="selectAvatar(this)"></div>
+        </div>
+        <div class="form-hint" style="margin-top:8px">추후 실제 캐릭터 이미지로 교체 예정</div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary">완료하고 시작하기</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-content">
+    <div class="annotation">
+      <strong>① 게스트 프로필 설정 모달</strong><br>
+      · 사이트 첫 방문 시 자동으로 뜨는 모달. 완료 후에는 다시 뜨지 않아요.<br>
+      · 아바타를 선택하기 전에는 완료 버튼이 비활성화됩니다.<br>
+      · 색상 원은 임시 플레이스홀더 — 추후 캐릭터 이미지로 교체 예정.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN 2 — 로비
+══════════════════════════════════════════ -->
+<div id="screen-lobby" class="screen">
+
+  <!-- 방 만들기 모달 -->
+  <div id="modal-create" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-title">방 만들기</div>
+      <div class="modal-subtitle">방 이름과 최대 인원을 설정하세요</div>
+      <div class="form-group">
+        <label class="form-label">방 이름 <span style="color:#f87171">*</span></label>
+        <input class="form-input" type="text" placeholder="예: 판타지 대모험" maxlength="20" />
+        <div class="form-hint">최대 20자</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">최대 인원</label>
+        <div class="slider-row">
+          <input type="range" min="2" max="7" value="4"
+            oninput="document.getElementById('slider-val').textContent = this.value" />
+          <span class="slider-value" id="slider-val">4</span>
+          <span style="font-size:13px; color:var(--text-muted)">명</span>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="document.getElementById('modal-create').classList.add('hidden')">취소</button>
+        <button class="btn btn-primary">만들기</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-content">
+    <div class="lobby-toolbar">
+      <div>
+        <h1 class="page-title">TRPG 로비</h1>
+        <p class="page-subtitle">참여할 방을 선택하거나 새로 만드세요</p>
+      </div>
+      <div style="display:flex; gap:8px; flex-shrink:0;">
+        <button class="btn btn-secondary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          새로고침
+        </button>
+        <button class="btn btn-primary" onclick="document.getElementById('modal-create').classList.remove('hidden')">
+          + 방 만들기
+        </button>
+      </div>
+    </div>
+
+    <div class="room-grid">
+      <div class="room-card">
+        <div class="room-name">판타지 대모험</div>
+        <div class="room-meta">
+          <span class="room-capacity">👥 2 / 4명</span>
+          <span class="badge badge-open">● 참여 가능</span>
+        </div>
+        <div class="room-footer">
+          <button class="btn btn-primary" style="width:100%">입장하기</button>
+        </div>
+      </div>
+
+      <div class="room-card">
+        <div class="room-name">어둠의 던전 탐험</div>
+        <div class="room-meta">
+          <span class="room-capacity">👥 3 / 4명</span>
+          <span class="badge badge-open">● 참여 가능</span>
+        </div>
+        <div class="room-footer">
+          <button class="btn btn-primary" style="width:100%">입장하기</button>
+        </div>
+      </div>
+
+      <div class="room-card full">
+        <div class="room-name">드래곤 슬레이어</div>
+        <div class="room-meta">
+          <span class="room-capacity">👥 5 / 5명</span>
+          <span class="badge badge-full">● 만석</span>
+        </div>
+        <div class="room-footer">
+          <button class="btn btn-primary" style="width:100%" disabled>입장 불가</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="annotation">
+      <strong>② 로비 — 방 목록 & 방 만들기</strong><br>
+      · 방 목록은 자동 갱신 없음 — "새로고침" 버튼으로 최신 목록 조회.<br>
+      · 만석 방은 반투명 + 버튼 비활성화.<br>
+      · "+ 방 만들기" 클릭 시 모달이 뜹니다 (클릭해보세요).
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN 3 — 대기실
+══════════════════════════════════════════ -->
+<div id="screen-waiting" class="screen">
+  <div class="page-content">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
+      <button class="btn btn-ghost" style="padding:4px 8px; font-size:13px;">← 로비로</button>
+      <h1 class="page-title">판타지 대모험</h1>
+    </div>
+    <p class="page-subtitle">
+      <span class="status-dot"></span>대기 중 · 방장이 게임을 시작하면 자동으로 이동합니다
+    </p>
+
+    <div class="waiting-layout">
+      <div>
+        <div class="section-label">참여자 목록 (2 / 4명)</div>
+        <div class="player-list">
+          <div class="player-item host">
+            <div class="player-avatar av-yellow"></div>
+            <div class="player-info">
+              <div class="player-name">황금 현자</div>
+              <div class="player-tag">방장</div>
+            </div>
+            <span style="font-size:18px">👑</span>
+          </div>
+          <div class="player-item">
+            <div class="player-avatar av-blue"></div>
+            <div class="player-info">
+              <div class="player-name">폭풍의 궁수</div>
+              <div class="player-tag">참여자</div>
+            </div>
+          </div>
+          <div class="player-item" style="opacity:0.35; border-style:dashed;">
+            <div class="player-avatar" style="border:2px dashed var(--border-strong);"></div>
+            <div class="player-info"><div class="player-name" style="color:var(--text-muted)">대기 중…</div></div>
+          </div>
+          <div class="player-item" style="opacity:0.35; border-style:dashed;">
+            <div class="player-avatar" style="border:2px dashed var(--border-strong);"></div>
+            <div class="player-info"><div class="player-name" style="color:var(--text-muted)">대기 중…</div></div>
+          </div>
+        </div>
+
+        <div class="annotation">
+          <strong>실시간 자동 갱신 (Supabase Realtime)</strong><br>
+          · 누군가 입장하면 새로고침 없이 2초 안에 목록에 추가됩니다.<br>
+          · 방장에게만 오른쪽 "게임 시작" 버튼이 보입니다.
+        </div>
+      </div>
+
+      <div>
+        <div class="sidebar-card">
+          <div class="section-label" style="margin-bottom:12px">방 정보</div>
+          <div style="margin-bottom:20px;">
+            <div class="info-row"><span class="info-label">방 이름</span><span class="info-value">판타지 대모험</span></div>
+            <div class="info-row"><span class="info-label">최대 인원</span><span class="info-value">4명</span></div>
+            <div class="info-row"><span class="info-label">시나리오</span><span class="info-value">판타지 (기본)</span></div>
+            <div class="info-row"><span class="info-label">상태</span><span class="info-value"><span class="status-dot"></span>대기 중</span></div>
+          </div>
+          <button class="start-btn">게임 시작</button>
+          <button class="leave-btn">방 나가기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showScreen(id, btn) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  function selectAvatar(el) {
+    document.querySelectorAll('.avatar-option').forEach(a => a.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+</script>
+</body>
+</html>

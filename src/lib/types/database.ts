@@ -33,6 +33,7 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["Scenario"]["Insert"]>;
+        Relationships: [];
       };
 
       NPC_Persona: {
@@ -69,6 +70,7 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["NPC_Persona"]["Insert"]>;
+        Relationships: [];
       };
 
       Game_Session: {
@@ -103,6 +105,7 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["Game_Session"]["Insert"]>;
+        Relationships: [];
       };
 
       Player_Character: {
@@ -141,6 +144,7 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["Player_Character"]["Insert"]>;
+        Relationships: [];
       };
 
       Action_Log: {
@@ -171,6 +175,7 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["Action_Log"]["Insert"]>;
+        Relationships: [];
       };
 
       Session_Memory: {
@@ -193,6 +198,7 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["Session_Memory"]["Insert"]>;
+        Relationships: [];
       };
     };
     Views: Record<string, never>;

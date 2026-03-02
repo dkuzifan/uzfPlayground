@@ -1,84 +1,131 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
+import type { GuestProfile } from "@/lib/types/lobby";
 
 interface CreateRoomModalProps {
   open: boolean;
   onClose: () => void;
-  onCreated: (sessionId: string) => void;
+  profile: GuestProfile;
 }
 
 export default function CreateRoomModal({
   open,
   onClose,
-  onCreated,
+  profile,
 }: CreateRoomModalProps) {
+  const router = useRouter();
   const [roomName, setRoomName] = useState("");
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!roomName.trim()) return;
+  const roomNameError =
+    roomName.trim().length === 0 && roomName.length > 0
+      ? "방 이름을 입력해주세요."
+      : roomName.length > 20
+      ? "방 이름은 최대 20자입니다."
+      : null;
+
+  const canSubmit = roomName.trim().length > 0 && roomName.length <= 20 && !loading;
+
+  async function handleCreate() {
+    if (!canSubmit) return;
     setLoading(true);
+    setError(null);
+
     try {
-      const res = await fetch("/api/trpg/game/session", {
+      const res = await fetch("/api/trpg/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           room_name: roomName.trim(),
           max_players: maxPlayers,
-          scenario_id: "default", // TODO: 시나리오 선택 UI
-          host_player_id: "user_id", // TODO: 실제 유저 ID
+          localId: profile.localId,
+          nickname: profile.nickname,
+          avatarIndex: profile.avatarIndex,
         }),
       });
+
       const data = await res.json();
-      if (data.session?.id) {
-        onCreated(data.session.id);
-        onClose();
+      if (!res.ok) {
+        setError(data.error ?? "방 생성에 실패했습니다.");
+        return;
       }
+
+      router.push(`/trpg/lobby/${data.sessionId}`);
+    } catch {
+      setError("네트워크 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
-    <Modal open={open} onClose={onClose} title="새 방 만들기">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div>
-          <label className="mb-1.5 block text-sm text-neutral-400">방 이름</label>
-          <input
-            type="text"
-            value={roomName}
-            onChange={(e) => setRoomName(e.target.value)}
-            placeholder="모험의 시작..."
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-neutral-500 outline-none focus:border-white/20"
-          />
+    <Modal open={open} onClose={onClose} title="방 만들기">
+      {/* 방 이름 */}
+      <div className="mb-5">
+        <label className="mb-1.5 block text-xs font-medium text-neutral-400">
+          방 이름 <span className="text-red-400">*</span>
+        </label>
+        <input
+          type="text"
+          maxLength={21}
+          placeholder="예: 판타지 대모험"
+          value={roomName}
+          onChange={(e) => setRoomName(e.target.value)}
+          className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder-neutral-500 outline-none focus:border-yellow-500/60"
+          autoFocus
+        />
+        {roomNameError ? (
+          <p className="mt-1 text-xs text-red-400">{roomNameError}</p>
+        ) : (
+          <p className="mt-1 text-xs text-neutral-500">최대 20자</p>
+        )}
+      </div>
+
+      {/* 최대 인원 */}
+      <div className="mb-6">
+        <label className="mb-2 block text-xs font-medium text-neutral-400">
+          최대 인원{" "}
+          <span className="font-bold text-yellow-400">{maxPlayers}명</span>
+        </label>
+        <input
+          type="range"
+          min={2}
+          max={7}
+          value={maxPlayers}
+          onChange={(e) => setMaxPlayers(Number(e.target.value))}
+          className="w-full accent-yellow-400"
+        />
+        <div className="mt-1 flex justify-between text-xs text-neutral-500">
+          <span>2명</span>
+          <span>7명</span>
         </div>
-        <div>
-          <label className="mb-1.5 block text-sm text-neutral-400">
-            최대 인원 ({maxPlayers}명)
-          </label>
-          <input
-            type="range"
-            min={1}
-            max={7}
-            value={maxPlayers}
-            onChange={(e) => setMaxPlayers(Number(e.target.value))}
-            className="w-full"
-          />
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" type="button" onClick={onClose}>
-            취소
-          </Button>
-          <Button variant="primary" type="submit" disabled={loading || !roomName.trim()}>
-            {loading ? "생성 중..." : "방 만들기"}
-          </Button>
-        </div>
-      </form>
+      </div>
+
+      {error && (
+        <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
+          {error}
+        </p>
+      )}
+
+      <div className="flex gap-2">
+        <Button variant="ghost" className="flex-1" onClick={onClose} disabled={loading}>
+          취소
+        </Button>
+        <Button
+          variant="primary"
+          className="flex-1"
+          disabled={!canSubmit}
+          onClick={handleCreate}
+        >
+          {loading ? "생성 중…" : "만들기"}
+        </Button>
+      </div>
     </Modal>
   );
 }

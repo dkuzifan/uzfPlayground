@@ -132,12 +132,44 @@ export interface SessionMemory {
   updated_at: string;
 }
 
+// ── Dice / HP Change ──────────────────────────────────────
+
+export interface DiceRoll {
+  rolled: number;    // d20 결과 (1~20)
+  modifier: number;  // 직업 보너스
+  total: number;     // rolled + modifier
+  label: string;     // 예: "판정"
+}
+
+export interface HpChange {
+  target_id: string;
+  name: string;
+  old_hp: number;
+  new_hp: number;
+  delta: number;
+}
+
+// ── Raw Player (DB 스키마 직접 매핑) ──────────────────────
+
+export interface RawPlayer {
+  id: string;
+  session_id: string;
+  user_id: string;
+  player_name: string;
+  character_name: string;
+  job: string;
+  personality_summary: string | null;
+  stats: { hp: number; max_hp: number; attack: number; defense: number; speed: number };
+  is_active: boolean;
+}
+
 // ── GM Response (AI Output) ───────────────────────────────
 
 export interface GmResponse {
   narration: string;
   outcome: ActionOutcome;
   state_changes: StateChanges[];
+  dice_roll?: DiceRoll;
   next_scene_hint?: string;
 }
 
