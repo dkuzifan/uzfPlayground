@@ -72,7 +72,8 @@ export async function POST(req: NextRequest) {
     const session = sessionData;
     const player = playerData;
 
-    // ── Step 2: 주사위 판정 필요 여부 확인 ──────────────────────────
+    // ── Step 2: 주사위 판정 필요 여부 확인 (free_input 전용) ───────
+    // choice 타입은 선택지 생성 시점에 이미 주사위 여부가 결정됨 → 재판단 불필요
     const { data: recentLogsData } = await supabase
       .from("Action_Log")
       .select("*")
@@ -82,15 +83,15 @@ export async function POST(req: NextRequest) {
 
     const recentLogs = ((recentLogsData ?? []).reverse()) as unknown as ActionLog[];
 
-    const diceNeed = await checkDiceNeed(content, recentLogs);
-
-    if (diceNeed.needs_check) {
-      // Phase 1 종료: 클라이언트에게 주사위 판정 필요 알림
-      return NextResponse.json({
-        needs_dice_check: true,
-        dc: diceNeed.dc ?? 13,
-        check_label: diceNeed.label ?? "판정",
-      });
+    if (action_type === "free_input") {
+      const diceNeed = await checkDiceNeed(content, recentLogs);
+      if (diceNeed.needs_check) {
+        return NextResponse.json({
+          needs_dice_check: true,
+          dc: diceNeed.dc ?? 13,
+          check_label: diceNeed.label ?? "판정",
+        });
+      }
     }
 
     // ── needs_check: false → 기존 플로우 (d20 롤 + GM 서사 + 턴 전진) ──

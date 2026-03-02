@@ -87,9 +87,9 @@ export default function WaitingRoom({ sessionId, profile }: WaitingRoomProps) {
             {Array.from({ length: emptySlots }).map((_, i) => (
               <div
                 key={`empty-${i}`}
-                className="flex items-center gap-3 rounded-xl border border-dashed border-black/10 px-4 py-3 opacity-40 dark:border-white/10"
+                className="flex items-center gap-3 rounded-xl border border-dashed border-neutral-300 px-4 py-3 opacity-60 dark:border-white/10"
               >
-                <div className="h-10 w-10 flex-shrink-0 rounded-full border border-dashed border-black/20 dark:border-white/20" />
+                <div className="h-10 w-10 flex-shrink-0 rounded-full border border-dashed border-neutral-300 dark:border-white/20" />
                 <p className="text-sm text-neutral-400">대기 중…</p>
               </div>
             ))}
