@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback } from "react";
 import RoomCard from "@/components/trpg/lobby/RoomCard";
 import CreateRoomModal from "@/components/trpg/lobby/CreateRoomModal";
+import GuestProfileModal from "@/components/trpg/lobby/GuestProfileModal";
 import Button from "@/components/ui/Button";
 import { useGuestProfile } from "@/hooks/useGuestProfile";
 import type { LobbySession } from "@/lib/types/lobby";
 
 export default function LobbyPage() {
-  const { profile, mounted } = useGuestProfile();
+  const { profile, mounted, saveProfile } = useGuestProfile();
   const [sessions, setSessions] = useState<LobbySession[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -100,6 +101,14 @@ export default function LobbyPage() {
             <RoomCard key={session.id} session={session} />
           ))}
         </div>
+      )}
+
+      {/* 프로필 설정 모달 (로비 첫 방문 시) */}
+      {mounted && (
+        <GuestProfileModal
+          open={profile === null}
+          onSave={saveProfile}
+        />
       )}
 
       {/* 방 만들기 모달 */}

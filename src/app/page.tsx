@@ -1,22 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import GuestProfileModal from "@/components/trpg/lobby/GuestProfileModal";
-import { useGuestProfile } from "@/hooks/useGuestProfile";
 
 export default function HomePage() {
-  const { profile, mounted, saveProfile } = useGuestProfile();
-
   return (
     <>
-      {/* 첫 방문 시 프로필 설정 모달 */}
-      {mounted && (
-        <GuestProfileModal
-          open={profile === null}
-          onSave={saveProfile}
-        />
-      )}
-
       <div className="mx-auto max-w-4xl px-4 py-20 text-center">
         <h1 className="mb-4 text-4xl font-bold text-neutral-900 dark:text-white">
           <span className="font-mono tracking-tight">PLGRND</span>{" "}

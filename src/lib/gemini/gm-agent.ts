@@ -71,8 +71,8 @@ export interface GmActionInput {
   actingPlayer: RawPlayer;
   action: string;
   actionType: "choice" | "free_input";
-  diceRoll: DiceRoll;
-  outcome: ActionOutcome;
+  diceRoll?: DiceRoll;
+  outcome?: ActionOutcome;
 }
 
 export async function runGmAction(input: GmActionInput): Promise<GmRawResponse> {
@@ -132,6 +132,10 @@ function buildContext(input: GmActionInput): string {
     failure: "실패",
   };
 
+  const diceSection = diceRoll && outcome
+    ? `## 판정 결과 (서버 확정)\n- 주사위: d20=${diceRoll.rolled} + 보너스=${diceRoll.modifier} = ${diceRoll.total}\n- 결과: ${outcomeLabel[outcome] ?? outcome}\n\n위 판정 결과에 맞는 나레이션과 HP 상태 변화를 반환하라.`
+    : `## 판정 없음\n이 행동은 주사위 판정 없이 자연스럽게 진행되었다. 행동 결과를 자연스럽게 서사로만 묘사하라. HP 변화가 없으면 state_changes는 []로 반환하라.`;
+
   return `${fixedTruthsText}
 ## 최근 행동 기록
 ${recentHistory}
@@ -144,9 +148,5 @@ ${recentHistory}
 ## 현재 행동
 ["${actingPlayer.character_name}"]: ${action}
 
-## 판정 결과 (서버 확정)
-- 주사위: d20=${diceRoll.rolled} + 보너스=${diceRoll.modifier} = ${diceRoll.total}
-- 결과: ${outcomeLabel[outcome ?? ""] ?? outcome}
-
-위 판정 결과에 맞는 나레이션과 HP 상태 변화를 반환하라.`.trim();
+${diceSection}`.trim();
 }

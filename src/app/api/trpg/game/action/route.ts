@@ -2,18 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { runGmAction, checkDiceNeed } from "@/lib/gemini/gm-agent";
 import { getNextTurn } from "@/lib/game/turn-manager";
-import type { ActionOutcome, DiceRoll, HpChange, RawPlayer, GameSession, ActionLog } from "@/lib/types/game";
-
-const JOB_MODIFIERS: Record<string, number> = {
-  warrior: 2,
-  mage: 2,
-  rogue: 2,
-  cleric: 2,
-  adventurer: 0,
-  ranger: 2,
-  paladin: 2,
-  bard: 1,
-};
+import type { HpChange, RawPlayer, GameSession, ActionLog } from "@/lib/types/game";
 
 export async function POST(req: NextRequest) {
   try {
@@ -94,22 +83,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── needs_check: false → 기존 플로우 (d20 롤 + GM 서사 + 턴 전진) ──
+    // ── needs_check: false → 주사위 없는 플로우 (GM 서사 + 턴 전진) ──
 
-    // d20 서버 롤
-    const d20 = Math.ceil(Math.random() * 20);
-    const modifier = JOB_MODIFIERS[player.job] ?? 0;
-    const total = d20 + modifier;
-
-    let outcome: ActionOutcome;
-    if (d20 === 20) outcome = "critical_success";
-    else if (total >= 15) outcome = "success";
-    else if (total >= 10) outcome = "partial";
-    else outcome = "failure";
-
-    const diceRoll: DiceRoll = { rolled: d20, modifier, total, label: "판정" };
-
-    // 플레이어 Action_Log INSERT
+    // 플레이어 Action_Log INSERT (주사위 없음)
     await supabase.from("Action_Log").insert({
       session_id,
       turn_number: session.turn_number,
@@ -118,8 +94,8 @@ export async function POST(req: NextRequest) {
       speaker_name: player.player_name,
       action_type: action_type as "choice" | "free_input",
       content,
-      outcome,
-      state_changes: { dice_roll: diceRoll },
+      outcome: null,
+      state_changes: {},
     });
 
     // Gemini GM 호출
@@ -142,8 +118,6 @@ export async function POST(req: NextRequest) {
         actingPlayer: player,
         action: content,
         actionType: action_type as "choice" | "free_input",
-        diceRoll,
-        outcome,
       });
       gmNarration = gmResponse.narration;
       gmStateChanges = gmResponse.state_changes ?? [];
@@ -169,7 +143,7 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", session_id);
-      return NextResponse.json({ ok: true, outcome, dice_roll: diceRoll });
+      return NextResponse.json({ ok: true });
     }
 
     // HP 변환 + GM Action_Log INSERT
@@ -209,7 +183,7 @@ export async function POST(req: NextRequest) {
       speaker_name: "GM",
       action_type: "gm_narration",
       content: gmNarration,
-      outcome,
+      outcome: null,
       state_changes: { hp_changes: hpChanges },
     });
 
@@ -244,7 +218,7 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", session_id);
 
-    return NextResponse.json({ ok: true, outcome, dice_roll: diceRoll });
+    return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
