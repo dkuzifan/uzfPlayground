@@ -9,7 +9,7 @@ function HpBar({ hp, maxHp }: { hp: number; maxHp: number }) {
   const color =
     ratio >= 0.6 ? "bg-green-500" : ratio >= 0.3 ? "bg-yellow-500" : "bg-red-500";
   return (
-    <div className="h-2 w-full rounded-full bg-white/10">
+    <div className="h-2 w-full rounded-full bg-black/10 dark:bg-white/10">
       <div
         className={`h-2 rounded-full transition-all ${color}`}
         style={{ width: `${Math.round(ratio * 100)}%` }}
@@ -21,7 +21,7 @@ function HpBar({ hp, maxHp }: { hp: number; maxHp: number }) {
 export default function CharacterStatus({ player }: Props) {
   if (!player) {
     return (
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+      <div className="rounded-xl border border-black/10 bg-black/[0.04] p-4 dark:border-white/10 dark:bg-white/5">
         <p className="text-xs text-neutral-500">캐릭터 정보 없음</p>
       </div>
     );
@@ -30,17 +30,17 @@ export default function CharacterStatus({ player }: Props) {
   const { stats } = player;
 
   return (
-    <div className="space-y-3 rounded-xl border border-white/10 bg-white/5 p-4">
+    <div className="space-y-3 rounded-xl border border-black/10 bg-black/[0.04] p-4 dark:border-white/10 dark:bg-white/5">
       <div>
         <p className="text-xs text-neutral-500">내 캐릭터</p>
-        <p className="font-semibold text-white">{player.character_name}</p>
-        <p className="text-xs text-neutral-400">{player.job}</p>
+        <p className="font-semibold text-neutral-900 dark:text-white">{player.character_name}</p>
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">{player.job}</p>
       </div>
 
       <div>
         <div className="mb-1 flex justify-between text-xs">
-          <span className="text-neutral-400">HP</span>
-          <span className="font-medium text-white">
+          <span className="text-neutral-500 dark:text-neutral-400">HP</span>
+          <span className="font-medium text-neutral-900 dark:text-white">
             {stats.hp} / {stats.max_hp}
           </span>
         </div>
@@ -53,8 +53,8 @@ export default function CharacterStatus({ player }: Props) {
           { label: "DEF", value: stats.defense },
           { label: "SPD", value: stats.speed },
         ].map(({ label, value }) => (
-          <div key={label} className="rounded-md bg-white/5 py-1.5">
-            <p className="text-sm font-bold text-white">{value}</p>
+          <div key={label} className="rounded-md bg-black/5 py-1.5 dark:bg-white/5">
+            <p className="text-sm font-bold text-neutral-900 dark:text-white">{value}</p>
             <p className="text-xs text-neutral-500">{label}</p>
           </div>
         ))}

@@ -25,7 +25,7 @@ export default function ActionPanel({
   if (isSubmitting) {
     return (
       <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 text-center">
-        <div className="flex items-center justify-center gap-2 text-yellow-400">
+        <div className="flex items-center justify-center gap-2 text-yellow-600 dark:text-yellow-400">
           <span className="animate-spin text-lg">⚙</span>
           <span className="text-sm">GM이 판정 중...</span>
         </div>
@@ -35,7 +35,7 @@ export default function ActionPanel({
 
   if (!isMyTurn) {
     return (
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-center">
+      <div className="rounded-xl border border-black/10 bg-black/[0.04] p-4 text-center dark:border-white/10 dark:bg-white/5">
         <div className="flex items-center justify-center gap-2 text-neutral-500">
           <span className="animate-pulse text-lg">◌</span>
           <span className="text-sm">
@@ -48,12 +48,14 @@ export default function ActionPanel({
 
   return (
     <div className="space-y-3 rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-4">
-      <p className="text-xs font-medium text-indigo-300">당신의 턴 — 행동을 선택하세요</p>
+      <p className="text-xs font-medium text-indigo-600 dark:text-indigo-300">
+        당신의 턴 — 행동을 선택하세요
+      </p>
 
       {choicesLoading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-14 animate-pulse rounded-lg bg-white/10" />
+            <div key={i} className="h-14 animate-pulse rounded-lg bg-black/10 dark:bg-white/10" />
           ))}
         </div>
       ) : (
@@ -62,10 +64,14 @@ export default function ActionPanel({
             <button
               key={choice.id}
               onClick={() => onSubmit(choice.label, "choice")}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-left text-sm transition-colors hover:border-indigo-400/40 hover:bg-white/10"
+              className="w-full rounded-lg border border-black/10 bg-white/60 px-4 py-2.5 text-left text-sm transition-colors hover:border-indigo-400/50 hover:bg-indigo-50 dark:border-white/10 dark:bg-white/5 dark:hover:border-indigo-400/40 dark:hover:bg-white/10"
             >
-              <span className="font-medium text-white">{choice.label}</span>
-              <p className="mt-0.5 text-xs text-neutral-400">{choice.description}</p>
+              <span className="font-medium text-neutral-900 dark:text-white">
+                {choice.label}
+              </span>
+              <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                {choice.description}
+              </p>
             </button>
           ))}
         </div>
@@ -83,7 +89,7 @@ export default function ActionPanel({
             }
           }}
           placeholder="직접 입력..."
-          className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-neutral-500 outline-none focus:border-indigo-500/50"
+          className="flex-1 rounded-lg border border-black/10 bg-white/70 px-3 py-2 text-sm text-neutral-900 placeholder-neutral-400 outline-none focus:border-indigo-500/50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder-neutral-500"
         />
         <button
           onClick={() => {
