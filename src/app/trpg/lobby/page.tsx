@@ -35,8 +35,8 @@ export default function LobbyPage() {
       {/* 헤더 */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">TRPG 로비</h1>
-          <p className="mt-1 text-sm text-neutral-400">
+          <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">TRPG 로비</h1>
+          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
             참여할 방을 선택하거나 새로 만드세요
           </p>
         </div>

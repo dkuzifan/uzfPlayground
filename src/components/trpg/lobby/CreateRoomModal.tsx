@@ -68,8 +68,8 @@ export default function CreateRoomModal({
     <Modal open={open} onClose={onClose} title="방 만들기">
       {/* 방 이름 */}
       <div className="mb-5">
-        <label className="mb-1.5 block text-xs font-medium text-neutral-400">
-          방 이름 <span className="text-red-400">*</span>
+        <label className="mb-1.5 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
+          방 이름 <span className="text-red-500 dark:text-red-400">*</span>
         </label>
         <input
           type="text"
@@ -77,11 +77,11 @@ export default function CreateRoomModal({
           placeholder="예: 판타지 대모험"
           value={roomName}
           onChange={(e) => setRoomName(e.target.value)}
-          className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder-neutral-500 outline-none focus:border-yellow-500/60"
+          className="w-full rounded-lg border border-black/15 bg-white/70 px-3 py-2 text-sm text-neutral-900 placeholder-neutral-400 outline-none focus:border-yellow-500/60 dark:border-white/20 dark:bg-white/5 dark:text-white dark:placeholder-neutral-500"
           autoFocus
         />
         {roomNameError ? (
-          <p className="mt-1 text-xs text-red-400">{roomNameError}</p>
+          <p className="mt-1 text-xs text-red-500 dark:text-red-400">{roomNameError}</p>
         ) : (
           <p className="mt-1 text-xs text-neutral-500">최대 20자</p>
         )}
@@ -89,9 +89,9 @@ export default function CreateRoomModal({
 
       {/* 최대 인원 */}
       <div className="mb-6">
-        <label className="mb-2 block text-xs font-medium text-neutral-400">
+        <label className="mb-2 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
           최대 인원{" "}
-          <span className="font-bold text-yellow-400">{maxPlayers}명</span>
+          <span className="font-bold text-yellow-600 dark:text-yellow-400">{maxPlayers}명</span>
         </label>
         <input
           type="range"
@@ -99,7 +99,7 @@ export default function CreateRoomModal({
           max={7}
           value={maxPlayers}
           onChange={(e) => setMaxPlayers(Number(e.target.value))}
-          className="w-full accent-yellow-400"
+          className="w-full accent-yellow-500 dark:accent-yellow-400"
         />
         <div className="mt-1 flex justify-between text-xs text-neutral-500">
           <span>2명</span>
@@ -108,7 +108,7 @@ export default function CreateRoomModal({
       </div>
 
       {error && (
-        <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
+        <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
           {error}
         </p>
       )}

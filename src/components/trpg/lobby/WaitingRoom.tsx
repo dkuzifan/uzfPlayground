@@ -21,12 +21,9 @@ export default function WaitingRoom({ sessionId, profile }: WaitingRoomProps) {
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
 
-  // 내가 방장인지: players 중 hostPcId인 사람의 player_name이 내 nickname과 같은지
-  // 더 정확하게는 서버가 localId로 검증하지만, UI 표시용으로 players에서 찾음
-  const myPlayer = players.find((p) => p.isHost && hostPcId === p.id);
-  const amIHost = !!myPlayer && players.some(
-    (p) => p.id === hostPcId
-  ) && players.find((p) => p.id === hostPcId)?.nickname === profile.nickname;
+  const amIHost =
+    players.some((p) => p.id === hostPcId) &&
+    players.find((p) => p.id === hostPcId)?.nickname === profile.nickname;
 
   const emptySlots = Math.max(0, maxPlayers - players.length);
 
@@ -43,7 +40,6 @@ export default function WaitingRoom({ sessionId, profile }: WaitingRoomProps) {
       if (!res.ok) {
         setStartError(data.error ?? "게임 시작에 실패했습니다.");
       }
-      // 성공 시 Realtime이 자동으로 모든 참여자를 게임 화면으로 이동시킴
     } catch {
       setStartError("네트워크 오류가 발생했습니다.");
     } finally {
@@ -66,13 +62,13 @@ export default function WaitingRoom({ sessionId, profile }: WaitingRoomProps) {
         <div className="mb-1 flex items-center gap-3">
           <button
             onClick={() => router.push("/trpg/lobby")}
-            className="text-sm text-neutral-400 hover:text-white"
+            className="text-sm text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
           >
             ← 로비로
           </button>
-          <h1 className="text-2xl font-bold text-white">{roomName}</h1>
+          <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">{roomName}</h1>
         </div>
-        <p className="flex items-center gap-1.5 text-sm text-neutral-400">
+        <p className="flex items-center gap-1.5 text-sm text-neutral-500 dark:text-neutral-400">
           <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-yellow-400" />
           대기 중 · 방장이 게임을 시작하면 자동으로 이동합니다
         </p>
@@ -91,47 +87,46 @@ export default function WaitingRoom({ sessionId, profile }: WaitingRoomProps) {
             {Array.from({ length: emptySlots }).map((_, i) => (
               <div
                 key={`empty-${i}`}
-                className="flex items-center gap-3 rounded-xl border border-dashed border-white/10 px-4 py-3 opacity-40"
+                className="flex items-center gap-3 rounded-xl border border-dashed border-black/10 px-4 py-3 opacity-40 dark:border-white/10"
               >
-                <div className="h-10 w-10 flex-shrink-0 rounded-full border border-dashed border-white/20" />
-                <p className="text-sm text-neutral-500">대기 중…</p>
+                <div className="h-10 w-10 flex-shrink-0 rounded-full border border-dashed border-black/20 dark:border-white/20" />
+                <p className="text-sm text-neutral-400">대기 중…</p>
               </div>
             ))}
           </div>
         </div>
 
         {/* 사이드바 */}
-        <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+        <div className="rounded-xl border border-black/10 bg-black/[0.04] p-5 dark:border-white/10 dark:bg-white/5">
           <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">
             방 정보
           </p>
           <div className="mb-5 space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-neutral-400">방 이름</span>
-              <span className="font-medium text-white">{roomName}</span>
+              <span className="text-neutral-500 dark:text-neutral-400">방 이름</span>
+              <span className="font-medium text-neutral-900 dark:text-white">{roomName}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-neutral-400">최대 인원</span>
-              <span className="font-medium text-white">{maxPlayers}명</span>
+              <span className="text-neutral-500 dark:text-neutral-400">최대 인원</span>
+              <span className="font-medium text-neutral-900 dark:text-white">{maxPlayers}명</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-neutral-400">시나리오</span>
-              <span className="font-medium text-white">판타지 (기본)</span>
+              <span className="text-neutral-500 dark:text-neutral-400">시나리오</span>
+              <span className="font-medium text-neutral-900 dark:text-white">판타지 (기본)</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-neutral-400">상태</span>
-              <span className="flex items-center gap-1 font-medium text-yellow-400">
+              <span className="text-neutral-500 dark:text-neutral-400">상태</span>
+              <span className="flex items-center gap-1 font-medium text-yellow-600 dark:text-yellow-400">
                 <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-yellow-400" />
                 대기 중
               </span>
             </div>
           </div>
 
-          {/* 게임 시작 버튼 — 방장에게만 표시 */}
           {amIHost && (
             <>
               {startError && (
-                <p className="mb-2 text-xs text-red-400">{startError}</p>
+                <p className="mb-2 text-xs text-red-500 dark:text-red-400">{startError}</p>
               )}
               <Button
                 variant="primary"

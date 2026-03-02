@@ -13,19 +13,16 @@ export default function PlayerCard({ player }: PlayerCardProps) {
       className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
         player.isHost
           ? "border-yellow-500/30 bg-yellow-500/5"
-          : "border-white/10 bg-white/5"
+          : "border-black/10 bg-black/[0.04] dark:border-white/10 dark:bg-white/5"
       }`}
     >
-      {/* 아바타 */}
       <div className={`h-10 w-10 flex-shrink-0 rounded-full ${colorClass}`} />
-
-      {/* 닉네임 + 태그 */}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-white">{player.nickname}</p>
+        <p className="truncate text-sm font-semibold text-neutral-900 dark:text-white">
+          {player.nickname}
+        </p>
         <p className="text-xs text-neutral-500">{player.isHost ? "방장" : "참여자"}</p>
       </div>
-
-      {/* 왕관 */}
       {player.isHost && <span className="text-lg">👑</span>}
     </div>
   );
