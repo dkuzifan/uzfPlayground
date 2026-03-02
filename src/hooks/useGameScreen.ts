@@ -52,6 +52,8 @@ export function useGameScreen(sessionId: string, localId: string | null) {
   const [choicesLoading, setChoicesLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingDice, setPendingDice]   = useState<PendingDice | null>(null);
+  const [saveStatus, setSaveStatus]     = useState<"idle" | "saving" | "saved">("idle");
+  const [sessionDeleted, setSessionDeleted] = useState(false);
 
   const isMyTurn =
     !!session && !!myPlayer && session.current_turn_player_id === myPlayer.id;
@@ -137,8 +139,13 @@ export function useGameScreen(sessionId: string, localId: string | null) {
         event: "UPDATE", schema: "public", table: "Game_Session",
         filter: `id=eq.${sessionId}`,
       }, (payload) => {
+        const updated = payload.new as Partial<GameSession>;
+        if (updated.status === "abandoned") {
+          setSessionDeleted(true);
+          return;
+        }
         setSession((prev) =>
-          prev ? { ...prev, ...(payload.new as Partial<GameSession>) } : prev
+          prev ? { ...prev, ...updated } : prev
         );
       })
       .on("postgres_changes", {
@@ -253,6 +260,48 @@ export function useGameScreen(sessionId: string, localId: string | null) {
     [pendingDice, myPlayer, localId, sessionId, fetchChoices]
   );
 
+  // ── 방장 여부 ─────────────────────────────────────────────────────────
+  const amIHost = !!session && !!myPlayer && session.host_player_id === myPlayer.id;
+
+  // ── 나가기 ────────────────────────────────────────────────────────────
+  const leaveRoom = useCallback(async () => {
+    if (!localId) return;
+    await fetch(`/api/trpg/sessions/${sessionId}/leave`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ localId }),
+    });
+    router.replace("/trpg/lobby");
+  }, [sessionId, localId, router]);
+
+  // ── 저장 ──────────────────────────────────────────────────────────────
+  const saveGame = useCallback(async () => {
+    if (!localId) return;
+    setSaveStatus("saving");
+    try {
+      await fetch(`/api/trpg/sessions/${sessionId}/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ localId }),
+      });
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    } catch {
+      setSaveStatus("idle");
+    }
+  }, [sessionId, localId]);
+
+  // ── 방 제거 ───────────────────────────────────────────────────────────
+  const deleteRoom = useCallback(async () => {
+    if (!localId) return;
+    await fetch(`/api/trpg/sessions/${sessionId}/delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ localId }),
+    });
+    // 호스트 자신도 Realtime으로 abandoned 상태를 수신하여 모달이 뜸
+  }, [sessionId, localId]);
+
   return {
     session,
     scenario,
@@ -260,6 +309,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
     logs,
     myPlayer,
     isMyTurn,
+    amIHost,
     choices,
     choicesLoading,
     isSubmitting,
@@ -268,5 +318,10 @@ export function useGameScreen(sessionId: string, localId: string | null) {
     submitAction,
     pendingDice,
     resolveAndContinue,
+    saveStatus,
+    sessionDeleted,
+    leaveRoom,
+    saveGame,
+    deleteRoom,
   };
 }
