@@ -20,16 +20,16 @@ export default function PersonalityTest({ onComplete }: PersonalityTestProps) {
   const progress = Math.round((step / STEPS.length) * 100);
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-6">
+    <div className="rounded-xl border border-black/10 bg-black/[0.04] p-6 dark:border-white/10 dark:bg-white/5">
       {/* Progress */}
       <div className="mb-6">
-        <div className="mb-2 flex justify-between text-xs text-neutral-400">
+        <div className="mb-2 flex justify-between text-xs text-neutral-500 dark:text-neutral-400">
           <span>{STEPS[step]}</span>
           <span>{step + 1} / {STEPS.length}</span>
         </div>
-        <div className="h-1.5 w-full rounded-full bg-white/10">
+        <div className="h-1.5 w-full rounded-full bg-black/10 dark:bg-white/10">
           <div
-            className="h-1.5 rounded-full bg-white/50 transition-all"
+            className="h-1.5 rounded-full bg-neutral-400 transition-all dark:bg-white/50"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -44,21 +44,21 @@ export default function PersonalityTest({ onComplete }: PersonalityTestProps) {
         <button
           onClick={() => setStep((s) => Math.max(0, s - 1))}
           disabled={step === 0}
-          className="rounded-lg px-4 py-2 text-sm text-neutral-400 transition-colors hover:text-white disabled:opacity-0"
+          className="rounded-lg px-4 py-2 text-sm text-neutral-500 transition-colors hover:text-neutral-900 disabled:opacity-0 dark:text-neutral-400 dark:hover:text-white"
         >
           이전
         </button>
         {step < STEPS.length - 1 ? (
           <button
             onClick={() => setStep((s) => s + 1)}
-            className="rounded-lg bg-white/10 px-4 py-2 text-sm text-white transition-colors hover:bg-white/20"
+            className="rounded-lg bg-black/8 px-4 py-2 text-sm text-neutral-900 transition-colors hover:bg-black/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
           >
             다음
           </button>
         ) : (
           <button
             onClick={() => onComplete(answers)}
-            className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-neutral-200"
+            className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-700 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
           >
             완료
           </button>
