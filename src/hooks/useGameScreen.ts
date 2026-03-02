@@ -158,10 +158,31 @@ export function useGameScreen(sessionId: string, localId: string | null) {
     return () => { supabase.removeChannel(channel); };
   }, [sessionId]);
 
-  // ── 행동 제출 (Phase 1) ──────────────────────────────────────────────
+  // ── 행동 제출 ────────────────────────────────────────────────────────
+  // diceCheck가 있으면 → 즉시 오버레이 (Phase 1 API 생략)
+  // diceCheck 없으면  → Phase 1 API 경유 (GM이 판정 여부 결정)
   const submitAction = useCallback(
-    async (content: string, type: "choice" | "free_input") => {
+    async (
+      content: string,
+      type: "choice" | "free_input",
+      diceCheck?: { dc: number; check_label: string }
+    ) => {
       if (!myPlayer || !localId || isSubmitting) return;
+
+      // 선택지에 주사위 정보가 이미 있으면 API 없이 즉시 오버레이
+      if (diceCheck) {
+        setChoices([]);
+        setPendingDice({
+          dc: diceCheck.dc,
+          modifier: JOB_MODIFIERS[myPlayer.job] ?? 0,
+          check_label: diceCheck.check_label,
+          action_content: content,
+          action_type: type,
+        });
+        return;
+      }
+
+      // 주사위 정보 없음 → Phase 1 API (GM 판정 + 필요 시 오버레이)
       setIsSubmitting(true);
       setChoices([]);
       try {

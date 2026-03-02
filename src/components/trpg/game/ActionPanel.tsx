@@ -9,7 +9,11 @@ interface Props {
   choices: ActionChoice[];
   choicesLoading: boolean;
   isSubmitting: boolean;
-  onSubmit: (content: string, type: "choice" | "free_input") => Promise<void>;
+  onSubmit: (
+    content: string,
+    type: "choice" | "free_input",
+    diceCheck?: { dc: number; check_label: string }
+  ) => Promise<void>;
 }
 
 export default function ActionPanel({
@@ -63,12 +67,19 @@ export default function ActionPanel({
           {choices.map((choice) => (
             <button
               key={choice.id}
-              onClick={() => onSubmit(choice.label, "choice")}
+              onClick={() => onSubmit(choice.label, "choice", choice.dice_check)}
               className="w-full rounded-lg border border-black/10 bg-white/60 px-4 py-2.5 text-left text-sm transition-colors hover:border-indigo-400/50 hover:bg-indigo-50 dark:border-white/10 dark:bg-white/5 dark:hover:border-indigo-400/40 dark:hover:bg-white/10"
             >
-              <span className="font-medium text-neutral-900 dark:text-white">
-                {choice.label}
-              </span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-neutral-900 dark:text-white">
+                  {choice.label}
+                </span>
+                {choice.dice_check && (
+                  <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:bg-amber-400/15 dark:text-amber-400">
+                    ⚄ {choice.dice_check.dc} 이상 시 성공
+                  </span>
+                )}
+              </div>
               <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                 {choice.description}
               </p>

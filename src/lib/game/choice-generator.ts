@@ -35,10 +35,19 @@ ${currentSituation}
 이 캐릭터의 성향에 맞는 행동 선택지 3개를 생성하세요.
 각 선택지는 서로 다른 접근 방식을 나타내야 합니다.
 
+## 주사위 판정 여부 결정
+각 선택지에 대해 d20 주사위 판정이 필요한지 판단하세요.
+- 판정 필요: 전투, 공격, 회피, 도주, 잠입, 설득, 협박, 수색, 물리적 도전, 위험한 행동
+- 판정 불필요: 대화, 단순 이동, 관찰, 정보 확인, 일상 행동
+
+판정이 필요한 선택지에는 "dice_check" 필드를 추가하세요.
+DC 기준: 쉬움 8~10 / 보통 12~14 / 어려움 15~17 / 매우 어려움 18~20
+check_label 예시: "전투 판정", "회피 판정", "설득 판정", "잠입 판정", "수색 판정"
+
 JSON 배열로만 응답하세요:
 [
   { "id": "choice_1", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice" },
-  { "id": "choice_2", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice" },
+  { "id": "choice_2", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice", "dice_check": { "dc": 13, "check_label": "전투 판정" } },
   { "id": "choice_3", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice" }
 ]
 `.trim();

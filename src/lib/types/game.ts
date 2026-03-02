@@ -193,6 +193,10 @@ export interface ActionChoice {
   label: string;
   description: string;
   action_type: "choice";
+  dice_check?: {
+    dc: number;
+    check_label: string;
+  };
 }
 
 // ── Real-time Events ──────────────────────────────────────
