@@ -40,6 +40,16 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
   const session = rawSession as { id: string; max_players: number; status: string };
   if (session.status !== "waiting") {
+    // 이미 시작된 방이라도 기존 멤버라면 200 OK (멱등적 처리)
+    const { data: existing } = await supabase
+      .from("Player_Character")
+      .select("id")
+      .eq("session_id", sessionId)
+      .eq("user_id", localId)
+      .single();
+    if (existing) {
+      return NextResponse.json({ ok: true });
+    }
     return NextResponse.json({ error: "이미 시작된 방입니다." }, { status: 404 });
   }
 

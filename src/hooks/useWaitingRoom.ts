@@ -129,8 +129,7 @@ export function useWaitingRoom(sessionId: string, localId: string) {
     init();
 
     return () => {
-      const supabaseClient = createClient();
-      channelsRef.current.forEach((ch) => supabaseClient.removeChannel(ch));
+      channelsRef.current.forEach((ch) => supabase.removeChannel(ch));
       channelsRef.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

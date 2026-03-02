@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { buildTurnOrder } from "@/lib/game/turn-manager";
 
 interface RouteParams {
   params: Promise<{ sessionId: string }>;
@@ -45,10 +46,26 @@ export async function POST(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "방장만 게임을 시작할 수 있습니다." }, { status: 403 });
   }
 
-  // status → in_progress
+  // 참여 중인 플레이어 목록 조회 → turn_order 구성
+  const { data: pcs } = await supabase
+    .from("Player_Character")
+    .select("id")
+    .eq("session_id", sessionId)
+    .eq("is_active", true);
+
+  const playerIds = (pcs ?? []).map((p) => p.id);
+  const turnOrder = buildTurnOrder(playerIds, []);
+  const firstTurnPlayerId = turnOrder[0]?.id ?? null;
+
+  // status → in_progress + turn_order + current_turn_player_id 초기화
   const { error: updateError } = await supabase
     .from("Game_Session")
-    .update({ status: "in_progress" })
+    .update({
+      status: "in_progress",
+      turn_order: turnOrder,
+      current_turn_player_id: firstTurnPlayerId,
+      turn_number: 1,
+    })
     .eq("id", sessionId);
 
   if (updateError) {
