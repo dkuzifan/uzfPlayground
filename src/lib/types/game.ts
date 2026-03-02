@@ -141,6 +141,19 @@ export interface DiceRoll {
   label: string;     // 예: "판정"
 }
 
+export interface DiceCheckInfo {
+  dc: number;
+  check_label: string;  // "전투 판정", "설득 판정" 등
+}
+
+export interface DiceResolveResult {
+  rolled: number;
+  modifier: number;
+  total: number;
+  dc: number;
+  outcome: ActionOutcome;
+}
+
 export interface HpChange {
   target_id: string;
   name: string;

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { ActionLog, ActionChoice, RawPlayer, GameSession, Scenario } from "@/lib/types/game";
+import type { ActionLog, ActionChoice, RawPlayer, GameSession, Scenario, DiceResolveResult } from "@/lib/types/game";
 
 const FALLBACK_CHOICES: ActionChoice[] = [
   {
@@ -26,6 +26,13 @@ const FALLBACK_CHOICES: ActionChoice[] = [
   },
 ];
 
+export interface PendingDice {
+  dc: number;
+  check_label: string;
+  action_content: string;
+  action_type: "choice" | "free_input";
+}
+
 export function useGameScreen(sessionId: string, localId: string | null) {
   const router = useRouter();
   const [session, setSession] = useState<GameSession | null>(null);
@@ -38,6 +45,8 @@ export function useGameScreen(sessionId: string, localId: string | null) {
   const [choices, setChoices] = useState<ActionChoice[]>([]);
   const [choicesLoading, setChoicesLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingDice, setPendingDice] = useState<PendingDice | null>(null);
+  const [diceResult, setDiceResult] = useState<DiceResolveResult | null>(null);
 
   const isMyTurn =
     !!session && !!myPlayer && session.current_turn_player_id === myPlayer.id;
@@ -172,13 +181,14 @@ export function useGameScreen(sessionId: string, localId: string | null) {
     };
   }, [sessionId]);
 
-  // ── 행동 제출 ────────────────────────────────────────────────────────
+  // ── 행동 제출 (Phase 1) ──────────────────────────────────────────────
   const submitAction = useCallback(
     async (content: string, type: "choice" | "free_input") => {
       if (!myPlayer || !localId || isSubmitting) return;
       setIsSubmitting(true);
+      setChoices([]);
       try {
-        await fetch("/api/trpg/game/action", {
+        const res = await fetch("/api/trpg/game/action", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -189,12 +199,67 @@ export function useGameScreen(sessionId: string, localId: string | null) {
             content,
           }),
         });
-      } finally {
+        if (!res.ok) {
+          setIsSubmitting(false);
+          return;
+        }
+        const data = await res.json();
+
+        if (data.needs_dice_check) {
+          // Phase 1: 주사위 판정 필요 → 오버레이 표시
+          setPendingDice({
+            dc: data.dc,
+            check_label: data.check_label,
+            action_content: content,
+            action_type: type,
+          });
+          setIsSubmitting(false);
+        } else {
+          // 판정 불필요 → 기존 플로우
+          await fetchChoices(sessionId, myPlayer.id, localId);
+          setIsSubmitting(false);
+        }
+      } catch {
         setIsSubmitting(false);
       }
     },
-    [sessionId, myPlayer, localId, isSubmitting]
+    [sessionId, myPlayer, localId, isSubmitting, fetchChoices]
   );
+
+  // ── 주사위 판정 실행 (Phase 2) ────────────────────────────────────────
+  const resolveDice = useCallback(async () => {
+    if (!pendingDice || !myPlayer || !localId) return;
+    try {
+      const res = await fetch("/api/trpg/game/action/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          player_id: myPlayer.id,
+          local_id: localId,
+          action_content: pendingDice.action_content,
+          action_type: pendingDice.action_type,
+          dc: pendingDice.dc,
+        }),
+      });
+      if (!res.ok) return;
+      const data = await res.json() as DiceResolveResult;
+      setDiceResult(data);
+    } catch {
+      // 실패 시 오버레이 닫기
+      setPendingDice(null);
+      setDiceResult(null);
+    }
+  }, [pendingDice, myPlayer, localId, sessionId]);
+
+  // ── 오버레이 닫기 + 선택지 갱신 ─────────────────────────────────────
+  const clearDiceResult = useCallback(() => {
+    setPendingDice(null);
+    setDiceResult(null);
+    if (myPlayer && localId) {
+      fetchChoices(sessionId, myPlayer.id, localId);
+    }
+  }, [myPlayer, localId, sessionId, fetchChoices]);
 
   return {
     session,
@@ -209,5 +274,9 @@ export function useGameScreen(sessionId: string, localId: string | null) {
     loading,
     error,
     submitAction,
+    pendingDice,
+    diceResult,
+    resolveDice,
+    clearDiceResult,
   };
 }

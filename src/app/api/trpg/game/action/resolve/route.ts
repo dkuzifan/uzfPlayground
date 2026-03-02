@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { runGmAction, checkDiceNeed } from "@/lib/gemini/gm-agent";
+import { runGmAction } from "@/lib/gemini/gm-agent";
 import { getNextTurn } from "@/lib/game/turn-manager";
 import type { ActionOutcome, DiceRoll, HpChange, RawPlayer, GameSession, ActionLog } from "@/lib/types/game";
 
@@ -20,21 +20,22 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
 
-    const { session_id, player_id, local_id, action_type, content } = body as {
+    const { session_id, player_id, local_id, action_content, action_type, dc } = body as {
       session_id?: string;
       player_id?: string;
       local_id?: string;
+      action_content?: string;
       action_type?: string;
-      content?: string;
+      dc?: number;
     };
 
-    if (!session_id || !player_id || !local_id || !action_type || !content) {
+    if (!session_id || !player_id || !local_id || !action_content || !action_type || dc === undefined) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
     const supabase = createServiceClient();
 
-    // ── Step 1: 검증 ──────────────────────────────────────────────────
+    // ── 검증 ──────────────────────────────────────────────────────────
     const { data: sessionData, error: sessionError } = (await supabase
       .from("Game_Session")
       .select("*")
@@ -72,7 +73,39 @@ export async function POST(req: NextRequest) {
     const session = sessionData;
     const player = playerData;
 
-    // ── Step 2: 주사위 판정 필요 여부 확인 ──────────────────────────
+    // ── 서버 사이드 d20 롤 ─────────────────────────────────────────────
+    const d20 = Math.ceil(Math.random() * 20);
+    const modifier = JOB_MODIFIERS[player.job] ?? 0;
+    const total = d20 + modifier;
+
+    let outcome: ActionOutcome;
+    if (d20 === 20) outcome = "critical_success";
+    else if (total >= dc + 5) outcome = "success";
+    else if (total >= dc) outcome = "partial";
+    else outcome = "failure";
+
+    const diceRoll: DiceRoll = { rolled: d20, modifier, total, label: "판정" };
+
+    // ── 플레이어 Action_Log INSERT ────────────────────────────────────
+    await supabase.from("Action_Log").insert({
+      session_id,
+      turn_number: session.turn_number,
+      speaker_type: "player",
+      speaker_id: player_id,
+      speaker_name: player.player_name,
+      action_type: action_type as "choice" | "free_input",
+      content: action_content,
+      outcome,
+      state_changes: { dice_roll: diceRoll },
+    });
+
+    // ── Gemini GM 호출 ─────────────────────────────────────────────────
+    const { data: scenario } = await supabase
+      .from("Scenario")
+      .select("gm_system_prompt, fixed_truths")
+      .eq("id", session.scenario_id)
+      .single();
+
     const { data: recentLogsData } = await supabase
       .from("Action_Log")
       .select("*")
@@ -81,52 +114,6 @@ export async function POST(req: NextRequest) {
       .limit(10);
 
     const recentLogs = ((recentLogsData ?? []).reverse()) as unknown as ActionLog[];
-
-    const diceNeed = await checkDiceNeed(content, recentLogs);
-
-    if (diceNeed.needs_check) {
-      // Phase 1 종료: 클라이언트에게 주사위 판정 필요 알림
-      return NextResponse.json({
-        needs_dice_check: true,
-        dc: diceNeed.dc ?? 13,
-        check_label: diceNeed.label ?? "판정",
-      });
-    }
-
-    // ── needs_check: false → 기존 플로우 (d20 롤 + GM 서사 + 턴 전진) ──
-
-    // d20 서버 롤
-    const d20 = Math.ceil(Math.random() * 20);
-    const modifier = JOB_MODIFIERS[player.job] ?? 0;
-    const total = d20 + modifier;
-
-    let outcome: ActionOutcome;
-    if (d20 === 20) outcome = "critical_success";
-    else if (total >= 15) outcome = "success";
-    else if (total >= 10) outcome = "partial";
-    else outcome = "failure";
-
-    const diceRoll: DiceRoll = { rolled: d20, modifier, total, label: "판정" };
-
-    // 플레이어 Action_Log INSERT
-    await supabase.from("Action_Log").insert({
-      session_id,
-      turn_number: session.turn_number,
-      speaker_type: "player",
-      speaker_id: player_id,
-      speaker_name: player.player_name,
-      action_type: action_type as "choice" | "free_input",
-      content,
-      outcome,
-      state_changes: { dice_roll: diceRoll },
-    });
-
-    // Gemini GM 호출
-    const { data: scenario } = await supabase
-      .from("Scenario")
-      .select("gm_system_prompt, fixed_truths")
-      .eq("id", session.scenario_id)
-      .single();
 
     let gmNarration = "GM이 잠시 자리를 비웠습니다. 다음 플레이어로 턴을 넘깁니다.";
     let gmStateChanges: Array<{ target_id: string; hp_delta: number }> = [];
@@ -139,7 +126,7 @@ export async function POST(req: NextRequest) {
         fixedTruths: (scenario?.fixed_truths as Record<string, unknown>) ?? {},
         recentLogs,
         actingPlayer: player,
-        action: content,
+        action: action_content,
         actionType: action_type as "choice" | "free_input",
         diceRoll,
         outcome,
@@ -168,10 +155,10 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", session_id);
-      return NextResponse.json({ ok: true, outcome, dice_roll: diceRoll });
+      return NextResponse.json({ rolled: d20, modifier, total, dc, outcome });
     }
 
-    // HP 변환 + GM Action_Log INSERT
+    // ── HP 변환 + GM Action_Log INSERT ────────────────────────────────
     const hpChanges: HpChange[] = [];
 
     if (geminiSucceeded) {
@@ -212,7 +199,7 @@ export async function POST(req: NextRequest) {
       state_changes: { hp_changes: hpChanges },
     });
 
-    // HP 업데이트
+    // ── HP 업데이트 ──────────────────────────────────────────────────
     for (const hpChange of hpChanges) {
       const { data: target } = await supabase
         .from("Player_Character")
@@ -232,7 +219,7 @@ export async function POST(req: NextRequest) {
         .eq("id", hpChange.target_id);
     }
 
-    // 턴 전진
+    // ── 턴 전진 ────────────────────────────────────────────────────
     const nextTurn = getNextTurn(session);
     await supabase
       .from("Game_Session")
@@ -243,7 +230,7 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", session_id);
 
-    return NextResponse.json({ ok: true, outcome, dice_roll: diceRoll });
+    return NextResponse.json({ rolled: d20, modifier, total, dc, outcome });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

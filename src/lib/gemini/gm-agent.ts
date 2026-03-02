@@ -1,6 +1,62 @@
 import { getGeminiModel } from "./client";
 import type { ActionLog, ActionOutcome, DiceRoll, RawPlayer } from "@/lib/types/game";
 
+// ── checkDiceNeed ─────────────────────────────────────────────────────────────
+
+export interface DiceNeedResult {
+  needs_check: boolean;
+  dc?: number;
+  label?: string;
+}
+
+export async function checkDiceNeed(
+  actionContent: string,
+  recentLogs: ActionLog[]
+): Promise<DiceNeedResult> {
+  const model = getGeminiModel();
+
+  const recentHistory =
+    recentLogs
+      .slice(-5)
+      .map((log) => `[${log.speaker_name}]: ${log.content}`)
+      .join("\n") || "(없음)";
+
+  const prompt = `당신은 TRPG 게임 마스터입니다. 플레이어 행동이 주사위 판정(d20)이 필요한지 판단하십시오.
+
+## 최근 행동 기록
+${recentHistory}
+
+## 플레이어 행동
+${actionContent}
+
+## 판정 기준
+- 판정 필요: 전투, 공격, 방어, 회피, 도주, 잠입, 설득, 협박, 위협, 수색, 자물쇠 따기, 물리적 도전, 위험한 행동
+- 판정 불필요: 대화, 단순 이동, 관찰, 정보 확인, 일상 행동
+
+## DC 기준
+- 쉬움 (8~10): 기본적인 신체 동작, 익숙한 기술
+- 보통 (12~14): 표준적인 전투 행동, 일반적인 설득
+- 어려움 (15~17): 숙련된 기술이 필요한 행동, 강적과의 전투
+- 매우 어려움 (18~20): 극한의 상황, 강력한 적
+
+반드시 아래 JSON 형식으로만 응답하십시오:
+{"needs_check": true, "dc": 13, "label": "전투 판정"}
+또는
+{"needs_check": false}`;
+
+  try {
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
+    });
+    const text = result.response.text();
+    return JSON.parse(text) as DiceNeedResult;
+  } catch {
+    // Gemini 실패 시 판정 불필요로 처리 (플로우 중단 방지)
+    return { needs_check: false };
+  }
+}
+
 // Gemini가 실제로 반환하는 형태 (outcome은 서버 확정이므로 제외)
 interface GmRawResponse {
   narration: string;
@@ -47,7 +103,8 @@ function buildSystemInstruction(scenarioSystemPrompt: string): string {
 ## 제약
 - JSON 이외의 텍스트를 출력하지 마십시오.
 - outcome 필드는 반환하지 마십시오. 판정 결과는 이미 서버에서 확정되었습니다.
-- HP 변화가 없으면 state_changes는 빈 배열 []을 반환하십시오.`;
+- HP 변화가 없으면 state_changes는 빈 배열 []을 반환하십시오.
+- 캐릭터 이름은 입력된 표기를 절대 변경하지 마십시오. 로마자, 한자, 특수문자 등 언어·문자 종류에 관계없이 주어진 이름을 그대로 사용하십시오. 번역·발음 표기·변환 금지.`;
 }
 
 function buildContext(input: GmActionInput): string {
@@ -74,7 +131,7 @@ function buildContext(input: GmActionInput): string {
 ${recentHistory}
 
 ## 행동하는 캐릭터
-- 이름: ${actingPlayer.character_name}
+- 이름: ${actingPlayer.character_name} (이 이름을 그대로 사용할 것. 번역·변환 금지)
 - 직업: ${actingPlayer.job}
 - HP: ${actingPlayer.stats.hp}/${actingPlayer.stats.max_hp}
 

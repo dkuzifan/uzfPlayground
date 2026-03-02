@@ -8,6 +8,7 @@ import ActionPanel from "@/components/trpg/game/ActionPanel";
 import CharacterStatus from "@/components/trpg/game/CharacterStatus";
 import TurnIndicator from "@/components/trpg/game/TurnIndicator";
 import PlayerList from "@/components/trpg/game/PlayerList";
+import DiceRollOverlay from "@/components/trpg/game/DiceRollOverlay";
 
 export default function GamePage() {
   const params = useParams();
@@ -27,6 +28,10 @@ export default function GamePage() {
     loading,
     error,
     submitAction,
+    pendingDice,
+    diceResult,
+    resolveDice,
+    clearDiceResult,
   } = useGameScreen(sessionId, localId);
 
   if (loading) {
@@ -50,33 +55,45 @@ export default function GamePage() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-56px)] gap-4 p-4">
-      {/* 좌: 채팅 로그 + 행동 패널 */}
-      <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <ChatLog logs={logs} />
-        <ActionPanel
-          isMyTurn={isMyTurn}
-          currentTurnName={currentTurnPlayer?.player_name ?? ""}
-          choices={choices}
-          choicesLoading={choicesLoading}
-          isSubmitting={isSubmitting}
-          onSubmit={submitAction}
-        />
+    <>
+      <div className="flex h-[calc(100vh-56px)] gap-4 p-4">
+        {/* 좌: 채팅 로그 + 행동 패널 */}
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <ChatLog logs={logs} />
+          <ActionPanel
+            isMyTurn={isMyTurn}
+            currentTurnName={currentTurnPlayer?.player_name ?? ""}
+            choices={choices}
+            choicesLoading={choicesLoading}
+            isSubmitting={isSubmitting}
+            onSubmit={submitAction}
+          />
+        </div>
+
+        {/* 우: 사이드바 */}
+        <div className="flex w-64 flex-shrink-0 flex-col gap-4">
+          <CharacterStatus player={myPlayer} />
+          <TurnIndicator
+            currentTurnName={currentTurnPlayer?.player_name ?? ""}
+            isMyTurn={isMyTurn}
+          />
+          <PlayerList
+            players={players}
+            currentTurnPlayerId={session?.current_turn_player_id ?? null}
+            myPlayerId={myPlayer?.id ?? null}
+          />
+        </div>
       </div>
 
-      {/* 우: 사이드바 */}
-      <div className="flex w-64 flex-shrink-0 flex-col gap-4">
-        <CharacterStatus player={myPlayer} />
-        <TurnIndicator
-          currentTurnName={currentTurnPlayer?.player_name ?? ""}
-          isMyTurn={isMyTurn}
+      {pendingDice && (
+        <DiceRollOverlay
+          dc={pendingDice.dc}
+          checkLabel={pendingDice.check_label}
+          onRoll={resolveDice}
+          diceResult={diceResult}
+          onClose={clearDiceResult}
         />
-        <PlayerList
-          players={players}
-          currentTurnPlayerId={session?.current_turn_player_id ?? null}
-          myPlayerId={myPlayer?.id ?? null}
-        />
-      </div>
-    </div>
+      )}
+    </>
   );
 }
