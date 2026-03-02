@@ -20,16 +20,17 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
 
-    const { session_id, player_id, local_id, action_content, action_type, dc } = body as {
+    const { session_id, player_id, local_id, action_content, action_type, dc, rolled } = body as {
       session_id?: string;
       player_id?: string;
       local_id?: string;
       action_content?: string;
       action_type?: string;
       dc?: number;
+      rolled?: number;
     };
 
-    if (!session_id || !player_id || !local_id || !action_content || !action_type || dc === undefined) {
+    if (!session_id || !player_id || !local_id || !action_content || !action_type || dc === undefined || rolled === undefined) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -73,8 +74,8 @@ export async function POST(req: NextRequest) {
     const session = sessionData;
     const player = playerData;
 
-    // ── 서버 사이드 d20 롤 ─────────────────────────────────────────────
-    const d20 = Math.ceil(Math.random() * 20);
+    // ── 클라이언트가 보낸 d20 값 사용 (범위 클램프) ───────────────────
+    const d20 = Math.min(20, Math.max(1, Math.round(rolled)));
     const modifier = JOB_MODIFIERS[player.job] ?? 0;
     const total = d20 + modifier;
 

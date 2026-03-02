@@ -29,9 +29,7 @@ export default function GamePage() {
     error,
     submitAction,
     pendingDice,
-    diceResult,
-    resolveDice,
-    clearDiceResult,
+    resolveAndContinue,
   } = useGameScreen(sessionId, localId);
 
   if (loading) {
@@ -88,10 +86,9 @@ export default function GamePage() {
       {pendingDice && (
         <DiceRollOverlay
           dc={pendingDice.dc}
+          modifier={pendingDice.modifier}
           checkLabel={pendingDice.check_label}
-          onRoll={resolveDice}
-          diceResult={diceResult}
-          onClose={clearDiceResult}
+          onClose={resolveAndContinue}
         />
       )}
     </>
