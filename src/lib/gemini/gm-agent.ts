@@ -79,7 +79,7 @@ export async function runGmAction(input: GmActionInput): Promise<GmRawResponse> 
   const model = getGeminiModel();
 
   const result = await model.generateContent({
-    systemInstruction: buildSystemInstruction(input.scenarioSystemPrompt),
+    systemInstruction: buildSystemInstruction(input.scenarioSystemPrompt, input.actingPlayer.character_name),
     contents: [{ role: "user", parts: [{ text: buildContext(input) }] }],
     generationConfig: { responseMimeType: "application/json" },
   });
@@ -88,8 +88,14 @@ export async function runGmAction(input: GmActionInput): Promise<GmRawResponse> 
   return JSON.parse(text) as GmRawResponse;
 }
 
-function buildSystemInstruction(scenarioSystemPrompt: string): string {
-  return `${scenarioSystemPrompt}
+function buildSystemInstruction(scenarioSystemPrompt: string, characterName: string): string {
+  return `## [최우선 규칙] 고유명사 원문 표기 강제
+이 세션의 플레이어 캐릭터 이름은 정확히 "${characterName}" 입니다.
+나레이션에서 이 이름을 반드시 "${characterName}" 그대로 사용하십시오.
+어떤 이유로도 한글 발음 표기, 번역, 변환, 축약, 변형을 해서는 안 됩니다.
+다른 문자 체계(한글 등)로 바꾸는 것은 엄격히 금지됩니다.
+
+${scenarioSystemPrompt}
 
 ## 응답 형식 (반드시 JSON으로만 응답)
 {
@@ -104,7 +110,7 @@ function buildSystemInstruction(scenarioSystemPrompt: string): string {
 - JSON 이외의 텍스트를 출력하지 마십시오.
 - outcome 필드는 반환하지 마십시오. 판정 결과는 이미 서버에서 확정되었습니다.
 - HP 변화가 없으면 state_changes는 빈 배열 []을 반환하십시오.
-- 캐릭터 이름은 입력된 표기를 절대 변경하지 마십시오. 로마자, 한자, 특수문자 등 언어·문자 종류에 관계없이 주어진 이름을 그대로 사용하십시오. 번역·발음 표기·변환 금지.`;
+- 캐릭터 이름 "${characterName}"은 절대 변경하지 마십시오.`;
 }
 
 function buildContext(input: GmActionInput): string {
@@ -131,12 +137,12 @@ function buildContext(input: GmActionInput): string {
 ${recentHistory}
 
 ## 행동하는 캐릭터
-- 이름: ${actingPlayer.character_name} (이 이름을 그대로 사용할 것. 번역·변환 금지)
+- 이름(원문 그대로 사용): "${actingPlayer.character_name}"
 - 직업: ${actingPlayer.job}
 - HP: ${actingPlayer.stats.hp}/${actingPlayer.stats.max_hp}
 
 ## 현재 행동
-[${actingPlayer.character_name}]: ${action}
+["${actingPlayer.character_name}"]: ${action}
 
 ## 판정 결과 (서버 확정)
 - 주사위: d20=${diceRoll.rolled} + 보너스=${diceRoll.modifier} = ${diceRoll.total}
