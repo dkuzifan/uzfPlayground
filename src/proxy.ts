@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
 // 인증 없이 접근 가능한 경로
 const PUBLIC_PATHS = ["/login", "/auth/callback", "/pin", "/api/auth/verify-pin"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 공개 경로는 그대로 통과
@@ -13,7 +13,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
-  // Supabase 세션 확인 — @supabase/ssr 권장 패턴
+  // Supabase 세션 확인 — @supabase/ssr Next.js 16 패턴
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -25,8 +25,9 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
+          // request.cookies.set은 객체 형태로만 options 지원
           cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value, options)
+            request.cookies.set({ name, value, ...options })
           );
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
