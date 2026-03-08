@@ -1,11 +1,14 @@
 import { getGeminiModel } from "./client";
 import type { ActionLog, ActionOutcome, DiceRoll, RawPlayer } from "@/lib/types/game";
+import type { ActionCategory } from "@/lib/game/dc-calculator";
 
 // ── checkDiceNeed ─────────────────────────────────────────────────────────────
+// AI는 판정 필요 여부와 행동 카테고리만 결정합니다.
+// DC는 dc-calculator.ts에서 NPC resistance_stats를 기반으로 deterministic하게 계산합니다.
 
 export interface DiceNeedResult {
   needs_check: boolean;
-  dc?: number;
+  action_category?: ActionCategory;
   label?: string;
 }
 
@@ -21,7 +24,7 @@ export async function checkDiceNeed(
       .map((log) => `[${log.speaker_name}]: ${log.content}`)
       .join("\n") || "(없음)";
 
-  const prompt = `당신은 TRPG 게임 마스터입니다. 플레이어 행동이 주사위 판정(d20)이 필요한지 판단하십시오.
+  const prompt = `당신은 TRPG 게임 마스터입니다. 플레이어 행동을 분류하십시오.
 
 ## 최근 행동 기록
 ${recentHistory}
@@ -29,20 +32,22 @@ ${recentHistory}
 ## 플레이어 행동
 ${actionContent}
 
-## 판정 기준
-- 판정 필요: 전투, 공격, 방어, 회피, 도주, 잠입, 설득, 협박, 위협, 수색, 자물쇠 따기, 물리적 도전, 위험한 행동
-- 판정 불필요: 대화, 단순 이동, 관찰, 정보 확인, 일상 행동
+## 행동 카테고리 (하나를 선택)
+- attack: 물리적 공격, 격투, 무기 사용
+- threaten: 위협, 협박, 공갈, 무력 과시
+- persuade: 설득, 유혹, 매력, 협상, 애원
+- deceive: 거짓말, 속임수, 변장, 위장
+- stealth: 은신, 잠입, 도둑질, 몰래 행동
+- gift: 선물, 호의, 치유, 도움 제공
+- none: 대화, 이동, 관찰, 정보 확인, 일상 행동
 
-## DC 기준
-- 쉬움 (8~10): 기본적인 신체 동작, 익숙한 기술
-- 보통 (12~14): 표준적인 전투 행동, 일반적인 설득
-- 어려움 (15~17): 숙련된 기술이 필요한 행동, 강적과의 전투
-- 매우 어려움 (18~20): 극한의 상황, 강력한 적
+판정 필요(needs_check: true): attack, threaten, persuade, deceive, stealth
+판정 불필요(needs_check: false): gift, none
 
 반드시 아래 JSON 형식으로만 응답하십시오:
-{"needs_check": true, "dc": 13, "label": "전투 판정"}
+{"needs_check": true, "action_category": "attack", "label": "전투 판정"}
 또는
-{"needs_check": false}`;
+{"needs_check": false, "action_category": "none"}`;
 
   try {
     const result = await model.generateContent({
@@ -53,7 +58,7 @@ ${actionContent}
     return JSON.parse(text) as DiceNeedResult;
   } catch {
     // Gemini 실패 시 판정 불필요로 처리 (플로우 중단 방지)
-    return { needs_check: false };
+    return { needs_check: false, action_category: "none" };
   }
 }
 

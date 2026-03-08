@@ -1,22 +1,74 @@
-import type { NpcPersona } from "@/lib/types/game";
+// ============================================================
+// NPC System Prompt: buildNpcPrompt 래퍼
+// ============================================================
+// npc-agent.ts에서 호출하는 진입점입니다.
+// 단순 NPC 데이터만 있는 경우(기존 레거시 호환)와
+// 전체 v2 컨텍스트가 있는 경우를 모두 지원합니다.
+// ============================================================
 
-export function buildNpcSystemPrompt(npc: NpcPersona): string {
-  return `
-당신은 TRPG 세계에 존재하는 캐릭터 "${npc.name}"입니다.
+import type { NpcPersona, NpcMemory } from "@/lib/types/game";
+import type { NpcDynamicState, SpeciesInfo } from "@/lib/types/character";
+import { buildNpcPrompt, type NpcPromptInput, type LoreContext } from "@/lib/game/npc-prompt-builder";
+import { computeAgeMatrix } from "@/lib/game/age-matrix";
 
-## 캐릭터 정보
-- 역할: ${npc.role}
-- 외형: ${npc.appearance ?? "알 수 없음"}
-- 성격: ${npc.personality ?? "알 수 없음"}
-- MBTI: ${npc.mbti ?? "알 수 없음"}
-- D&D 성향: ${npc.dnd_alignment ?? "알 수 없음"}
+// 기본 NpcDynamicState (v2 데이터 없을 때 사용)
+function defaultDynamicState(): NpcDynamicState {
+  return {
+    current_mood: "평온",
+    mental_stress: 20,
+    physical_fatigue: 10,
+    fear_survival: 5,
+    self_image_management: 30,
+    mob_mentality: 20,
+    affinity: 0,
+    trust: 0,
+    power_dynamics: "대등한 관계",
+    personal_debt: 0,
+    sense_of_duty: 30,
+    camaraderie: 0,
+  };
+}
 
-## 행동 지침
-${npc.system_prompt}
+// 기본 SpeciesInfo (v2 종족 데이터 없을 때 사용)
+function defaultSpeciesInfo(): SpeciesInfo {
+  return {
+    species_name: "인간",
+    current_age: 25,
+    expected_lifespan: 80,
+    size_category: "표준형",
+  };
+}
 
-## 제약
-- 당신은 철저히 이 캐릭터로서만 발화해야 합니다.
-- 게임 시스템, 판정, 규칙에 대해 절대 언급하지 마십시오.
-- 당신은 GM이 아닙니다. NPC로서 대화하십시오.
-`.trim();
+// 빈 LoreContext
+function emptyLore(): LoreContext {
+  return { currentLoreTexts: [], pendingQueueNames: [] };
+}
+
+// ── 풀 컨텍스트 빌드 (v2) ────────────────────────────────────
+
+export function buildNpcSystemPrompt(
+  npc: NpcPersona,
+  options?: {
+    playerName?: string;
+    playerSpeciesInfo?: SpeciesInfo;
+    dynamicState?: NpcDynamicState;
+    memories?: NpcMemory[];
+    lore?: LoreContext;
+  }
+): string {
+  const playerSpeciesInfo = options?.playerSpeciesInfo ?? defaultSpeciesInfo();
+  const dynamicState = options?.dynamicState ?? defaultDynamicState();
+  const ageMatrix = computeAgeMatrix(npc.species_info, playerSpeciesInfo);
+
+  const promptInput: NpcPromptInput = {
+    npc,
+    playerSpeciesInfo,
+    dynamicState,
+    ageMatrix,
+    triggeredTaste: null, // 취향 트리거는 action route에서 계산 후 주입
+    memories: options?.memories ?? [],
+    lore: options?.lore ?? emptyLore(),
+  };
+
+  return buildNpcPrompt(promptInput, options?.playerName ?? "플레이어");
 }

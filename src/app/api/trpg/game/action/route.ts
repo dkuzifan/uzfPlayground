@@ -1,8 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { runGmAction, checkDiceNeed } from "@/lib/gemini/gm-agent";
+import { runNpcDialogue } from "@/lib/gemini/npc-agent";
 import { getNextTurn } from "@/lib/game/turn-manager";
-import type { HpChange, RawPlayer, GameSession, ActionLog } from "@/lib/types/game";
+import { computeDCFromCategory, defaultResistanceStats } from "@/lib/game/dc-calculator";
+import { applyTasteModifiers, buildBaseDeltas } from "@/lib/game/taste-modifier-engine";
+import { runMemorySummarize } from "@/lib/game/memory-pipeline";
+import { scanAndExtractLore } from "@/lib/game/lore-engine";
+import type { WorldDictionaryEntry } from "@/lib/game/lore-engine";
+import type { HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory } from "@/lib/types/game";
+import type { NpcDynamicState } from "@/lib/types/character";
+
+// ── NPC 감정 상태 초기값 ──────────────────────────────────────────────────────
+function defaultDynamicState(): NpcDynamicState {
+  return {
+    current_mood: "평온",
+    mental_stress: 20,
+    physical_fatigue: 10,
+    fear_survival: 5,
+    self_image_management: 30,
+    mob_mentality: 20,
+    affinity: 0,
+    trust: 0,
+    power_dynamics: "대등한 관계",
+    personal_debt: 0,
+    sense_of_duty: 30,
+    camaraderie: 0,
+  };
+}
+
+function clamp(val: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, val));
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,7 +52,7 @@ export async function POST(req: NextRequest) {
 
     const supabase = createServiceClient();
 
-    // ── Step 1: 검증 ──────────────────────────────────────────────────
+    // ── Step 1: 세션 + 플레이어 검증 ──────────────────────────────────────────
     const { data: sessionData, error: sessionError } = (await supabase
       .from("Game_Session")
       .select("*")
@@ -61,31 +90,58 @@ export async function POST(req: NextRequest) {
     const session = sessionData;
     const player = playerData;
 
-    // ── Step 2: 주사위 판정 필요 여부 확인 (free_input 전용) ───────
-    // choice 타입은 선택지 생성 시점에 이미 주사위 여부가 결정됨 → 재판단 불필요
-    const { data: recentLogsData } = await supabase
-      .from("Action_Log")
-      .select("*")
-      .eq("session_id", session_id)
-      .order("created_at", { ascending: false })
-      .limit(10);
+    // ── Step 2: NPC 조회 + 최근 로그 조회 ─────────────────────────────────────
+    const [{ data: recentLogsData }, { data: npcsData }, { data: memoriesData }, { data: loreData }] =
+      await Promise.all([
+        supabase
+          .from("Action_Log")
+          .select("*")
+          .eq("session_id", session_id)
+          .order("created_at", { ascending: false })
+          .limit(10),
+        supabase
+          .from("NPC_Persona")
+          .select("*")
+          .eq("session_id", session_id),
+        supabase
+          .from("Session_Memory")
+          .select("*")
+          .eq("session_id", session_id)
+          .not("npc_id", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(20),
+        supabase
+          .from("World_Dictionary")
+          .select("*")
+          .eq("scenario_id", session.scenario_id),
+      ]);
 
     const recentLogs = ((recentLogsData ?? []).reverse()) as unknown as ActionLog[];
+    const npcs = (npcsData ?? []) as unknown as NpcPersona[];
+    const primaryNpc = npcs[0] ?? null;
+    const npcMemories = (memoriesData ?? []) as unknown as NpcMemory[];
+    const loreEntries = (loreData ?? []) as unknown as WorldDictionaryEntry[];
 
+    // ── Step 3: 주사위 판정 필요 여부 확인 (free_input 전용) ──────────────────
     if (action_type === "free_input") {
       const diceNeed = await checkDiceNeed(content, recentLogs);
-      if (diceNeed.needs_check) {
+      if (diceNeed.needs_check && diceNeed.action_category) {
+        // DC 계산: NPC resistance_stats 기반 deterministic (AI hallucination 없음)
+        const resistance = primaryNpc?.resistance_stats ?? defaultResistanceStats();
+        const dc = computeDCFromCategory(diceNeed.action_category, resistance) ?? 13;
+
         return NextResponse.json({
           needs_dice_check: true,
-          dc: diceNeed.dc ?? 13,
+          dc,
           check_label: diceNeed.label ?? "판정",
+          action_category: diceNeed.action_category, // resolve route에서 사용
         });
       }
     }
 
-    // ── needs_check: false → 주사위 없는 플로우 (GM 서사 + 턴 전진) ──
+    // ── Step 4: 주사위 없는 플로우 ────────────────────────────────────────────
 
-    // 플레이어 Action_Log INSERT (주사위 없음)
+    // 플레이어 Action_Log INSERT
     await supabase.from("Action_Log").insert({
       session_id,
       turn_number: session.turn_number,
@@ -98,7 +154,35 @@ export async function POST(req: NextRequest) {
       state_changes: {},
     });
 
-    // Gemini GM 호출
+    // ── Step 5: 취향 모디파이어 + NPC 감정 상태 업데이트 ─────────────────────
+    let updatedDynamicStates = (session.npc_dynamic_states ?? {}) as Record<string, NpcDynamicState>;
+
+    if (primaryNpc) {
+      const baseDeltas = buildBaseDeltas("neutral", null);
+      const { modifiedDeltas } = applyTasteModifiers(
+        content,
+        primaryNpc.taste_preferences ?? [],
+        baseDeltas
+      );
+
+      const currentState = updatedDynamicStates[primaryNpc.id] ?? defaultDynamicState();
+      const updatedState: NpcDynamicState = {
+        ...currentState,
+        affinity: clamp(currentState.affinity + modifiedDeltas.affinity_delta, -100, 100),
+        mental_stress: clamp(currentState.mental_stress + modifiedDeltas.stress_delta, 0, 100),
+        fear_survival: clamp(currentState.fear_survival + modifiedDeltas.fear_delta, 0, 100),
+        trust: clamp(currentState.trust + (modifiedDeltas.trust_delta ?? 0), -100, 100),
+      };
+
+      updatedDynamicStates = { ...updatedDynamicStates, [primaryNpc.id]: updatedState };
+
+      await supabase
+        .from("Game_Session")
+        .update({ npc_dynamic_states: updatedDynamicStates })
+        .eq("id", session_id);
+    }
+
+    // ── Step 6: Gemini GM 서사 생성 ───────────────────────────────────────────
     const { data: scenario } = await supabase
       .from("Scenario")
       .select("gm_system_prompt, fixed_truths")
@@ -146,7 +230,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // HP 변환 + GM Action_Log INSERT
+    // ── Step 7: HP 변환 + GM Action_Log INSERT ────────────────────────────────
     const hpChanges: HpChange[] = [];
 
     if (geminiSucceeded) {
@@ -207,16 +291,78 @@ export async function POST(req: NextRequest) {
         .eq("id", hpChange.target_id);
     }
 
-    // 턴 전진
+    // ── Step 8: NPC 대화 생성 ─────────────────────────────────────────────────
+    if (primaryNpc && geminiSucceeded) {
+      try {
+        const npcState = updatedDynamicStates[primaryNpc.id] ?? null;
+        const npcSpecificMemories = npcMemories.filter(
+          (m): m is NpcMemory => (m as NpcMemory).npc_id === primaryNpc.id
+        );
+
+        // Lore 추출 (키워드 스캔 + 권한 검증 + 군집화)
+        const currentPendingQueue = (session.pending_lore_queue ?? []) as string[];
+        const { loreContext, updatedPendingQueue } = scanAndExtractLore({
+          playerText: content,
+          npcKnowledgeLevel: primaryNpc.knowledge_level ?? 5,
+          npcTrust: npcState?.trust ?? 0,
+          loreEntries,
+          pendingQueue: currentPendingQueue,
+        });
+
+        // pending_lore_queue 변경 시 세션 업데이트
+        if (updatedPendingQueue.join(",") !== currentPendingQueue.join(",")) {
+          await supabase
+            .from("Game_Session")
+            .update({ pending_lore_queue: updatedPendingQueue })
+            .eq("id", session_id);
+        }
+
+        const conversationHistory = recentLogs
+          .filter((log) => log.speaker_type === "player" || log.speaker_type === "npc")
+          .map((log) => ({
+            role: (log.speaker_type === "player" ? "user" : "model") as "user" | "model",
+            content: log.content,
+          }));
+
+        const npcResponse = await runNpcDialogue(primaryNpc, conversationHistory, content, {
+          dynamicState: npcState ?? undefined,
+          playerName: player.player_name,
+          memories: npcSpecificMemories,
+          lore: loreContext,
+        });
+
+        await supabase.from("Action_Log").insert({
+          session_id,
+          turn_number: session.turn_number,
+          speaker_type: "npc",
+          speaker_id: primaryNpc.id,
+          speaker_name: primaryNpc.name,
+          action_type: "npc_dialogue",
+          content: npcResponse,
+          outcome: null,
+          state_changes: {},
+        });
+      } catch {
+        // NPC 대화 실패는 무시 (GM 서사만으로 턴 진행 가능)
+      }
+    }
+
+    // ── Step 9: 턴 전진 ───────────────────────────────────────────────────────
+    const nextTurnNumber = session.turn_number + 1;
     const nextTurn = getNextTurn(session);
     await supabase
       .from("Game_Session")
       .update({
         current_turn_player_id: nextTurn?.id ?? null,
-        turn_number: session.turn_number + 1,
+        turn_number: nextTurnNumber,
         updated_at: new Date().toISOString(),
       })
       .eq("id", session_id);
+
+    // ── Step 10: 5턴마다 메모리 요약 (fire-and-forget) ────────────────────────
+    if (nextTurnNumber % 5 === 0) {
+      runMemorySummarize(session_id).catch(() => {});
+    }
 
     return NextResponse.json({ ok: true });
   } catch {

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { generateChoices } from "@/lib/game/choice-generator";
 import type { ActionChoice, RawPlayer } from "@/lib/types/game";
+import type { PersonalityProfile } from "@/lib/types/character";
+
+type PlayerWithPersonality = RawPlayer & { personality: PersonalityProfile | null };
 
 const FALLBACK_CHOICES: ActionChoice[] = [
   {
@@ -41,13 +44,13 @@ export async function POST(req: NextRequest) {
 
     const supabase = createServiceClient();
 
-    // 플레이어 조회 (user_id로 본인 확인)
+    // 플레이어 조회 (user_id로 본인 확인, personality 컬럼 포함)
     const { data: player } = (await supabase
       .from("Player_Character")
       .select("*")
       .eq("id", player_id)
       .eq("user_id", local_id)
-      .single()) as unknown as { data: RawPlayer | null; error: unknown };
+      .single()) as unknown as { data: PlayerWithPersonality | null; error: unknown };
 
     if (!player) {
       return NextResponse.json({ choices: FALLBACK_CHOICES });
@@ -69,7 +72,7 @@ export async function POST(req: NextRequest) {
 
     try {
       const choices = await generateChoices(
-        player.personality_summary,
+        player.personality ?? null,
         currentSituation,
         player.character_name
       );

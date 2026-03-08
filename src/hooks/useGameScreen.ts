@@ -37,6 +37,7 @@ export interface PendingDice {
   check_label: string;
   action_content: string;
   action_type: "choice" | "free_input";
+  action_category?: string;
 }
 
 export function useGameScreen(sessionId: string, localId: string | null) {
@@ -217,6 +218,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
             check_label: data.check_label,
             action_content: content,
             action_type: type,
+            action_category: data.action_category,
           });
           setIsSubmitting(false);
         } else {
@@ -251,6 +253,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
             action_type: captured.action_type,
             dc: captured.dc,
             rolled,
+            action_category: captured.action_category,
           }),
         });
       } finally {

@@ -2,7 +2,7 @@
 // Game Types
 // ============================================================
 
-import type { PlayerCharacter } from "./character";
+import type { PlayerCharacter, NpcDynamicState } from "./character";
 
 export type SessionStatus = "waiting" | "in_progress" | "completed" | "abandoned";
 
@@ -44,6 +44,13 @@ export interface Scenario {
 
 // ── NPC ───────────────────────────────────────────────────
 
+import type {
+  SpeciesInfo,
+  ResistanceStats,
+  LinguisticProfile,
+  TastePreference,
+} from "./character";
+
 export interface NpcStats {
   hp: number;
   max_hp: number;
@@ -65,7 +72,28 @@ export interface NpcPersona {
   hidden_motivation: Record<string, unknown>;
   system_prompt: string;
   stats: NpcStats;
+  // v2: 다이내믹 페르소나 필드
+  resistance_stats: ResistanceStats;
+  species_info: SpeciesInfo;
+  linguistic_profile: LinguisticProfile;
+  taste_preferences: TastePreference[];
+  decay_rate_negative: number;
+  camaraderie_threshold: number;
+  // v3: 세계관 지식 접근 레벨 (1=평민, 5=학자/귀족, 10=극비)
+  knowledge_level: number;
   created_at: string;
+}
+
+// NPC 주관적 기억 (망각 연산 적용 후 형태)
+export interface NpcMemory {
+  id: string;
+  session_id: string;
+  npc_id: string;
+  summary_text: string;              // NPC 주관적 기억 텍스트
+  emotional_tags: Record<string, number>; // { anger: 80, thrill: 20 }
+  is_core_memory: boolean;           // true이면 λ=0 (절대 잊히지 않음)
+  created_at_turn: number;           // 기억 생성 턴 (Δt 계산용)
+  decayed_emotion_level: number;     // 망각 연산 적용 후 감정 강도 (0~100)
 }
 
 // ── Game Session ──────────────────────────────────────────
@@ -86,6 +114,10 @@ export interface GameSession {
   turn_duration_seconds: number;
   max_players: number;
   host_player_id: string | null;
+  // v2: NPC 동적 심리 상태 맵 (키: NPC ID)
+  npc_dynamic_states: Record<string, NpcDynamicState> | null;
+  // v3: 미뤄둔 Lore 키워드 대기열
+  pending_lore_queue: string[];
   created_at: string;
   updated_at: string;
 }
@@ -125,9 +157,13 @@ export interface ActionLog {
 export interface SessionMemory {
   id: string;
   session_id: string;
+  npc_id: string | null;   // null = 전역 요약, 값 있음 = NPC별 주관적 기억
   summary_text: string;
   last_summarized_turn: number;
   key_facts: string[];
+  emotional_tags: Record<string, number>;
+  is_core_memory: boolean;
+  created_at_turn: number;
   created_at: string;
   updated_at: string;
 }

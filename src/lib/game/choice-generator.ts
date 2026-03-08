@@ -1,30 +1,76 @@
 import { getGeminiModel } from "@/lib/gemini/client";
 import type { ActionChoice } from "@/lib/types/game";
+import type { PersonalityProfile } from "@/lib/types/character";
 
-const AVATAR_STYLE: Record<number, string> = {
-  0: "공격적이고 대담한 행동을 선호",
-  1: "모험적이고 위험을 감수하는 행동을 선호",
-  2: "호기심 많고 탐색적인 행동을 선호",
-  3: "신중하고 전술적인 행동을 선호",
-  4: "사교적이고 외교적인 접근을 선호",
-  5: "분석적이고 신중하게 상황을 파악하는 행동을 선호",
-  6: "신비롭고 마법적 해결책을 찾는 행동을 선호",
-  7: "창의적이고 예상치 못한 행동을 선호",
+const MBTI_TRAITS: Record<string, string> = {
+  INTJ: "전략적이고 독립적, 장기 계획 선호, 감정보다 논리 우선",
+  INTP: "분석적이고 호기심 많음, 이론적 탐구 선호",
+  ENTJ: "결단력 있고 리더십 강함, 직접적이고 목표 지향적",
+  ENTP: "창의적이고 논쟁 즐김, 새로운 가능성 탐색",
+  INFJ: "통찰력 있고 이상주의적, 타인의 감정에 민감",
+  INFP: "이상주의적이고 공감 능력 강함, 가치 중심 행동",
+  ENFJ: "카리스마 있고 타인 중심, 협력과 조화 추구",
+  ENFP: "열정적이고 창의적, 다양한 가능성 탐색",
+  ISTJ: "신뢰할 수 있고 체계적, 규칙과 의무 중시",
+  ISFJ: "헌신적이고 신중함, 타인을 돌보고 전통 중시",
+  ESTJ: "실용적이고 조직적, 효율성과 질서 중시",
+  ESFJ: "사교적이고 협력적, 타인의 필요를 먼저 생각",
+  ISTP: "실용적이고 관찰력 강함, 상황에 유연하게 적응",
+  ISFP: "유연하고 감수성 풍부, 현재에 충실하고 예술적",
+  ESTP: "대담하고 즉흥적, 직접적인 행동 선호",
+  ESFP: "자발적이고 활기차며, 즐거움과 흥분 추구",
 };
 
-export function parseAvatarStyle(personalitySummary: string | null): string {
-  const match = personalitySummary?.match(/avatar:(\d)/);
-  const idx = match ? parseInt(match[1]) : 0;
-  return AVATAR_STYLE[idx] ?? AVATAR_STYLE[0];
+const ENNEAGRAM_TRAITS: Record<number, string> = {
+  1: "완벽주의적이고 원칙 중심, 옳고 그름에 민감",
+  2: "타인을 돕고 싶어하며, 관계와 인정 중시",
+  3: "성취 지향적이고 효율적, 성공과 이미지 관리",
+  4: "독창적이고 감성적, 자신의 정체성과 의미 추구",
+  5: "지식과 정보 수집 선호, 독립적이고 분석적",
+  6: "안전과 신뢰를 추구, 충성스럽고 신중함",
+  7: "다양한 경험 추구, 낙관적이고 즉흥적",
+  8: "강인하고 직접적, 통제력과 자율성 중시",
+  9: "평화를 추구하고 갈등 회피, 조화 중심",
+};
+
+const DND_ALIGNMENT_TRAITS: Record<string, string> = {
+  "lawful-good": "규칙을 지키며 타인을 돕는 행동 선호",
+  "neutral-good": "상황에 맞게 선한 행동을 추구",
+  "chaotic-good": "자유롭게 선을 추구, 규칙보다 결과 중시",
+  "lawful-neutral": "질서와 규칙을 중시, 중립적 입장 유지",
+  "true-neutral": "균형과 중립을 유지, 편향 없음",
+  "chaotic-neutral": "개인의 자유를 최우선, 예측 불가능한 행동",
+  "lawful-evil": "규칙을 이용해 자신의 이익 추구",
+  "neutral-evil": "순수하게 자기 이익만 추구",
+  "chaotic-evil": "무질서하고 파괴적, 충동적으로 행동",
+};
+
+export function buildPersonalityDescription(personality: PersonalityProfile | null): string {
+  if (!personality) return "특별한 성향 없음";
+
+  const parts: string[] = [];
+  if (personality.mbti) {
+    parts.push(`MBTI ${personality.mbti}: ${MBTI_TRAITS[personality.mbti] ?? ""}`);
+  }
+  if (personality.enneagram) {
+    parts.push(`에니어그램 ${personality.enneagram}번: ${ENNEAGRAM_TRAITS[personality.enneagram] ?? ""}`);
+  }
+  if (personality.dnd_alignment) {
+    parts.push(`D&D 성향 ${personality.dnd_alignment}: ${DND_ALIGNMENT_TRAITS[personality.dnd_alignment] ?? ""}`);
+  }
+  if (personality.summary) {
+    parts.push(`추가 성향: ${personality.summary}`);
+  }
+  return parts.join("\n") || "특별한 성향 없음";
 }
 
 export async function generateChoices(
-  personalitySummary: string | null,
+  personality: PersonalityProfile | null,
   currentSituation: string,
   characterName: string
 ): Promise<ActionChoice[]> {
   const model = getGeminiModel();
-  const style = parseAvatarStyle(personalitySummary);
+  const style = buildPersonalityDescription(personality);
 
   const prompt = `
 캐릭터 "${characterName}"의 행동 성향: ${style}
