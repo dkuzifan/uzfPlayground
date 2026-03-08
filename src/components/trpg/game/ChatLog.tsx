@@ -149,6 +149,21 @@ export default function ChatLog({ logs }: Props) {
             );
           }
 
+          if (log.speaker_type === "npc") {
+            return (
+              <div key={log.id} className="flex flex-col items-start">
+                <div className="max-w-[80%]">
+                  <p className="mb-1 text-xs text-amber-600 dark:text-amber-400">
+                    🗣 {log.speaker_name}
+                  </p>
+                  <div className="rounded-2xl rounded-tl-sm border border-amber-200/60 bg-amber-50/80 px-4 py-2 text-sm text-neutral-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-neutral-200">
+                    {log.content}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
           return null;
         })}
 

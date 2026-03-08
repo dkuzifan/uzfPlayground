@@ -10,6 +10,7 @@ import TurnIndicator from "@/components/trpg/game/TurnIndicator";
 import PlayerList from "@/components/trpg/game/PlayerList";
 import GameControls from "@/components/trpg/game/GameControls";
 import DiceRollOverlay from "@/components/trpg/game/DiceRollOverlay";
+import NpcEmotionPanel from "@/components/trpg/game/NpcEmotionPanel";
 
 export default function GamePage() {
   const params = useParams();
@@ -21,6 +22,7 @@ export default function GamePage() {
   const {
     session,
     players,
+    npcs,
     logs,
     myPlayer,
     isMyTurn,
@@ -87,6 +89,10 @@ export default function GamePage() {
             players={players}
             currentTurnPlayerId={session?.current_turn_player_id ?? null}
             myPlayerId={myPlayer?.id ?? null}
+          />
+          <NpcEmotionPanel
+            npcs={npcs}
+            dynamicStates={session?.npc_dynamic_states ?? null}
           />
           <GameControls
             amIHost={amIHost}

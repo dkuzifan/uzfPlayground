@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { ActionLog, ActionChoice, RawPlayer, GameSession, Scenario } from "@/lib/types/game";
+import type { ActionLog, ActionChoice, RawPlayer, GameSession, Scenario, NpcPersona } from "@/lib/types/game";
 
 const FALLBACK_CHOICES: ActionChoice[] = [
   {
@@ -45,6 +45,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
   const [session, setSession]           = useState<GameSession | null>(null);
   const [scenario, setScenario]         = useState<Scenario | null>(null);
   const [players, setPlayers]           = useState<RawPlayer[]>([]);
+  const [npcs, setNpcs]                 = useState<NpcPersona[]>([]);
   const [logs, setLogs]                 = useState<ActionLog[]>([]);
   const [myPlayer, setMyPlayer]         = useState<RawPlayer | null>(null);
   const [loading, setLoading]           = useState(true);
@@ -99,6 +100,14 @@ export function useGameScreen(sessionId: string, localId: string | null) {
         setScenario(data.scenario as Scenario);
         setPlayers(data.players as RawPlayer[]);
         setLogs(data.logs as ActionLog[]);
+
+        // NPC 페르소나 조회
+        const supabase = createClient();
+        const { data: npcsData } = await supabase
+          .from("NPC_Persona")
+          .select("*")
+          .eq("session_id", sessionId);
+        setNpcs((npcsData ?? []) as unknown as NpcPersona[]);
 
         const me = (data.players as RawPlayer[]).find((p) => p.user_id === localId);
         if (!me) {
@@ -309,6 +318,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
     session,
     scenario,
     players,
+    npcs,
     logs,
     myPlayer,
     isMyTurn,

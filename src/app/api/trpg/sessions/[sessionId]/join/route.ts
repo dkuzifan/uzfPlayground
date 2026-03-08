@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import type { PersonalityProfile, CharacterJob } from "@/lib/types/character";
 
 interface RouteParams {
   params: Promise<{ sessionId: string }>;
@@ -12,10 +13,13 @@ export async function POST(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { localId, nickname, avatarIndex } = body as {
+  const { localId, nickname, avatarIndex, characterName, job, personality } = body as {
     localId?: string;
     nickname?: string;
     avatarIndex?: number;
+    characterName?: string;
+    job?: CharacterJob;
+    personality?: PersonalityProfile;
   };
 
   if (!localId || !nickname?.trim()) {
@@ -70,9 +74,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       session_id: sessionId,
       user_id: localId,
       player_name: nickname.trim(),
-      character_name: nickname.trim(),
-      job: "adventurer",
+      character_name: (characterName?.trim() || nickname.trim()),
+      job: job ?? "adventurer",
       personality_summary: `avatar:${safeAvatarIndex}`,
+      ...(personality ? { personality } : {}),
     });
 
   if (insertError && insertError.code !== "23505") {
