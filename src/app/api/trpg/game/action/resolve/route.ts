@@ -11,38 +11,7 @@ import type { WorldDictionaryEntry } from "@/lib/game/lore-engine";
 import type { ActionOutcome, DiceRoll, HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory } from "@/lib/types/game";
 import type { NpcDynamicState } from "@/lib/types/character";
 import type { ActionCategory } from "@/lib/game/dc-calculator";
-
-const JOB_MODIFIERS: Record<string, number> = {
-  warrior: 2,
-  mage: 2,
-  rogue: 2,
-  cleric: 2,
-  adventurer: 0,
-  ranger: 2,
-  paladin: 2,
-  bard: 1,
-};
-
-function defaultDynamicState(): NpcDynamicState {
-  return {
-    current_mood: "평온",
-    mental_stress: 20,
-    physical_fatigue: 10,
-    fear_survival: 5,
-    self_image_management: 30,
-    mob_mentality: 20,
-    affinity: 0,
-    trust: 0,
-    power_dynamics: "대등한 관계",
-    personal_debt: 0,
-    sense_of_duty: 30,
-    camaraderie: 0,
-  };
-}
-
-function clamp(val: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, val));
-}
+import { JOB_MODIFIERS, defaultDynamicState, clamp } from "@/lib/game/action-utils";
 
 export async function POST(req: NextRequest) {
   try {

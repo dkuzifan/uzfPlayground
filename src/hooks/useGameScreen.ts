@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { ActionLog, ActionChoice, RawPlayer, GameSession, Scenario, NpcPersona } from "@/lib/types/game";
+import { JOB_MODIFIERS } from "@/lib/game/action-utils";
 
 const FALLBACK_CHOICES: ActionChoice[] = [
   {
@@ -26,10 +27,6 @@ const FALLBACK_CHOICES: ActionChoice[] = [
   },
 ];
 
-const JOB_MODIFIERS: Record<string, number> = {
-  warrior: 2, mage: 2, rogue: 2, cleric: 2,
-  adventurer: 0, ranger: 2, paladin: 2, bard: 1,
-};
 
 export interface PendingDice {
   dc: number;
