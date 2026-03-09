@@ -340,7 +340,9 @@ export async function POST(req: NextRequest) {
 
     // ── Step 10: 5턴마다 메모리 요약 (fire-and-forget) ────────────────────────
     if (nextTurnNumber % 5 === 0) {
-      runMemorySummarize(session_id).catch(() => {});
+      runMemorySummarize(session_id).catch((err) =>
+        console.error(`[MemoryPipeline] session=${session_id}`, err)
+      );
     }
 
     return NextResponse.json({ ok: true });

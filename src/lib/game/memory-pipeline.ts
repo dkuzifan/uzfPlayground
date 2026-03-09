@@ -151,17 +151,29 @@ export async function runMemorySummarize(
     // NPC 현재 동적 상태
     const dynamicState: NpcDynamicState = npcDynamicStates[npc.id] ?? defaultDynamicState();
 
-    // Gemini 요약 에이전트 호출
+    // Gemini 요약 에이전트 호출 (실패 시 1회 재시도)
     let summary;
-    try {
-      summary = await summarizeNpcMemory({
-        npcName: npc.name,
-        dynamicState,
-        relativeAgePerception: agePerceptionText,
-        triggeredTasteDesc,
-        recentLogs,
-      });
-    } catch {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        summary = await summarizeNpcMemory({
+          npcName: npc.name,
+          dynamicState,
+          relativeAgePerception: agePerceptionText,
+          triggeredTasteDesc,
+          recentLogs,
+        });
+        break;
+      } catch (err) {
+        lastError = err;
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 1500));
+      }
+    }
+    if (!summary) {
+      console.error(
+        `[MemoryPipeline] session=${session_id} npc=${npc.name} 요약 2회 실패:`,
+        lastError
+      );
       results.push({ npc_id: npc.id, npc_name: npc.name, status: "gemini_error" });
       continue;
     }

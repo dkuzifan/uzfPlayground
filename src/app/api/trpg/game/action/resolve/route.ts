@@ -361,7 +361,9 @@ export async function POST(req: NextRequest) {
 
     // 5턴마다 메모리 요약 (fire-and-forget)
     if (nextTurnNumber % 5 === 0) {
-      runMemorySummarize(session_id).catch(() => {});
+      runMemorySummarize(session_id).catch((err) =>
+        console.error(`[MemoryPipeline] session=${session_id}`, err)
+      );
     }
 
     return NextResponse.json({ rolled: d20, modifier, total, dc: verifiedDc, outcome });
