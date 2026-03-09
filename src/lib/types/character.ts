@@ -28,7 +28,8 @@ export type CharacterJob =
   | "cleric"
   | "ranger"
   | "paladin"
-  | "bard";
+  | "bard"
+  | "adventurer";
 
 // 신장 구분: 세계관 종족 특성 기반 카테고리
 // 소형종: 고블린, 노움, 코볼트, 하플링 (은신+, 위협-)
