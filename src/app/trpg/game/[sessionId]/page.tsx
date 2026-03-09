@@ -11,6 +11,7 @@ import PlayerList from "@/components/trpg/game/PlayerList";
 import GameControls from "@/components/trpg/game/GameControls";
 import DiceRollOverlay from "@/components/trpg/game/DiceRollOverlay";
 import NpcEmotionPanel from "@/components/trpg/game/NpcEmotionPanel";
+import QuestTrackerPanel from "@/components/trpg/game/QuestTrackerPanel";
 
 function weatherIcon(weather: string): string {
   if (weather.includes("폭우") || weather.includes("비")) return "🌧";
@@ -128,6 +129,7 @@ export default function GamePage() {
             npcs={npcs}
             dynamicStates={session?.npc_dynamic_states ?? null}
           />
+          <QuestTrackerPanel questTracker={session?.quest_tracker ?? null} />
           <GameControls
             amIHost={amIHost}
             onLeave={leaveRoom}

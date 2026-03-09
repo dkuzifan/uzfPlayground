@@ -118,6 +118,11 @@ export interface GameSession {
   npc_dynamic_states: Record<string, NpcDynamicState> | null;
   // v2: 세션 환경 (날씨, 시간대)
   session_environment: { weather: string; time_of_day: string } | null;
+  // v2: 퀘스트 트래커
+  quest_tracker: {
+    status: "IN_PROGRESS" | "CLEARED" | "FAILED";
+    milestones: Record<string, { type: "boolean" | "counter"; value: boolean | number; target?: number }>;
+  } | null;
   // v3: 미뤄둔 Lore 키워드 대기열
   pending_lore_queue: string[];
   created_at: string;
