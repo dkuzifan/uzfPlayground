@@ -73,10 +73,19 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
     .order("created_at", { ascending: true })
     .limit(30);
 
+  // 4. NPC 공개 정보 (hidden_motivation, system_prompt 제외)
+  const { data: npcRows } = await supabase
+    .from("NPC_Persona")
+    .select(
+      "id, scenario_id, session_id, name, role, mbti, enneagram, dnd_alignment, appearance, personality, stats, resistance_stats, species_info, linguistic_profile, taste_preferences, decay_rate_negative, camaraderie_threshold, knowledge_level, created_at"
+    )
+    .eq("session_id", sessionId);
+
   return NextResponse.json({
     session,
     scenario,
     players: players ?? [],
     logs: logs ?? [],
+    npcs: npcRows ?? [],
   });
 }

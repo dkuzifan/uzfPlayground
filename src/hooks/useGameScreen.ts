@@ -100,14 +100,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
         setScenario(data.scenario as Scenario);
         setPlayers(data.players as RawPlayer[]);
         setLogs(data.logs as ActionLog[]);
-
-        // NPC 페르소나 조회
-        const supabase = createClient();
-        const { data: npcsData } = await supabase
-          .from("NPC_Persona")
-          .select("*")
-          .eq("session_id", sessionId);
-        setNpcs((npcsData ?? []) as unknown as NpcPersona[]);
+        setNpcs((data.npcs ?? []) as NpcPersona[]);
 
         const me = (data.players as RawPlayer[]).find((p) => p.user_id === localId);
         if (!me) {
