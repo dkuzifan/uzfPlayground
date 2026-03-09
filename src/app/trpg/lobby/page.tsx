@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import RoomCard from "@/components/trpg/lobby/RoomCard";
 import CreateRoomModal from "@/components/trpg/lobby/CreateRoomModal";
 import GuestProfileModal from "@/components/trpg/lobby/GuestProfileModal";
@@ -76,6 +77,29 @@ export default function LobbyPage() {
           )}
         </div>
       </div>
+
+      {/* 캐릭터 미생성 안내 배너 */}
+      {mounted && profile && !profile.characterCreated && (
+        <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-amber-300/60 bg-amber-50/80 px-4 py-3 dark:border-amber-600/40 dark:bg-amber-900/20">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">⚠️</span>
+            <div>
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                성향 테스트가 아직 완료되지 않았어요
+              </p>
+              <p className="text-xs text-amber-700/70 dark:text-amber-400/70">
+                테스트를 완료하면 AI가 내 성향에 맞는 선택지를 만들어 줍니다.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/trpg/character/create"
+            className="shrink-0 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 transition-colors"
+          >
+            테스트 시작
+          </Link>
+        </div>
+      )}
 
       {/* 방 목록 */}
       {loading ? (
