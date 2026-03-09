@@ -11,7 +11,7 @@ import type { WorldDictionaryEntry } from "@/lib/game/lore-engine";
 import type { ActionOutcome, DiceRoll, HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory } from "@/lib/types/game";
 import type { NpcDynamicState } from "@/lib/types/character";
 import type { ActionCategory } from "@/lib/game/dc-calculator";
-import { JOB_MODIFIERS, defaultDynamicState, clamp } from "@/lib/game/action-utils";
+import { JOB_MODIFIERS, defaultDynamicState, clamp, determineTargetedNpcs } from "@/lib/game/action-utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -106,7 +106,8 @@ export async function POST(req: NextRequest) {
 
     const recentLogs = ((recentLogsData ?? []).reverse()) as unknown as ActionLog[];
     const npcs = (npcsData ?? []) as unknown as NpcPersona[];
-    const primaryNpc = npcs[0] ?? null;
+    const targetedNpcs = determineTargetedNpcs(action_content, npcs);
+    const primaryNpc = targetedNpcs[0] ?? null; // DC 서버 재검증 기준 NPC
     const npcMemories = (memoriesData ?? []) as unknown as NpcMemory[];
     const loreEntries = (loreData ?? []) as unknown as WorldDictionaryEntry[];
 
@@ -148,33 +149,32 @@ export async function POST(req: NextRequest) {
     // ── 취향 모디파이어 + NPC 감정 상태 업데이트 ─────────────────────────────
     let updatedDynamicStates = (session.npc_dynamic_states ?? {}) as Record<string, NpcDynamicState>;
 
-    if (primaryNpc) {
-      // action_category → buildBaseDeltas의 actionType으로 변환
-      const actionType = (action_category === "gift" ? "gift"
+    if (targetedNpcs.length > 0) {
+      // action_category → buildBaseDeltas actionType 변환 (NPC 공통)
+      const mappedActionType = (action_category === "gift" ? "gift"
         : action_category === "deceive" ? "deceive"
         : action_category === "persuade" ? "persuade"
         : action_category === "threaten" ? "threaten"
         : action_category === "attack" ? "attack"
         : "neutral") as Parameters<typeof buildBaseDeltas>[0];
 
-      const baseDeltas = buildBaseDeltas(actionType, outcome);
-      const { modifiedDeltas } = applyTasteModifiers(
-        action_content,
-        primaryNpc.taste_preferences ?? [],
-        baseDeltas
-      );
-
-      const currentState = updatedDynamicStates[primaryNpc.id] ?? defaultDynamicState();
-      const updatedState: NpcDynamicState = {
-        ...currentState,
-        affinity: clamp(currentState.affinity + modifiedDeltas.affinity_delta, -100, 100),
-        mental_stress: clamp(currentState.mental_stress + modifiedDeltas.stress_delta, 0, 100),
-        fear_survival: clamp(currentState.fear_survival + modifiedDeltas.fear_delta, 0, 100),
-        trust: clamp(currentState.trust + (modifiedDeltas.trust_delta ?? 0), -100, 100),
-      };
-
-      updatedDynamicStates = { ...updatedDynamicStates, [primaryNpc.id]: updatedState };
-
+      for (const npc of targetedNpcs) {
+        const baseDeltas = buildBaseDeltas(mappedActionType, outcome);
+        const { modifiedDeltas } = applyTasteModifiers(
+          action_content,
+          npc.taste_preferences ?? [],
+          baseDeltas
+        );
+        const currentState = updatedDynamicStates[npc.id] ?? defaultDynamicState();
+        const updatedState: NpcDynamicState = {
+          ...currentState,
+          affinity: clamp(currentState.affinity + modifiedDeltas.affinity_delta, -100, 100),
+          mental_stress: clamp(currentState.mental_stress + modifiedDeltas.stress_delta, 0, 100),
+          fear_survival: clamp(currentState.fear_survival + modifiedDeltas.fear_delta, 0, 100),
+          trust: clamp(currentState.trust + (modifiedDeltas.trust_delta ?? 0), -100, 100),
+        };
+        updatedDynamicStates = { ...updatedDynamicStates, [npc.id]: updatedState };
+      }
       await supabase
         .from("Game_Session")
         .update({ npc_dynamic_states: updatedDynamicStates })
@@ -292,58 +292,59 @@ export async function POST(req: NextRequest) {
         .eq("id", hpChange.target_id);
     }
 
-    // ── NPC 대화 생성 ─────────────────────────────────────────────────────────
-    if (primaryNpc && geminiSucceeded) {
-      try {
-        const npcState = updatedDynamicStates[primaryNpc.id] ?? null;
-        const npcSpecificMemories = npcMemories.filter(
-          (m): m is NpcMemory => (m as NpcMemory).npc_id === primaryNpc.id
-        );
+    // ── NPC 대화 생성 (대상 NPC 전체) ────────────────────────────────────────
+    if (targetedNpcs.length > 0 && geminiSucceeded) {
+      // Lore 추출은 주 대상 NPC(첫 번째) 기준으로 1회 실행
+      const loreSourceNpc = targetedNpcs[0];
+      const loreSourceState = updatedDynamicStates[loreSourceNpc.id] ?? null;
+      const currentPendingQueue = (session.pending_lore_queue ?? []) as string[];
+      const { loreContext, updatedPendingQueue } = scanAndExtractLore({
+        playerText: action_content,
+        npcKnowledgeLevel: loreSourceNpc.knowledge_level ?? 5,
+        npcTrust: loreSourceState?.trust ?? 0,
+        loreEntries,
+        pendingQueue: currentPendingQueue,
+      });
+      if (updatedPendingQueue.join(",") !== currentPendingQueue.join(",")) {
+        await supabase
+          .from("Game_Session")
+          .update({ pending_lore_queue: updatedPendingQueue })
+          .eq("id", session_id);
+      }
 
-        // Lore 추출
-        const currentPendingQueue = (session.pending_lore_queue ?? []) as string[];
-        const { loreContext, updatedPendingQueue } = scanAndExtractLore({
-          playerText: action_content,
-          npcKnowledgeLevel: primaryNpc.knowledge_level ?? 5,
-          npcTrust: npcState?.trust ?? 0,
-          loreEntries,
-          pendingQueue: currentPendingQueue,
-        });
+      const conversationHistory = recentLogs
+        .filter((log) => log.speaker_type === "player" || log.speaker_type === "npc")
+        .map((log) => ({
+          role: (log.speaker_type === "player" ? "user" : "model") as "user" | "model",
+          content: log.content,
+        }));
 
-        if (updatedPendingQueue.join(",") !== currentPendingQueue.join(",")) {
-          await supabase
-            .from("Game_Session")
-            .update({ pending_lore_queue: updatedPendingQueue })
-            .eq("id", session_id);
+      for (const npc of targetedNpcs) {
+        try {
+          const npcState = updatedDynamicStates[npc.id] ?? null;
+          const npcSpecificMemories = npcMemories.filter(
+            (m): m is NpcMemory => (m as NpcMemory).npc_id === npc.id
+          );
+          const npcResponse = await runNpcDialogue(npc, conversationHistory, action_content, {
+            dynamicState: npcState ?? undefined,
+            playerName: player.player_name,
+            memories: npcSpecificMemories,
+            lore: loreContext,
+          });
+          await supabase.from("Action_Log").insert({
+            session_id,
+            turn_number: session.turn_number,
+            speaker_type: "npc",
+            speaker_id: npc.id,
+            speaker_name: npc.name,
+            action_type: "npc_dialogue",
+            content: npcResponse,
+            outcome: null,
+            state_changes: {},
+          });
+        } catch {
+          // 개별 NPC 대화 실패는 무시
         }
-
-        const conversationHistory = recentLogs
-          .filter((log) => log.speaker_type === "player" || log.speaker_type === "npc")
-          .map((log) => ({
-            role: (log.speaker_type === "player" ? "user" : "model") as "user" | "model",
-            content: log.content,
-          }));
-
-        const npcResponse = await runNpcDialogue(primaryNpc, conversationHistory, action_content, {
-          dynamicState: npcState ?? undefined,
-          playerName: player.player_name,
-          memories: npcSpecificMemories,
-          lore: loreContext,
-        });
-
-        await supabase.from("Action_Log").insert({
-          session_id,
-          turn_number: session.turn_number,
-          speaker_type: "npc",
-          speaker_id: primaryNpc.id,
-          speaker_name: primaryNpc.name,
-          action_type: "npc_dialogue",
-          content: npcResponse,
-          outcome: null,
-          state_changes: {},
-        });
-      } catch {
-        // NPC 대화 실패는 무시
       }
     }
 
