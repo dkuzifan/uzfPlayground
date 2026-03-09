@@ -12,6 +12,24 @@ import GameControls from "@/components/trpg/game/GameControls";
 import DiceRollOverlay from "@/components/trpg/game/DiceRollOverlay";
 import NpcEmotionPanel from "@/components/trpg/game/NpcEmotionPanel";
 
+function weatherIcon(weather: string): string {
+  if (weather.includes("폭우") || weather.includes("비")) return "🌧";
+  if (weather.includes("눈")) return "❄️";
+  if (weather.includes("안개")) return "🌫";
+  if (weather.includes("폭풍") || weather.includes("번개")) return "⛈";
+  if (weather.includes("맑음") || weather.includes("청명")) return "☀️";
+  if (weather.includes("흐림") || weather.includes("구름")) return "☁️";
+  return "🌤";
+}
+
+function timeIcon(time: string): string {
+  if (time.includes("심야") || time.includes("새벽")) return "🌙";
+  if (time.includes("낮") || time.includes("정오")) return "☀️";
+  if (time.includes("황혼") || time.includes("저녁") || time.includes("노을")) return "🌆";
+  if (time.includes("아침") || time.includes("새벽")) return "🌅";
+  return "🕐";
+}
+
 export default function GamePage() {
   const params = useParams();
   const router = useRouter();
@@ -67,6 +85,22 @@ export default function GamePage() {
       <div className="flex h-[calc(100vh-56px)] gap-4 p-4">
         {/* 좌: 채팅 로그 + 행동 패널 */}
         <div className="flex min-w-0 flex-1 flex-col gap-4">
+          {/* 세션 환경 배지 */}
+          {session?.session_environment && (
+            session.session_environment.weather || session.session_environment.time_of_day
+          ) && (
+            <div className="flex items-center gap-2 rounded-xl border border-sky-200/60 bg-sky-50/70 px-3 py-1.5 text-xs text-sky-700 dark:border-sky-700/40 dark:bg-sky-900/20 dark:text-sky-300">
+              {session.session_environment.weather && (
+                <span>{weatherIcon(session.session_environment.weather)} {session.session_environment.weather}</span>
+              )}
+              {session.session_environment.weather && session.session_environment.time_of_day && (
+                <span className="text-sky-400">·</span>
+              )}
+              {session.session_environment.time_of_day && (
+                <span>{timeIcon(session.session_environment.time_of_day)} {session.session_environment.time_of_day}</span>
+              )}
+            </div>
+          )}
           <ChatLog logs={logs} />
           <ActionPanel
             isMyTurn={isMyTurn}
