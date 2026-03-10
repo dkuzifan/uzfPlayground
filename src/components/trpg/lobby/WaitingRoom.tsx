@@ -14,16 +14,14 @@ interface WaitingRoomProps {
 
 export default function WaitingRoom({ sessionId, profile }: WaitingRoomProps) {
   const router = useRouter();
-  const { players, hostPcId, maxPlayers, roomName, loading } = useWaitingRoom(
+  const { players, hostPcId, myPcId, maxPlayers, roomName, loading } = useWaitingRoom(
     sessionId,
     profile.localId
   );
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
 
-  const amIHost =
-    players.some((p) => p.id === hostPcId) &&
-    players.find((p) => p.id === hostPcId)?.nickname === profile.nickname;
+  const amIHost = myPcId !== null && myPcId === hostPcId;
 
   const emptySlots = Math.max(0, maxPlayers - players.length);
 

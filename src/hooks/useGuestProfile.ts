@@ -33,19 +33,21 @@ export function useGuestProfile() {
 
   /** 방 입장/생성 후 nickname + avatarIndex 업데이트 */
   const saveProfile = useCallback((nickname: string, avatarIndex: number) => {
-    setProfile((prev) => {
-      const updated: GuestProfile = {
-        localId: prev?.localId ?? crypto.randomUUID(),
-        nickname,
-        avatarIndex,
-      };
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      } catch {
-        // 저장 실패 시 세션 내에서만 유지
-      }
-      return updated;
-    });
+    // localStorage를 즉시 동기적으로 기록 (router.push 전에 보장)
+    let localId: string;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      localId = raw ? (JSON.parse(raw) as GuestProfile).localId : crypto.randomUUID();
+    } catch {
+      localId = crypto.randomUUID();
+    }
+    const updated: GuestProfile = { localId, nickname, avatarIndex };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch {
+      // 저장 실패 시 세션 내에서만 유지
+    }
+    setProfile(updated);
   }, []);
 
   return {

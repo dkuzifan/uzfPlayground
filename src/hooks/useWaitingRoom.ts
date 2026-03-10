@@ -10,6 +10,7 @@ import type { WaitingPlayer } from "@/lib/types/lobby";
 interface WaitingRoomState {
   players: WaitingPlayer[];
   hostPcId: string | null;
+  myPcId: string | null;
   maxPlayers: number;
   roomName: string;
   loading: boolean;
@@ -20,6 +21,7 @@ export function useWaitingRoom(sessionId: string, localId: string) {
   const [state, setState] = useState<WaitingRoomState>({
     players: [],
     hostPcId: null,
+    myPcId: null,
     maxPlayers: 4,
     roomName: "",
     loading: true,
@@ -54,16 +56,19 @@ export function useWaitingRoom(sessionId: string, localId: string) {
       // 2. 현재 참여자 목록 초기 fetch
       const { data: pcs } = await supabase
         .from("Player_Character")
-        .select("id, player_name, personality_summary")
+        .select("id, player_name, personality_summary, user_id")
         .eq("session_id", sessionId);
 
       const initialPlayers = (pcs ?? []).map((pc) =>
         toWaitingPlayer(pc, hostPcId)
       );
 
+      const myPcId = (pcs ?? []).find((pc) => pc.user_id === localId)?.id ?? null;
+
       setState({
         players: initialPlayers,
         hostPcId,
+        myPcId,
         maxPlayers: session.max_players,
         roomName: session.room_name,
         loading: false,
@@ -134,20 +139,6 @@ export function useWaitingRoom(sessionId: string, localId: string) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
-
-  // localId로 내가 방장인지 확인
-  const myPcId = state.players.find(
-    (p) => state.hostPcId && p.id === state.hostPcId
-  )?.id;
-  const isHost = state.hostPcId !== null && myPcId === state.hostPcId &&
-    state.players.some(
-      (p) => p.id === state.hostPcId
-    );
-
-  // 좀 더 정확하게: localId 기반으로 내 PC 찾기는 API에서만 가능
-  // 여기서는 hostPcId가 현재 플레이어 목록에 있는지로 방장 여부 표시
-  // 실제 방장 여부는 start API가 서버에서 검증함
-  void isHost; // suppress unused warning — 컴포넌트에서 localId 직접 비교
 
   return {
     ...state,
