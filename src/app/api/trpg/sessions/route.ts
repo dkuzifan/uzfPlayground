@@ -52,9 +52,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { room_name, max_players, localId, nickname, avatarIndex, characterName, job, personality } = body as {
+  const { room_name, max_players, scenario_id, localId, nickname, avatarIndex, characterName, job, personality } = body as {
     room_name?: string;
     max_players?: number;
+    scenario_id?: string;
     localId?: string;
     nickname?: string;
     avatarIndex?: number;
@@ -76,6 +77,12 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+  if (!scenario_id) {
+    return NextResponse.json(
+      { error: "scenario_id는 필수입니다." },
+      { status: 400 }
+    );
+  }
   const safeMaxPlayers = Math.min(7, Math.max(2, max_players ?? 4));
   const safeAvatarIndex = Math.min(7, Math.max(0, avatarIndex ?? 0));
   const safeJob = typeof job === "string" && VALID_JOBS_SET.has(job) ? job : "adventurer";
@@ -83,17 +90,17 @@ export async function POST(request: Request) {
 
   const supabase = createServiceClient();
 
-  // Step 1: 기본 판타지 시나리오 조회
+  // Step 1: 시나리오 존재 확인
   const { data: scenario, error: scenarioError } = await supabase
     .from("Scenario")
     .select("id")
-    .eq("theme", "fantasy")
-    .limit(1)
+    .eq("id", scenario_id)
+    .eq("is_active", true)
     .single();
 
   if (scenarioError || !scenario) {
     return NextResponse.json(
-      { error: "기본 시나리오가 없습니다. Supabase에 시드 데이터를 삽입해주세요." },
+      { error: "유효한 시나리오를 찾을 수 없습니다." },
       { status: 404 }
     );
   }

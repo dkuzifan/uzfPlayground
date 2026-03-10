@@ -11,6 +11,8 @@ import type {
 
 interface Props {
   onComplete: (personality: PersonalityProfile, characterName: string, job: CharacterJob) => void;
+  availableJobs?: { value: CharacterJob; label: string; desc?: string; icon?: string }[];
+  characterNameHint?: string;
 }
 
 interface ChoiceScore {
@@ -416,7 +418,7 @@ function calcDnD(sc: TotalScores, ch: number[]): DnDAlignment {
 
 type Phase = "intro" | "scenes" | "result" | "character";
 
-export default function PersonalityTest({ onComplete }: Props) {
+export default function PersonalityTest({ onComplete, availableJobs, characterNameHint }: Props) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [sceneIdx, setSceneIdx] = useState(0);
   const [choices, setChoices] = useState<number[]>([]);
@@ -615,7 +617,7 @@ export default function PersonalityTest({ onComplete }: Props) {
             maxLength={16}
             value={characterName}
             onChange={(e) => setCharacterName(e.target.value)}
-            placeholder="예: 아리엘, 카인, Lysander"
+            placeholder={characterNameHint ?? "예: 아리엘, 카인, Lysander"}
             className="w-full rounded-lg border border-black/15 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-white/15 dark:bg-white/5 dark:text-white dark:placeholder-neutral-500"
           />
           {nameError && <p className="text-xs text-red-500">최대 16자까지 입력할 수 있습니다.</p>}
@@ -625,7 +627,7 @@ export default function PersonalityTest({ onComplete }: Props) {
         <div className="space-y-2">
           <p className="text-sm font-medium text-neutral-800 dark:text-neutral-200">직업</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {JOBS.map((j) => (
+            {(availableJobs ?? JOBS).map((j) => (
               <button
                 key={j.value}
                 onClick={() => setJob(j.value)}
