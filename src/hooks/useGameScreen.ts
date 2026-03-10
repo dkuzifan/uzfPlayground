@@ -59,6 +59,18 @@ export function useGameScreen(sessionId: string, localId: string | null) {
 
   const prevIsMyTurnRef = useRef(false);
 
+  // ── 로그 재조회 (Realtime 실패 보완) ────────────────────────────────
+  const refreshLogs = useCallback(async (sid: string) => {
+    try {
+      const res = await fetch(`/api/trpg/game/session/${sid}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLogs(data.logs as ActionLog[]);
+        setSession((prev) => prev ? { ...prev, ...(data.session as GameSession) } : prev);
+      }
+    } catch { /* 무시 */ }
+  }, []);
+
   // ── 선택지 생성 ──────────────────────────────────────────────────────
   const fetchChoices = useCallback(
     async (sid: string, pid: string, lid: string) => {
@@ -221,6 +233,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
           });
           setIsSubmitting(false);
         } else {
+          await refreshLogs(sessionId);
           await fetchChoices(sessionId, myPlayer.id, localId);
           setIsSubmitting(false);
         }
@@ -228,7 +241,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
         setIsSubmitting(false);
       }
     },
-    [sessionId, myPlayer, localId, isSubmitting, fetchChoices]
+    [sessionId, myPlayer, localId, isSubmitting, fetchChoices, refreshLogs]
   );
 
   // ── 오버레이 닫기: 클라이언트 rolled 값으로 Phase 2 API 호출 ─────────
@@ -256,10 +269,11 @@ export function useGameScreen(sessionId: string, localId: string | null) {
           }),
         });
       } finally {
+        await refreshLogs(sessionId);
         fetchChoices(sessionId, myPlayer.id, localId);
       }
     },
-    [pendingDice, myPlayer, localId, sessionId, fetchChoices]
+    [pendingDice, myPlayer, localId, sessionId, fetchChoices, refreshLogs]
   );
 
   // ── 방장 여부 ─────────────────────────────────────────────────────────

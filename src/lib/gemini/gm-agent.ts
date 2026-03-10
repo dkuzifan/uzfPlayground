@@ -93,6 +93,30 @@ export async function runGmAction(input: GmActionInput): Promise<GmRawResponse> 
   return JSON.parse(text) as GmRawResponse;
 }
 
+/** 게임 시작 시 오프닝 서사 생성 */
+export async function generateOpeningNarration(
+  scenarioSystemPrompt: string,
+  playerNames: string[]
+): Promise<string> {
+  const model = getGeminiModel();
+  const prompt = `${scenarioSystemPrompt}
+
+## 지시
+지금 TRPG 세션이 막 시작되었습니다.
+참가 플레이어: ${playerNames.join(", ")}
+
+플레이어들이 처음 마주하는 장면을 200~350자 한국어로 묘사하세요.
+배경, 분위기, 첫 번째 상황을 생생하게 전달하고 플레이어의 행동을 유도하는 문장으로 마무리하세요.
+JSON 없이 순수 텍스트로만 응답하세요.`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    return result.response.text().trim();
+  } catch {
+    return "어둠 속에서 모험이 시작됩니다. 무엇을 하시겠습니까?";
+  }
+}
+
 function buildSystemInstruction(scenarioSystemPrompt: string, characterName: string): string {
   return `## [최우선 규칙] 고유명사 원문 표기 강제
 이 세션의 플레이어 캐릭터 이름은 정확히 "${characterName}" 입니다.

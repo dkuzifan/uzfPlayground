@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { buildTurnOrder } from "@/lib/game/turn-manager";
+import { generateOpeningNarration } from "@/lib/gemini/gm-agent";
 
 interface RouteParams {
   params: Promise<{ sessionId: string }>;
@@ -35,7 +36,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   // 세션의 host_player_id와 비교
   const { data: session, error: sessionError } = await supabase
     .from("Game_Session")
-    .select("id, host_player_id, status")
+    .select("id, host_player_id, status, scenario_id")
     .eq("id", sessionId)
     .single();
 
@@ -71,6 +72,40 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (updateError) {
     console.error("[start] update error:", updateError);
     return NextResponse.json({ error: "게임 시작에 실패했습니다.", detail: updateError.message }, { status: 500 });
+  }
+
+  // 오프닝 서사 생성 (비동기 — 실패해도 게임 시작은 이미 완료)
+  try {
+    const [{ data: scenarioData }, { data: playerList }] = await Promise.all([
+      supabase
+        .from("Scenario")
+        .select("gm_system_prompt")
+        .eq("id", (session as { scenario_id?: string }).scenario_id ?? "")
+        .single(),
+      supabase
+        .from("Player_Character")
+        .select("player_name")
+        .eq("session_id", sessionId)
+        .eq("is_active", true),
+    ]);
+
+    const prompt = scenarioData?.gm_system_prompt ?? "당신은 TRPG 게임 마스터입니다.";
+    const names = (playerList ?? []).map((p) => p.player_name);
+    const opening = await generateOpeningNarration(prompt, names);
+
+    await supabase.from("Action_Log").insert({
+      session_id: sessionId,
+      turn_number: 0,
+      speaker_type: "gm",
+      speaker_id: null,
+      speaker_name: "GM",
+      action_type: "gm_narration",
+      content: opening,
+      outcome: null,
+      state_changes: {},
+    });
+  } catch (e) {
+    console.error("[start] opening narration failed:", e);
   }
 
   return NextResponse.json({ ok: true });
