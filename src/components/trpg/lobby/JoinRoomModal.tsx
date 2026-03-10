@@ -14,6 +14,7 @@ interface Props {
   localId: string;
   scenarioTitle: string;
   config: CharacterCreationConfig;
+  onSaveProfile: (nickname: string, avatarIndex: number) => void;
 }
 
 type Step = "character" | "avatar";
@@ -31,7 +32,7 @@ const JOB_EMOJI: Record<string, string> = {
 };
 
 export default function JoinRoomModal({
-  open, onClose, sessionId, localId, scenarioTitle, config,
+  open, onClose, sessionId, localId, scenarioTitle, config, onSaveProfile,
 }: Props) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("character");
@@ -88,6 +89,7 @@ export default function JoinRoomModal({
         return;
       }
 
+      onSaveProfile(characterData.characterName, avatarIndex);
       router.push(`/trpg/lobby/${sessionId}`);
     } catch {
       setError("네트워크 오류가 발생했습니다.");

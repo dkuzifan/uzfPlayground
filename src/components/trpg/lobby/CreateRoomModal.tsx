@@ -15,6 +15,7 @@ interface CreateRoomModalProps {
   open: boolean;
   onClose: () => void;
   profile: GuestProfile;
+  onSaveProfile: (nickname: string, avatarIndex: number) => void;
 }
 
 type Step = "scenario" | "create-scenario" | "character" | "room";
@@ -40,7 +41,7 @@ const JOB_EMOJI: Record<string, string> = {
   detective: "🔍", journalist: "📰", doctor: "🩺", lawyer: "⚖️", civilian: "👤",
 };
 
-export default function CreateRoomModal({ open, onClose, profile }: CreateRoomModalProps) {
+export default function CreateRoomModal({ open, onClose, profile, onSaveProfile }: CreateRoomModalProps) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("scenario");
   const [selectedScenario, setSelectedScenario] = useState<ScenarioSummary | null>(null);
@@ -110,6 +111,7 @@ export default function CreateRoomModal({ open, onClose, profile }: CreateRoomMo
         setError(data.error ?? "방 생성에 실패했습니다.");
         return;
       }
+      onSaveProfile(characterData.characterName, avatarIndex);
       router.push(`/trpg/lobby/${data.sessionId}`);
     } catch {
       setError("네트워크 오류가 발생했습니다.");

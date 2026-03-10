@@ -15,21 +15,37 @@ export function useGuestProfile() {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         setProfile(JSON.parse(raw) as GuestProfile);
+      } else {
+        // 최초 방문 — localId 자동 생성 (닉네임/아바타는 첫 방 입장 시 설정)
+        const init: GuestProfile = {
+          localId: crypto.randomUUID(),
+          nickname: "",
+          avatarIndex: 0,
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(init));
+        setProfile(init);
       }
     } catch {
-      // localStorage 파싱 실패 시 무시 → 모달 표시
+      // localStorage 실패 시 임시 프로필 (세션 내에서만 유지)
+      setProfile({ localId: crypto.randomUUID(), nickname: "", avatarIndex: 0 });
     }
   }, []);
 
-  const saveProfile = useCallback((p: Omit<GuestProfile, "localId"> & { localId?: string }) => {
-    const localId = p.localId ?? crypto.randomUUID();
-    const full: GuestProfile = { ...p, localId };
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(full));
-    } catch {
-      // 저장 실패 시 세션 내에서만 유지
-    }
-    setProfile(full);
+  /** 방 입장/생성 후 nickname + avatarIndex 업데이트 */
+  const saveProfile = useCallback((nickname: string, avatarIndex: number) => {
+    setProfile((prev) => {
+      const updated: GuestProfile = {
+        localId: prev?.localId ?? crypto.randomUUID(),
+        nickname,
+        avatarIndex,
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {
+        // 저장 실패 시 세션 내에서만 유지
+      }
+      return updated;
+    });
   }, []);
 
   return {

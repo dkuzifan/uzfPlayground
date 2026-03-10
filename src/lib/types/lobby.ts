@@ -2,19 +2,12 @@
 // Lobby & Waiting Room Types
 // ============================================================
 
-import type { PersonalityProfile } from "@/lib/types/character";
-import type { CharacterJob } from "@/lib/types/character";
 
 /** localStorage에 저장되는 게스트 프로필 */
 export interface GuestProfile {
-  nickname: string;    // 최대 12자
-  avatarIndex: number; // 0~7 (색상 원 인덱스)
   localId: string;     // crypto.randomUUID() — DB Player_Character.user_id로 사용
-  // 캐릭터 생성 데이터 (성향 테스트 완료 시 저장)
-  characterName?: string;
-  job?: CharacterJob;
-  personality?: PersonalityProfile;
-  characterCreated?: boolean;
+  nickname: string;    // 최근 사용한 캐릭터 이름 (방 입장 시 자동 갱신)
+  avatarIndex: number; // 0~7 (색상 원 인덱스, 방 입장 시 자동 갱신)
 }
 
 /** 로비 방 목록 카드 1개 */

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { LobbySession } from "@/lib/types/lobby";
 import type { CharacterCreationConfig } from "@/lib/types/character";
 import { useGuestProfile } from "@/hooks/useGuestProfile";
+
 import JoinRoomModal from "./JoinRoomModal";
 
 interface RoomCardProps {
@@ -13,7 +14,7 @@ interface RoomCardProps {
 
 export default function RoomCard({ session }: RoomCardProps) {
   const router = useRouter();
-  const { profile } = useGuestProfile();
+  const { profile, saveProfile } = useGuestProfile();
   const isFull = session.player_count >= session.max_players;
 
   const [checking, setChecking] = useState(false);
@@ -110,6 +111,7 @@ export default function RoomCard({ session }: RoomCardProps) {
           localId={profile.localId}
           scenarioTitle={joinModal.scenarioTitle}
           config={joinModal.config}
+          onSaveProfile={saveProfile}
         />
       )}
     </>
