@@ -47,6 +47,9 @@ export default function CreateRoomModal({
           localId: profile.localId,
           nickname: profile.nickname,
           avatarIndex: profile.avatarIndex,
+          ...(profile.characterName ? { characterName: profile.characterName } : {}),
+          ...(profile.job ? { job: profile.job } : {}),
+          ...(profile.personality ? { personality: profile.personality } : {}),
         }),
       });
 

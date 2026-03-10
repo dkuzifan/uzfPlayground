@@ -41,6 +41,10 @@ export async function GET() {
   return NextResponse.json(result);
 }
 
+const VALID_JOBS_SET = new Set([
+  "warrior","mage","rogue","cleric","ranger","paladin","bard","adventurer",
+]);
+
 // ── POST /api/trpg/sessions — 방 생성 ───────────────────────────────
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -48,12 +52,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { room_name, max_players, localId, nickname, avatarIndex } = body as {
+  const { room_name, max_players, localId, nickname, avatarIndex, characterName, job, personality } = body as {
     room_name?: string;
     max_players?: number;
     localId?: string;
     nickname?: string;
     avatarIndex?: number;
+    characterName?: string;
+    job?: string;
+    personality?: { mbti?: string | null; enneagram?: number | null; dnd_alignment?: string | null };
   };
 
   // 입력 검증
@@ -71,6 +78,8 @@ export async function POST(request: Request) {
   }
   const safeMaxPlayers = Math.min(7, Math.max(2, max_players ?? 4));
   const safeAvatarIndex = Math.min(7, Math.max(0, avatarIndex ?? 0));
+  const safeJob = typeof job === "string" && VALID_JOBS_SET.has(job) ? job : "adventurer";
+  const safeCharName = (characterName?.trim() || nickname.trim()).slice(0, 16);
 
   const supabase = createServiceClient();
 
@@ -102,6 +111,7 @@ export async function POST(request: Request) {
     .single();
 
   if (sessionError || !session) {
+    console.error("[sessions POST] Game_Session insert error:", sessionError);
     return NextResponse.json(
       { error: "방 생성에 실패했습니다." },
       { status: 500 }
@@ -115,14 +125,18 @@ export async function POST(request: Request) {
       session_id: session.id,
       user_id: localId,
       player_name: nickname.trim(),
-      character_name: nickname.trim(),
-      job: "adventurer",
+      character_name: safeCharName,
+      job: safeJob,
       personality_summary: `avatar:${safeAvatarIndex}`,
+      ...(personality?.mbti ? { mbti: personality.mbti } : {}),
+      ...(personality?.enneagram != null ? { enneagram: personality.enneagram } : {}),
+      ...(personality?.dnd_alignment ? { dnd_alignment: personality.dnd_alignment } : {}),
     })
     .select("id")
     .single();
 
   if (pcError || !pc) {
+    console.error("[sessions POST] Player_Character insert error:", pcError);
     return NextResponse.json(
       { error: "플레이어 등록에 실패했습니다." },
       { status: 500 }

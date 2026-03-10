@@ -128,7 +128,9 @@ export async function POST(request: Request, { params }: RouteParams) {
       character_name: (characterName?.trim() || nickname.trim()).slice(0, 16),
       job: safeJob,
       personality_summary: `avatar:${safeAvatarIndex}`,
-      ...(safePersonality ? { personality: safePersonality } : {}),
+      ...(safePersonality?.mbti ? { mbti: safePersonality.mbti } : {}),
+      ...(safePersonality?.enneagram != null ? { enneagram: safePersonality.enneagram } : {}),
+      ...(safePersonality?.dnd_alignment ? { dnd_alignment: safePersonality.dnd_alignment } : {}),
     });
 
   if (insertError && insertError.code !== "23505") {
