@@ -120,7 +120,7 @@ export async function POST(request: Request) {
   if (sessionError || !session) {
     console.error("[sessions POST] Game_Session insert error:", sessionError);
     return NextResponse.json(
-      { error: "방 생성에 실패했습니다." },
+      { error: "방 생성에 실패했습니다.", detail: sessionError?.message },
       { status: 500 }
     );
   }
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
   if (pcError || !pc) {
     console.error("[sessions POST] Player_Character insert error:", pcError);
     return NextResponse.json(
-      { error: "플레이어 등록에 실패했습니다." },
+      { error: "플레이어 등록에 실패했습니다.", detail: pcError?.message },
       { status: 500 }
     );
   }
