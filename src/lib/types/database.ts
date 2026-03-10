@@ -16,6 +16,12 @@ export interface Database {
           clear_conditions: string[];
           max_players: number;
           is_active: boolean;
+          character_creation_config: {
+            available_jobs: string[];
+            job_labels: Record<string, string>;
+            personality_test_theme: string;
+            character_name_hint: string;
+          };
           created_at: string;
           updated_at: string;
         };
@@ -29,6 +35,12 @@ export interface Database {
           clear_conditions?: string[];
           max_players?: number;
           is_active?: boolean;
+          character_creation_config?: {
+            available_jobs?: string[];
+            job_labels?: Record<string, string>;
+            personality_test_theme?: string;
+            character_name_hint?: string;
+          };
           created_at?: string;
           updated_at?: string;
         };

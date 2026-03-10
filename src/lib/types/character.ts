@@ -21,7 +21,8 @@ export type DnDAlignment =
   | "neutral-evil"
   | "chaotic-evil";
 
-export type CharacterJob =
+// 판타지 직업
+export type FantasyJob =
   | "warrior"
   | "mage"
   | "rogue"
@@ -30,6 +31,16 @@ export type CharacterJob =
   | "paladin"
   | "bard"
   | "adventurer";
+
+// 현대/미스터리 직업
+export type ModernJob =
+  | "detective"
+  | "journalist"
+  | "doctor"
+  | "lawyer"
+  | "civilian";
+
+export type CharacterJob = FantasyJob | ModernJob;
 
 // 신장 구분: 세계관 종족 특성 기반 카테고리
 // 소형종: 고블린, 노움, 코볼트, 하플링 (은신+, 위협-)
@@ -86,6 +97,19 @@ export interface StatusEffect {
   effect_description: string;
   stat_modifier: Partial<BaseModifiers>;
   duration_turns: number | null; // null = 무기한
+}
+
+// 성향 테스트 테마 — 시나리오 장르에 따라 씬 배경이 달라짐
+// "fantasy": 마법/검 세계관 (현재 구현됨)
+// "modern" | "mystery": 추후 구현 예정
+export type PersonalityTestTheme = "fantasy" | "modern" | "mystery";
+
+// 시나리오별 캐릭터 생성 설정 (Scenario.character_creation_config)
+export interface CharacterCreationConfig {
+  available_jobs: CharacterJob[];
+  job_labels: Partial<Record<CharacterJob, string>>;
+  personality_test_theme: PersonalityTestTheme;
+  character_name_hint: string;
 }
 
 export interface PersonalityProfile {
