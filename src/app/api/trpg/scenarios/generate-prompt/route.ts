@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 시스템 프롬프트:`;
 
   try {
-    const model = getGeminiModel("gemini-2.0-flash");
+    const model = getGeminiModel("gemini-2.5-pro");
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
 
