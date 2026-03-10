@@ -36,8 +36,11 @@ export default function WaitingRoom({ sessionId, profile }: WaitingRoomProps) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setStartError(data.error ?? "게임 시작에 실패했습니다.");
+        setStartError(data.detail ?? data.error ?? "게임 시작에 실패했습니다.");
+        return;
       }
+      // 방장은 직접 이동 (다른 플레이어는 realtime으로 이동)
+      router.push(`/trpg/game/${sessionId}`);
     } catch {
       setStartError("네트워크 오류가 발생했습니다.");
     } finally {
@@ -124,7 +127,7 @@ export default function WaitingRoom({ sessionId, profile }: WaitingRoomProps) {
           {amIHost && (
             <>
               {startError && (
-                <p className="mb-2 text-xs text-red-500 dark:text-red-400">{startError}</p>
+                <p className="mb-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{startError}</p>
               )}
               <Button
                 variant="primary"

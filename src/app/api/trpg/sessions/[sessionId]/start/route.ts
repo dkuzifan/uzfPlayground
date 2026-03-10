@@ -69,7 +69,8 @@ export async function POST(request: Request, { params }: RouteParams) {
     .eq("id", sessionId);
 
   if (updateError) {
-    return NextResponse.json({ error: "게임 시작에 실패했습니다." }, { status: 500 });
+    console.error("[start] update error:", updateError);
+    return NextResponse.json({ error: "게임 시작에 실패했습니다.", detail: updateError.message }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });
