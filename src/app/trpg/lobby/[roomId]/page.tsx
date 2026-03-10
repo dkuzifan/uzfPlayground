@@ -37,7 +37,9 @@ export default function WaitingRoomPage({ params }: WaitingRoomPageProps) {
   );
 }
 
-// 입장 API를 1회 호출하고 WaitingRoom을 렌더링하는 내부 컴포넌트
+// PC 존재 확인 후 WaitingRoom을 렌더링하는 내부 컴포넌트.
+// RoomCard를 통해 정상 입장한 경우 PC는 이미 생성되어 있음.
+// 직접 URL 접근 등 예외 케이스에만 fallback join 시도.
 function JoinAndShow({
   sessionId,
   localId,
@@ -50,28 +52,31 @@ function JoinAndShow({
   const router = useRouter();
 
   useEffect(() => {
-    fetch(`/api/trpg/sessions/${sessionId}/join`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        localId,
-        nickname: profile.nickname,
-        avatarIndex: profile.avatarIndex,
-        ...(profile.characterName ? { characterName: profile.characterName } : {}),
-        ...(profile.job ? { job: profile.job } : {}),
-        ...(profile.personality ? { personality: profile.personality } : {}),
-      }),
-    }).then(async (res) => {
-      if (!res.ok) {
+    fetch(`/api/trpg/sessions/${sessionId}/my-character?localId=${localId}`)
+      .then(async (res) => {
         const data = await res.json().catch(() => ({}));
-        // 만석(409) 또는 세션 없음(404)이면 로비로 돌아감
-        if (res.status === 409 || res.status === 404) {
-          alert(data.error ?? "입장할 수 없는 방입니다.");
+
+        if (res.status === 409) {
+          // 이미 시작된 방
+          alert(data.error ?? "이미 시작된 방입니다.");
           router.replace("/trpg/lobby");
+          return;
         }
-      }
-    });
-    // 마운트 시 1회만 실행
+        if (res.status === 404) {
+          alert(data.error ?? "방을 찾을 수 없습니다.");
+          router.replace("/trpg/lobby");
+          return;
+        }
+
+        if (data.exists) return; // 이미 참여 중 → 그대로 대기실
+
+        // PC 없음 (직접 URL 접근 등) → 로비로 리다이렉트
+        // 정상 흐름(RoomCard → JoinRoomModal)에선 여기 도달하지 않음
+        router.replace("/trpg/lobby");
+      })
+      .catch(() => {
+        // 네트워크 오류는 무시하고 대기실 렌더 유지
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
