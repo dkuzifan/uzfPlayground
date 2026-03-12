@@ -2,18 +2,34 @@
 
 import { useState } from "react";
 import type { ScenarioSummary } from "./ScenarioSelectStep";
+import type { ObjectiveType, EndingTrigger, EndingTone, ScenarioObjectives, ScenarioEndings } from "@/lib/types/game";
 
 interface Props {
   onComplete: (scenario: ScenarioSummary) => void;
   onBack: () => void;
 }
 
-type SubStep = "basic" | "jobs" | "prompt";
+type SubStep = "basic" | "jobs" | "prompt" | "objectives";
 
 interface JobConfig {
   job: string;
   label: string;
   enabled: boolean;
+}
+
+interface ObjectiveForm {
+  type: ObjectiveType;
+  target_description: string;
+  progress_max: number;
+  is_hidden?: boolean;
+}
+
+interface EndingForm {
+  id: string;
+  label: string;
+  description: string;
+  trigger: EndingTrigger;
+  tone: EndingTone;
 }
 
 const THEME_OPTIONS = [
@@ -68,6 +84,50 @@ const PERSONALITY_THEME_MAP: Record<string, string> = {
   "sci-fi": "modern",
 };
 
+const OBJECTIVE_TYPE_OPTIONS: { value: ObjectiveType; label: string }[] = [
+  { value: "eliminate", label: "제거 — 특정 NPC/위협 처치" },
+  { value: "reach",     label: "도달 — 특정 장소 도달" },
+  { value: "find",      label: "발견 — 정보/물건 발견" },
+  { value: "obtain",    label: "획득 — 아이템 입수" },
+  { value: "protect",   label: "보호 — NPC/장소 보호" },
+  { value: "survive",   label: "생존 — N턴 살아남기" },
+  { value: "solve",     label: "해결 — 퍼즐/수수께끼" },
+  { value: "reveal",    label: "폭로 — 숨겨진 사실 밝히기" },
+  { value: "escort",    label: "호위 — NPC 안전히 동행" },
+  { value: "choose",    label: "선택 — 분기점 결정" },
+];
+
+const TRIGGER_OPTIONS: { value: EndingTrigger; label: string }[] = [
+  { value: "primary_complete", label: "메인 목표 달성" },
+  { value: "doom_maxed",       label: "위기 시계 최대 도달" },
+  { value: "secret_complete",  label: "비밀 목표 달성" },
+  { value: "primary_failed",   label: "메인 목표 실패" },
+  { value: "custom",           label: "GM 판단 (커스텀)" },
+];
+
+const TONE_OPTIONS: { value: EndingTone; label: string }[] = [
+  { value: "triumphant",  label: "승리 (금색)" },
+  { value: "bittersweet", label: "여운 (회색)" },
+  { value: "tragic",      label: "비극 (빨강)" },
+  { value: "mysterious",  label: "신비 (보라)" },
+];
+
+const SUB_STEP_LABELS: Record<SubStep, string> = {
+  basic: "기본 정보",
+  jobs: "직업 설정",
+  prompt: "GM 프롬프트",
+  objectives: "게임 목표",
+};
+const SUB_STEPS: SubStep[] = ["basic", "jobs", "prompt", "objectives"];
+
+function defaultEndings(): EndingForm[] {
+  return [
+    { id: "full_victory", label: "완전한 승리", description: "", trigger: "primary_complete", tone: "triumphant" },
+    { id: "doom_end",     label: "실패",         description: "", trigger: "doom_maxed",       tone: "tragic" },
+    { id: "secret_end",   label: "비밀 엔딩",    description: "", trigger: "secret_complete",  tone: "mysterious" },
+  ];
+}
+
 export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
   const [subStep, setSubStep] = useState<SubStep>("basic");
 
@@ -81,11 +141,34 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
   const [jobs, setJobs] = useState<JobConfig[]>(THEME_JOB_PRESETS.fantasy);
 
   // Step C
-  const [gmPrompt, setGmPrompt]       = useState("");
-  const [generating, setGenerating]   = useState(false);
+  const [gmPrompt, setGmPrompt]     = useState("");
+  const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const [saving, setSaving]           = useState(false);
-  const [saveError, setSaveError]     = useState<string | null>(null);
+
+  // Step D
+  const [primaryObj, setPrimaryObj] = useState<ObjectiveForm>({
+    type: "find",
+    target_description: "",
+    progress_max: 4,
+  });
+  const [secondaryObjs, setSecondaryObjs] = useState<ObjectiveForm[]>([]);
+  const [secretObj, setSecretObj] = useState<ObjectiveForm>({
+    type: "reveal",
+    target_description: "",
+    progress_max: 4,
+    is_hidden: true,
+  });
+  const [doomInterval, setDoomInterval] = useState(4);
+  const [doomMax, setDoomMax]           = useState(8);
+  const [endings, setEndings]           = useState<EndingForm[]>(defaultEndings());
+  const [generatingObj, setGeneratingObj] = useState(false);
+  const [objError, setObjError]           = useState<string | null>(null);
+
+  // 저장
+  const [saving, setSaving]     = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const enabledJobs = jobs.filter((j) => j.enabled);
 
   // ── Step A → B ──────────────────────────────────────────────────────
   function handleBasicNext() {
@@ -96,38 +179,26 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
 
   // ── Step B: 직업 토글/라벨 편집 ──────────────────────────────────────
   function toggleJob(idx: number) {
-    setJobs((prev) =>
-      prev.map((j, i) => (i === idx ? { ...j, enabled: !j.enabled } : j))
-    );
+    setJobs((prev) => prev.map((j, i) => (i === idx ? { ...j, enabled: !j.enabled } : j)));
   }
-
   function updateLabel(idx: number, label: string) {
-    setJobs((prev) =>
-      prev.map((j, i) => (i === idx ? { ...j, label } : j))
-    );
+    setJobs((prev) => prev.map((j, i) => (i === idx ? { ...j, label } : j)));
   }
-
-  const enabledJobs = jobs.filter((j) => j.enabled);
 
   // ── Step C: AI 초안 생성 ─────────────────────────────────────────────
   async function handleGenerate() {
     setGenerating(true);
     setGenerateError(null);
     try {
-      const jobLabels = Object.fromEntries(
-        enabledJobs.map((j) => [j.job, j.label])
-      );
+      const jobLabels = Object.fromEntries(enabledJobs.map((j) => [j.job, j.label]));
       const res = await fetch("/api/trpg/scenarios/generate-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, theme, description, job_labels: jobLabels }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setGenerateError(data.error ?? "생성에 실패했습니다.");
-      } else {
-        setGmPrompt(data.gm_system_prompt);
-      }
+      if (!res.ok) setGenerateError(data.error ?? "생성에 실패했습니다.");
+      else setGmPrompt(data.gm_system_prompt);
     } catch {
       setGenerateError("네트워크 오류가 발생했습니다.");
     } finally {
@@ -135,15 +206,102 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
     }
   }
 
+  // ── Step D: 목표 자동 생성 ───────────────────────────────────────────
+  async function handleGenerateObjectives() {
+    setGeneratingObj(true);
+    setObjError(null);
+    try {
+      const res = await fetch("/api/trpg/scenarios/generate-objectives", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, theme, description, gm_system_prompt: gmPrompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setObjError(data.error ?? "자동 생성에 실패했습니다.");
+        return;
+      }
+      const obj = data.objectives as ScenarioObjectives;
+      const end = data.endings as ScenarioEndings;
+      setPrimaryObj({
+        type: obj.primary.type,
+        target_description: obj.primary.target_description,
+        progress_max: obj.primary.progress_max,
+      });
+      setSecondaryObjs((obj.secondary ?? []).map((s) => ({
+        type: s.type,
+        target_description: s.target_description,
+        progress_max: s.progress_max,
+      })));
+      if (obj.secret) {
+        setSecretObj({
+          type: obj.secret.type,
+          target_description: obj.secret.target_description,
+          progress_max: obj.secret.progress_max,
+          is_hidden: true,
+        });
+      }
+      setDoomInterval(obj.doom_clock_interval);
+      setDoomMax(obj.doom_clock_max);
+      setEndings(end.endings.map((e) => ({
+        id: e.id,
+        label: e.label,
+        description: e.description,
+        trigger: e.trigger,
+        tone: e.tone,
+      })));
+    } catch {
+      setObjError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setGeneratingObj(false);
+    }
+  }
+
+  // ── Step D: 서브 목표 추가/삭제 ──────────────────────────────────────
+  function addSecondary() {
+    if (secondaryObjs.length >= 2) return;
+    setSecondaryObjs((prev) => [...prev, { type: "find", target_description: "", progress_max: 4 }]);
+  }
+  function removeSecondary(idx: number) {
+    setSecondaryObjs((prev) => prev.filter((_, i) => i !== idx));
+  }
+  function updateSecondary(idx: number, patch: Partial<ObjectiveForm>) {
+    setSecondaryObjs((prev) => prev.map((o, i) => (i === idx ? { ...o, ...patch } : o)));
+  }
+
+  // ── Step D: 엔딩 편집 ────────────────────────────────────────────────
+  function updateEnding(idx: number, patch: Partial<EndingForm>) {
+    setEndings((prev) => prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)));
+  }
+
   // ── 최종 저장 ────────────────────────────────────────────────────────
   async function handleSave() {
-    if (!gmPrompt.trim()) return;
     setSaving(true);
     setSaveError(null);
 
-    const jobLabels = Object.fromEntries(
-      enabledJobs.map((j) => [j.job, j.label])
-    );
+    const jobLabels = Object.fromEntries(enabledJobs.map((j) => [j.job, j.label]));
+
+    const objectives: ScenarioObjectives | null = primaryObj.target_description.trim()
+      ? {
+          primary: {
+            type: primaryObj.type,
+            target_description: primaryObj.target_description.trim(),
+            progress_max: primaryObj.progress_max,
+          },
+          secondary: secondaryObjs
+            .filter((o) => o.target_description.trim())
+            .map((o) => ({ type: o.type, target_description: o.target_description.trim(), progress_max: o.progress_max })),
+          secret: secretObj.target_description.trim()
+            ? { type: secretObj.type, target_description: secretObj.target_description.trim(), progress_max: secretObj.progress_max, is_hidden: true }
+            : undefined,
+          doom_clock_interval: doomInterval,
+          doom_clock_max: doomMax,
+        }
+      : null;
+
+    const endingsData: ScenarioEndings | null = endings.some((e) => e.label.trim())
+      ? { endings: endings.filter((e) => e.label.trim()).map((e) => ({ ...e, label: e.label.trim(), description: e.description.trim(), custom_condition: undefined })) }
+      : null;
 
     try {
       const res = await fetch("/api/trpg/scenarios", {
@@ -159,17 +317,15 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
             available_jobs: enabledJobs.map((j) => j.job),
             job_labels: jobLabels,
             personality_test_theme: PERSONALITY_THEME_MAP[theme] ?? "fantasy",
-            character_name_hint:
-              theme === "fantasy" ? "모험가의 이름을 입력하세요" : "캐릭터 이름을 입력하세요",
+            character_name_hint: theme === "fantasy" ? "모험가의 이름을 입력하세요" : "캐릭터 이름을 입력하세요",
           },
+          objectives,
+          endings: endingsData,
         }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setSaveError(data.error ?? "저장에 실패했습니다.");
-      } else {
-        onComplete(data);
-      }
+      if (!res.ok) setSaveError(data.error ?? "저장에 실패했습니다.");
+      else onComplete(data);
     } catch {
       setSaveError("네트워크 오류가 발생했습니다.");
     } finally {
@@ -181,14 +337,14 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
   return (
     <div className="space-y-4">
       {/* 진행 표시 */}
-      <div className="flex items-center gap-2 text-xs text-neutral-400">
-        {(["basic", "jobs", "prompt"] as SubStep[]).map((s, i) => (
-          <span key={s} className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 text-xs text-neutral-400 flex-wrap">
+        {SUB_STEPS.map((s, i) => (
+          <span key={s} className="flex items-center gap-1.5">
             <span
               className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
                 subStep === s
                   ? "bg-yellow-400 text-neutral-900"
-                  : i < ["basic", "jobs", "prompt"].indexOf(subStep)
+                  : i < SUB_STEPS.indexOf(subStep)
                   ? "bg-neutral-300 text-neutral-600 dark:bg-neutral-600 dark:text-neutral-300"
                   : "border border-neutral-300 dark:border-neutral-600"
               }`}
@@ -196,9 +352,9 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
               {i + 1}
             </span>
             <span className={subStep === s ? "text-neutral-700 dark:text-neutral-200" : ""}>
-              {["기본 정보", "직업 설정", "GM 프롬프트"][i]}
+              {SUB_STEP_LABELS[s]}
             </span>
-            {i < 2 && <span>›</span>}
+            {i < SUB_STEPS.length - 1 && <span>›</span>}
           </span>
         ))}
       </div>
@@ -211,11 +367,9 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
               시나리오 제목 <span className="text-red-500">*</span>
             </label>
             <input
-              type="text"
-              maxLength={40}
+              type="text" maxLength={40}
               placeholder="예: 어둠의 던전, 저택 살인사건"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              value={title} onChange={(e) => setTitle(e.target.value)}
               className="w-full rounded-lg border border-black/15 bg-white/70 px-3 py-2 text-sm outline-none focus:border-yellow-500/60 dark:border-white/20 dark:bg-white/5 dark:text-white"
               autoFocus
             />
@@ -228,16 +382,14 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
             <div className="grid grid-cols-2 gap-2">
               {THEME_OPTIONS.map((t) => (
                 <button
-                  key={t.value}
-                  onClick={() => setTheme(t.value)}
+                  key={t.value} onClick={() => setTheme(t.value)}
                   className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
                     theme === t.value
                       ? "border-yellow-400 bg-yellow-50 font-semibold text-yellow-700 dark:border-yellow-500 dark:bg-yellow-900/20 dark:text-yellow-300"
                       : "border-black/10 bg-white hover:border-yellow-300 dark:border-white/10 dark:bg-white/5"
                   }`}
                 >
-                  <span>{t.icon}</span>
-                  <span>{t.label}</span>
+                  <span>{t.icon}</span><span>{t.label}</span>
                 </button>
               ))}
             </div>
@@ -248,16 +400,12 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
               시나리오 설명
             </label>
             <textarea
-              rows={3}
-              maxLength={300}
+              rows={3} maxLength={300}
               placeholder="플레이어에게 보여줄 간단한 소개 (선택)"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              value={description} onChange={(e) => setDescription(e.target.value)}
               className="w-full resize-none rounded-lg border border-black/15 bg-white/70 px-3 py-2 text-sm outline-none focus:border-yellow-500/60 dark:border-white/20 dark:bg-white/5 dark:text-white"
             />
-            <p className="mt-0.5 text-right text-xs text-neutral-400">
-              {description.length}/300
-            </p>
+            <p className="mt-0.5 text-right text-xs text-neutral-400">{description.length}/300</p>
           </div>
 
           <div>
@@ -270,9 +418,7 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
               onChange={(e) => setMaxPlayers(Number(e.target.value))}
               className="w-full accent-yellow-500"
             />
-            <div className="flex justify-between text-xs text-neutral-400">
-              <span>2명</span><span>7명</span>
-            </div>
+            <div className="flex justify-between text-xs text-neutral-400"><span>2명</span><span>7명</span></div>
           </div>
 
           <div className="flex gap-2 pt-1">
@@ -283,8 +429,7 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
               취소
             </button>
             <button
-              onClick={handleBasicNext}
-              disabled={!title.trim()}
+              onClick={handleBasicNext} disabled={!title.trim()}
               className="flex-1 rounded-lg bg-yellow-400 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-500 disabled:opacity-40"
             >
               다음 →
@@ -297,9 +442,8 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
       {subStep === "jobs" && (
         <div className="space-y-4">
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            플레이어가 선택할 수 있는 직업을 설정하세요. 이름도 자유롭게 바꿀 수 있습니다.
+            플레이어가 선택할 수 있는 직업을 설정하세요.
           </p>
-
           <div className="space-y-2">
             {jobs.map((j, idx) => (
               <div
@@ -313,20 +457,15 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
                 <button
                   onClick={() => toggleJob(idx)}
                   className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border text-xs font-bold transition ${
-                    j.enabled
-                      ? "border-yellow-400 bg-yellow-400 text-neutral-900"
-                      : "border-neutral-300 dark:border-neutral-600"
+                    j.enabled ? "border-yellow-400 bg-yellow-400 text-neutral-900" : "border-neutral-300 dark:border-neutral-600"
                   }`}
                 >
                   {j.enabled && "✓"}
                 </button>
                 <span className="text-base">{JOB_EMOJI[j.job] ?? "👤"}</span>
                 <input
-                  type="text"
-                  value={j.label}
-                  onChange={(e) => updateLabel(idx, e.target.value)}
-                  disabled={!j.enabled}
-                  maxLength={12}
+                  type="text" value={j.label} onChange={(e) => updateLabel(idx, e.target.value)}
+                  disabled={!j.enabled} maxLength={12}
                   className="flex-1 bg-transparent text-sm font-medium outline-none dark:text-white"
                 />
                 <span className="text-xs text-neutral-400 dark:text-neutral-500">{j.job}</span>
@@ -346,8 +485,7 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
               ← 이전
             </button>
             <button
-              onClick={() => setSubStep("prompt")}
-              disabled={enabledJobs.length === 0}
+              onClick={() => setSubStep("prompt")} disabled={enabledJobs.length === 0}
               className="flex-1 rounded-lg bg-yellow-400 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-500 disabled:opacity-40"
             >
               다음 →
@@ -365,42 +503,23 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
                 GM 시스템 프롬프트 <span className="text-red-500">*</span>
               </label>
               <button
-                onClick={handleGenerate}
-                disabled={generating}
+                onClick={handleGenerate} disabled={generating}
                 className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
               >
                 {generating ? (
-                  <>
-                    <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white dark:border-neutral-900/30 dark:border-t-neutral-900" />
-                    생성 중…
-                  </>
-                ) : (
-                  <>✨ AI로 초안 생성</>
-                )}
+                  <><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white dark:border-neutral-900/30 dark:border-t-neutral-900" />생성 중…</>
+                ) : <>✨ AI로 초안 생성</>}
               </button>
             </div>
-
-            {generateError && (
-              <p className="mb-1.5 text-xs text-red-400">{generateError}</p>
-            )}
-
+            {generateError && <p className="mb-1.5 text-xs text-red-400">{generateError}</p>}
             <textarea
               rows={10}
               placeholder={`AI 초안 생성 버튼을 누르거나 직접 작성하세요.\n\n예시:\n당신은 어둠의 던전을 배경으로 한 판타지 RPG의 게임 마스터입니다.\n\n[세계관]\n...\n\n[GM 규칙]\n...`}
-              value={gmPrompt}
-              onChange={(e) => setGmPrompt(e.target.value)}
+              value={gmPrompt} onChange={(e) => setGmPrompt(e.target.value)}
               className="w-full resize-none rounded-lg border border-black/15 bg-white/70 px-3 py-2 font-mono text-xs leading-relaxed outline-none focus:border-yellow-500/60 dark:border-white/20 dark:bg-white/5 dark:text-white"
             />
-            <p className="mt-0.5 text-right text-xs text-neutral-400">
-              {gmPrompt.length}자
-            </p>
+            <p className="mt-0.5 text-right text-xs text-neutral-400">{gmPrompt.length}자</p>
           </div>
-
-          {saveError && (
-            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-500 dark:text-red-400">
-              {saveError}
-            </p>
-          )}
 
           <div className="flex gap-2">
             <button
@@ -410,8 +529,234 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
               ← 이전
             </button>
             <button
-              onClick={handleSave}
-              disabled={!gmPrompt.trim() || saving}
+              onClick={() => setSubStep("objectives")} disabled={!gmPrompt.trim()}
+              className="flex-1 rounded-lg bg-yellow-400 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-500 disabled:opacity-40"
+            >
+              다음 →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step D: 게임 목표 설정 ── */}
+      {subStep === "objectives" && (
+        <div className="space-y-5">
+          {/* 자동 생성 버튼 */}
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              목표와 엔딩을 설정하세요. 건너뛰면 목표 없이 진행됩니다.
+            </p>
+            <button
+              onClick={handleGenerateObjectives} disabled={generatingObj}
+              className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 whitespace-nowrap"
+            >
+              {generatingObj ? (
+                <><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white dark:border-neutral-900/30 dark:border-t-neutral-900" />생성 중…</>
+              ) : <>✨ AI 자동 생성</>}
+            </button>
+          </div>
+          {objError && <p className="text-xs text-red-400">{objError}</p>}
+
+          {/* 메인 목표 */}
+          <section className="space-y-2 rounded-xl border border-black/10 bg-white/60 p-3 dark:border-white/10 dark:bg-white/5">
+            <h4 className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">메인 목표</h4>
+            <div className="flex gap-2">
+              <select
+                value={primaryObj.type}
+                onChange={(e) => setPrimaryObj((p) => ({ ...p, type: e.target.value as ObjectiveType }))}
+                className="rounded-lg border border-black/10 bg-white px-2 py-1.5 text-xs dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+              >
+                {OBJECTIVE_TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <span className="flex items-center text-xs text-neutral-400">클락</span>
+              <select
+                value={primaryObj.progress_max}
+                onChange={(e) => setPrimaryObj((p) => ({ ...p, progress_max: Number(e.target.value) }))}
+                className="w-16 rounded-lg border border-black/10 bg-white px-2 py-1.5 text-xs dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+              >
+                {[4, 6, 8].map((v) => <option key={v} value={v}>{v}칸</option>)}
+              </select>
+            </div>
+            <input
+              type="text" maxLength={60}
+              placeholder="예: 카림을 마을 밖으로 데려간다"
+              value={primaryObj.target_description}
+              onChange={(e) => setPrimaryObj((p) => ({ ...p, target_description: e.target.value }))}
+              className="w-full rounded-lg border border-black/10 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-white/5 dark:text-white"
+            />
+          </section>
+
+          {/* 서브 목표 */}
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">
+                서브 목표 <span className="font-normal text-neutral-400">({secondaryObjs.length}/2)</span>
+              </h4>
+              {secondaryObjs.length < 2 && (
+                <button
+                  onClick={addSecondary}
+                  className="rounded-lg border border-black/10 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5"
+                >
+                  + 추가
+                </button>
+              )}
+            </div>
+            {secondaryObjs.map((obj, i) => (
+              <div key={i} className="space-y-1.5 rounded-xl border border-black/10 bg-white/60 p-3 dark:border-white/10 dark:bg-white/5">
+                <div className="flex items-center gap-2">
+                  <select
+                    value={obj.type}
+                    onChange={(e) => updateSecondary(i, { type: e.target.value as ObjectiveType })}
+                    className="flex-1 rounded-lg border border-black/10 bg-white px-2 py-1 text-xs dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                  >
+                    {OBJECTIVE_TYPE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={obj.progress_max}
+                    onChange={(e) => updateSecondary(i, { progress_max: Number(e.target.value) })}
+                    className="w-16 rounded-lg border border-black/10 bg-white px-2 py-1 text-xs dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                  >
+                    {[4, 6, 8].map((v) => <option key={v} value={v}>{v}칸</option>)}
+                  </select>
+                  <button onClick={() => removeSecondary(i)} className="text-xs text-red-400 hover:text-red-600">✕</button>
+                </div>
+                <input
+                  type="text" maxLength={60}
+                  placeholder="서브 목표 설명"
+                  value={obj.target_description}
+                  onChange={(e) => updateSecondary(i, { target_description: e.target.value })}
+                  className="w-full rounded-lg border border-black/10 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                />
+              </div>
+            ))}
+            {secondaryObjs.length === 0 && (
+              <p className="text-xs text-neutral-400">서브 목표 없음 (선택 사항)</p>
+            )}
+          </section>
+
+          {/* 비밀 목표 */}
+          <section className="space-y-2 rounded-xl border border-dashed border-black/10 bg-white/40 p-3 dark:border-white/10 dark:bg-white/5">
+            <h4 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+              비밀 목표 <span className="font-normal">(플레이어에게 숨겨짐)</span>
+            </h4>
+            <div className="flex gap-2">
+              <select
+                value={secretObj.type}
+                onChange={(e) => setSecretObj((s) => ({ ...s, type: e.target.value as ObjectiveType }))}
+                className="rounded-lg border border-black/10 bg-white px-2 py-1 text-xs dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+              >
+                {OBJECTIVE_TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <select
+                value={secretObj.progress_max}
+                onChange={(e) => setSecretObj((s) => ({ ...s, progress_max: Number(e.target.value) }))}
+                className="w-16 rounded-lg border border-black/10 bg-white px-2 py-1 text-xs dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+              >
+                {[4, 6].map((v) => <option key={v} value={v}>{v}칸</option>)}
+              </select>
+            </div>
+            <input
+              type="text" maxLength={60}
+              placeholder="예: 배신자의 정체를 밝혀낸다 (선택 사항)"
+              value={secretObj.target_description}
+              onChange={(e) => setSecretObj((s) => ({ ...s, target_description: e.target.value }))}
+              className="w-full rounded-lg border border-black/10 bg-white/80 px-3 py-1.5 text-sm outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-white/5 dark:text-white"
+            />
+          </section>
+
+          {/* Doom Clock */}
+          <section className="space-y-3 rounded-xl border border-black/10 bg-white/60 p-3 dark:border-white/10 dark:bg-white/5">
+            <h4 className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">위기 시계 (Doom Clock)</h4>
+            <div>
+              <label className="text-xs text-neutral-500">
+                {doomInterval}턴마다 +1 증가
+              </label>
+              <input
+                type="range" min={2} max={6} value={doomInterval}
+                onChange={(e) => setDoomInterval(Number(e.target.value))}
+                className="w-full accent-red-500"
+              />
+              <div className="flex justify-between text-xs text-neutral-400"><span>2턴</span><span>6턴</span></div>
+            </div>
+            <div>
+              <label className="text-xs text-neutral-500">
+                최대 <span className="font-bold text-red-500">{doomMax}</span>칸 (초과 시 실패 엔딩)
+              </label>
+              <input
+                type="range" min={4} max={12} value={doomMax}
+                onChange={(e) => setDoomMax(Number(e.target.value))}
+                className="w-full accent-red-500"
+              />
+              <div className="flex justify-between text-xs text-neutral-400"><span>4칸</span><span>12칸</span></div>
+            </div>
+          </section>
+
+          {/* 엔딩 설정 */}
+          <section className="space-y-2">
+            <h4 className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">
+              엔딩 결말 <span className="font-normal text-neutral-400">({endings.length}개)</span>
+            </h4>
+            {endings.map((ending, i) => (
+              <div key={ending.id} className="space-y-1.5 rounded-xl border border-black/10 bg-white/60 p-3 dark:border-white/10 dark:bg-white/5">
+                <div className="flex gap-2">
+                  <input
+                    type="text" maxLength={20}
+                    placeholder="엔딩 레이블"
+                    value={ending.label}
+                    onChange={(e) => updateEnding(i, { label: e.target.value })}
+                    className="flex-1 rounded-lg border border-black/10 bg-white/80 px-2 py-1 text-xs outline-none dark:border-white/10 dark:bg-white/5 dark:text-white"
+                  />
+                  <select
+                    value={ending.trigger}
+                    onChange={(e) => updateEnding(i, { trigger: e.target.value as EndingTrigger })}
+                    className="rounded-lg border border-black/10 bg-white px-2 py-1 text-xs dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                  >
+                    {TRIGGER_OPTIONS.map((t) => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={ending.tone}
+                    onChange={(e) => updateEnding(i, { tone: e.target.value as EndingTone })}
+                    className="rounded-lg border border-black/10 bg-white px-2 py-1 text-xs dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                  >
+                    {TONE_OPTIONS.map((t) => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <textarea
+                  rows={2} maxLength={200}
+                  placeholder="결말 설명 (게임 종료 시 플레이어에게 표시됩니다)"
+                  value={ending.description}
+                  onChange={(e) => updateEnding(i, { description: e.target.value })}
+                  className="w-full resize-none rounded-lg border border-black/10 bg-white/80 px-3 py-1.5 text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                />
+              </div>
+            ))}
+          </section>
+
+          {saveError && (
+            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-500 dark:text-red-400">
+              {saveError}
+            </p>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => setSubStep("prompt")}
+              className="flex-1 rounded-lg border border-black/10 py-2 text-sm text-neutral-600 transition hover:bg-neutral-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5"
+            >
+              ← 이전
+            </button>
+            <button
+              onClick={handleSave} disabled={saving}
               className="flex-1 rounded-lg bg-neutral-900 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-40 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
             >
               {saving ? "저장 중…" : "시나리오 저장"}
