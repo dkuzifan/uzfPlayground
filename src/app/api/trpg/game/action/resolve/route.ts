@@ -8,6 +8,8 @@ import { applyTasteModifiers, buildBaseDeltas } from "@/lib/game/taste-modifier-
 import { runMemorySummarize } from "@/lib/game/memory-pipeline";
 import { scanAndExtractLore } from "@/lib/game/lore-engine";
 import { applyObjectiveUpdate, tickDoomClock, evaluateEndings, applyEnding } from "@/lib/game/objective-engine";
+import { evaluateTriggers, markTriggerFired } from "@/lib/game/npc-trigger-engine";
+import { runNpcAutonomousAction } from "@/lib/gemini/npc-agent";
 import type { WorldDictionaryEntry } from "@/lib/game/lore-engine";
 import type { ActionOutcome, DiceRoll, HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory, ActionChoice, ScenarioObjectives, ScenarioEndings } from "@/lib/types/game";
 import type { NpcDynamicState } from "@/lib/types/character";
@@ -440,6 +442,49 @@ export async function POST(req: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", session_id);
+
+    // ── NPC 이벤트 트리거 평가 ────────────────────────────────────────────────
+    if (!sessionEnded) {
+      const triggerEvents = evaluateTriggers(npcs, updatedDynamicStates);
+      if (triggerEvents.length > 0) {
+        let triggeredStates = { ...updatedDynamicStates };
+        for (const event of triggerEvents) {
+          try {
+            const npcState = triggeredStates[event.npc.id];
+            const dialogue = await runNpcAutonomousAction(
+              event.npc,
+              event.trigger,
+              event.contextHint,
+              recentLogs,
+              npcState
+            );
+            await supabase.from("Action_Log").insert({
+              session_id,
+              turn_number: nextTurnNumber,
+              speaker_type: "npc",
+              speaker_id: event.npc.id,
+              speaker_name: event.npc.name,
+              action_type: "npc_dialogue",
+              content: dialogue,
+              outcome: null,
+              state_changes: { trigger: event.trigger },
+            });
+            if (npcState) {
+              triggeredStates = {
+                ...triggeredStates,
+                [event.npc.id]: markTriggerFired(npcState, event.trigger),
+              };
+            }
+          } catch (err) {
+            console.error(`[ResolveRoute] NPC trigger failed (npc=${event.npc.id}):`, err);
+          }
+        }
+        await supabase
+          .from("Game_Session")
+          .update({ npc_dynamic_states: triggeredStates })
+          .eq("id", session_id);
+      }
+    }
 
     // 5턴마다 메모리 요약 (fire-and-forget)
     if (nextTurnNumber % 5 === 0) {

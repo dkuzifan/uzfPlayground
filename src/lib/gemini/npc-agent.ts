@@ -1,8 +1,9 @@
 import { getGeminiModel } from "./client";
 import { buildNpcSystemPrompt } from "./prompts/npc-system";
-import type { NpcPersona, NpcMemory } from "@/lib/types/game";
+import type { NpcPersona, NpcMemory, ActionLog } from "@/lib/types/game";
 import type { NpcDynamicState, SpeciesInfo } from "@/lib/types/character";
 import type { LoreContext } from "@/lib/game/npc-prompt-builder";
+import type { NpcTriggerType } from "@/lib/game/npc-trigger-engine";
 
 /**
  * 직접 언급되지 않은 NPC들이 해당 행동에 반응할지 판단합니다.
@@ -110,6 +111,49 @@ export async function runNpcDialogue(
   });
 
   return result.response.text();
+}
+
+// ── NPC 자발 행동 생성 ────────────────────────────────────────
+// 이벤트 트리거 발동 시 NPC가 플레이어 행동 없이 스스로 말하거나 행동한다.
+
+export async function runNpcAutonomousAction(
+  npc: NpcPersona,
+  trigger: NpcTriggerType,
+  contextHint: string,
+  recentLogs: ActionLog[],
+  dynamicState?: NpcDynamicState
+): Promise<string> {
+  const model = getGeminiModel();
+
+  const recentHistory = recentLogs
+    .slice(-6)
+    .map((l) => `[${l.speaker_name}]: ${l.content}`)
+    .join("\n") || "(아직 대화 없음)";
+
+  const systemPrompt = buildNpcSystemPrompt(npc, { dynamicState });
+
+  const userPrompt = `## 최근 대화 기록
+${recentHistory}
+
+## 자발 행동 지시
+${contextHint}
+
+위 상황에서 ${npc.name}이 플레이어의 행동을 기다리지 않고 스스로 말하거나 행동합니다.
+NPC의 언어 스타일과 성격을 유지하며, 1~3문장으로 자연스럽게 표현하세요.
+순수 텍스트로만 응답하세요.`;
+
+  try {
+    const result = await model.generateContent({
+      systemInstruction: systemPrompt,
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+    });
+    return result.response.text().trim();
+  } catch (err) {
+    console.error(`[NpcAgent] runNpcAutonomousAction failed (npc=${npc.id}, trigger=${trigger}):`, err);
+    return trigger === "fear_flee"
+      ? `${npc.name}이 두려움에 떨며 뒷걸음질 쳤다.`
+      : `${npc.name}이 잠시 망설이다 조용히 입을 열었다.`;
+  }
 }
 
 export async function generateNpcProfile(

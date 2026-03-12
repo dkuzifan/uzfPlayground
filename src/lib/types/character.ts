@@ -210,6 +210,8 @@ export interface NpcDynamicState {
   personal_debt: number;      // 0~100 (부채의식)
   sense_of_duty: number;      // 0~100 (의무감)
   camaraderie: number;        // 0~100 (전우애)
+  // 이벤트 트리거 중복 방지
+  fired_triggers?: string[];  // 이미 발동된 트리거 ID 목록
 }
 
 // 세션 환경 (다이내믹 DC 보정에 사용)
