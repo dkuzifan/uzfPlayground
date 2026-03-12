@@ -7,8 +7,9 @@ import { computeDCFromCategory, defaultResistanceStats } from "@/lib/game/dc-cal
 import { applyTasteModifiers, buildBaseDeltas } from "@/lib/game/taste-modifier-engine";
 import { runMemorySummarize } from "@/lib/game/memory-pipeline";
 import { scanAndExtractLore } from "@/lib/game/lore-engine";
+import { applyObjectiveUpdate, tickDoomClock, evaluateEndings, applyEnding } from "@/lib/game/objective-engine";
 import type { WorldDictionaryEntry } from "@/lib/game/lore-engine";
-import type { ActionOutcome, DiceRoll, HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory, ActionChoice } from "@/lib/types/game";
+import type { ActionOutcome, DiceRoll, HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory, ActionChoice, ScenarioObjectives, ScenarioEndings } from "@/lib/types/game";
 import type { NpcDynamicState } from "@/lib/types/character";
 import type { ActionCategory } from "@/lib/game/dc-calculator";
 import type { NpcEmotionDelta } from "@/lib/gemini/gm-agent";
@@ -206,15 +207,24 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Gemini GM 서사 생성 ───────────────────────────────────────────────────
-    const { data: scenario } = await supabase
+    const { data: scenarioRaw } = await supabase
       .from("Scenario")
-      .select("gm_system_prompt, fixed_truths")
+      .select("gm_system_prompt, fixed_truths, objectives, endings")
       .eq("id", session.scenario_id)
-      .single();
+      .single() as unknown as {
+        data: {
+          gm_system_prompt: string;
+          fixed_truths: Record<string, unknown>;
+          objectives: ScenarioObjectives | null;
+          endings: ScenarioEndings | null;
+        } | null;
+      };
+    const scenario = scenarioRaw;
 
     let gmNarration = "GM이 잠시 자리를 비웠습니다. 다음 플레이어로 턴을 넘깁니다.";
     let gmStateChanges: Array<{ target_id: string; hp_delta: number }> = [];
     let gmNextChoices: ActionChoice[] = [];
+    let gmQuestUpdate: import("@/lib/game/objective-engine").GmObjectiveUpdate | undefined;
     let geminiSucceeded = false;
 
     try {
@@ -230,9 +240,12 @@ export async function POST(req: NextRequest) {
         outcome,
         npcEmotionDeltas: npcEmotionDeltas.length > 0 ? npcEmotionDeltas : undefined,
         sessionSummary,
+        questTracker: session.quest_tracker,
+        objectives: scenario?.objectives,
       });
       gmNarration = gmResponse.narration;
       gmStateChanges = gmResponse.state_changes ?? [];
+      gmQuestUpdate = gmResponse.quest_update;
       // DC 오버라이드: Gemini가 반환한 dc=0을 NPC resistance_stats 기반 실제 DC로 교체
       const resistance = primaryNpc?.resistance_stats ?? defaultResistanceStats();
       gmNextChoices = (gmResponse.next_choices ?? []).map((choice) => {
@@ -394,14 +407,36 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── 목표 진척도 업데이트 + 엔딩 평가 ─────────────────────────────────────
+    let updatedQuestTracker = session.quest_tracker;
+    let sessionEnded = false;
+
+    if (updatedQuestTracker && scenario?.objectives) {
+      updatedQuestTracker = tickDoomClock(updatedQuestTracker);
+
+      if (gmQuestUpdate) {
+        updatedQuestTracker = applyObjectiveUpdate(updatedQuestTracker, gmQuestUpdate, scenario.objectives);
+      }
+
+      if (scenario?.endings && !updatedQuestTracker.ended) {
+        const achievedEnding = evaluateEndings(updatedQuestTracker, scenario.objectives, scenario.endings);
+        if (achievedEnding) {
+          updatedQuestTracker = applyEnding(updatedQuestTracker, achievedEnding);
+          sessionEnded = true;
+        }
+      }
+    }
+
     // ── 턴 전진 ───────────────────────────────────────────────────────────────
     const nextTurnNumber = session.turn_number + 1;
     const nextTurn = getNextTurn(session);
     await supabase
       .from("Game_Session")
       .update({
-        current_turn_player_id: nextTurn?.id ?? null,
+        current_turn_player_id: sessionEnded ? null : (nextTurn?.id ?? null),
         turn_number: nextTurnNumber,
+        status: sessionEnded ? "completed" : session.status,
+        quest_tracker: updatedQuestTracker,
         updated_at: new Date().toISOString(),
       })
       .eq("id", session_id);
@@ -413,7 +448,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ rolled: d20, modifier, total, dc: verifiedDc, outcome, next_choices: gmNextChoices });
+    return NextResponse.json({ rolled: d20, modifier, total, dc: verifiedDc, outcome, next_choices: gmNextChoices, session_ended: sessionEnded });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

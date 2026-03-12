@@ -54,6 +54,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
   const [pendingDice, setPendingDice]   = useState<PendingDice | null>(null);
   const [saveStatus, setSaveStatus]     = useState<"idle" | "saving" | "saved">("idle");
   const [sessionDeleted, setSessionDeleted] = useState(false);
+  const [gameEnded, setGameEnded]       = useState(false);
 
   const isMyTurn =
     !!session && !!myPlayer && session.current_turn_player_id === myPlayer.id;
@@ -159,6 +160,9 @@ export function useGameScreen(sessionId: string, localId: string | null) {
           setSessionDeleted(true);
           return;
         }
+        if (updated.status === "completed" || updated.quest_tracker?.ended) {
+          setGameEnded(true);
+        }
         setSession((prev) =>
           prev ? { ...prev, ...updated } : prev
         );
@@ -232,6 +236,9 @@ export function useGameScreen(sessionId: string, localId: string | null) {
         if (data.gm_error) {
           toast.warning("GM이 일시적으로 응답하지 않았습니다. 자동으로 진행됩니다.");
         }
+        if (data.session_ended) {
+          setGameEnded(true);
+        }
 
         if (data.needs_dice_check) {
           setPendingDice({
@@ -291,6 +298,9 @@ export function useGameScreen(sessionId: string, localId: string | null) {
           toast.error("주사위 결과 처리 중 오류가 발생했습니다.");
         } else if (data?.gm_error) {
           toast.warning("GM이 일시적으로 응답하지 않았습니다. 자동으로 진행됩니다.");
+        }
+        if (data?.session_ended) {
+          setGameEnded(true);
         }
         await refreshLogs(sessionId);
         if (data?.next_choices?.length > 0) {
@@ -371,6 +381,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
     resolveAndContinue,
     saveStatus,
     sessionDeleted,
+    gameEnded,
     leaveRoom,
     saveGame,
     deleteRoom,

@@ -2,6 +2,8 @@
 // Supabase Database Types (mirrors SQL schema)
 // ============================================================
 
+import type { ScenarioObjectives, ScenarioEndings, QuestTracker } from "./game";
+
 export interface Database {
   public: {
     Tables: {
@@ -22,6 +24,8 @@ export interface Database {
             personality_test_theme: string;
             character_name_hint: string;
           };
+          objectives: ScenarioObjectives | null;
+          endings: ScenarioEndings | null;
           created_at: string;
           updated_at: string;
         };
@@ -41,6 +45,8 @@ export interface Database {
             personality_test_theme?: string;
             character_name_hint?: string;
           };
+          objectives?: ScenarioObjectives | null;
+          endings?: ScenarioEndings | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -156,10 +162,7 @@ export interface Database {
             weather: string;
             time_of_day: string;
           };
-          quest_tracker: {
-            status: "IN_PROGRESS" | "CLEARED" | "FAILED";
-            milestones: Record<string, unknown>;
-          };
+          quest_tracker: QuestTracker | null;
           created_at: string;
           updated_at: string;
         };
@@ -183,10 +186,7 @@ export interface Database {
             weather?: string;
             time_of_day?: string;
           };
-          quest_tracker?: {
-            status?: "IN_PROGRESS" | "CLEARED" | "FAILED";
-            milestones?: Record<string, unknown>;
-          };
+          quest_tracker?: QuestTracker | null;
           created_at?: string;
           updated_at?: string;
         };

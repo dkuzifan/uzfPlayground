@@ -26,6 +26,73 @@ export type ScenarioTheme = "fantasy" | "mystery" | "horror" | "sci-fi";
 
 export type NpcRole = "enemy" | "ally" | "neutral" | "boss";
 
+// ── Objectives & Endings ──────────────────────────────────
+
+export type ObjectiveType =
+  | "eliminate"   // 특정 NPC/위협 제거
+  | "reach"       // 특정 장소 도달
+  | "find"        // 정보/물건 발견
+  | "obtain"      // 아이템 획득
+  | "protect"     // NPC/장소 보호
+  | "survive"     // N턴 생존
+  | "solve"       // 퍼즐/수수께끼 해결
+  | "reveal"      // 숨겨진 사실 폭로
+  | "escort"      // NPC 동행/호위
+  | "choose";     // 분기점 선택
+
+export interface ObjectiveCondition {
+  type: ObjectiveType;
+  target_description: string;   // 예: "카림을 마을 밖으로 데려간다"
+  target_npc_id?: string;       // 특정 NPC 연동 시
+  progress_max: number;         // Clock 최대값 (보통 4 또는 6)
+  is_hidden?: boolean;          // 플레이어에게 숨겨진 목표 여부
+}
+
+export interface ScenarioObjectives {
+  primary: ObjectiveCondition;
+  secondary?: ObjectiveCondition[];
+  secret?: ObjectiveCondition;
+  doom_clock_interval: number;  // 몇 턴마다 Doom Clock +1
+  doom_clock_max: number;       // Doom Clock 최대값 (초과 시 Bad End)
+}
+
+export type EndingTone = "triumphant" | "bittersweet" | "tragic" | "mysterious";
+
+export type EndingTrigger =
+  | "primary_complete"
+  | "primary_failed"
+  | "doom_maxed"
+  | "secret_complete"
+  | "custom";
+
+export interface EndingCondition {
+  id: string;
+  label: string;
+  description: string;
+  trigger: EndingTrigger;
+  custom_condition?: string;    // trigger="custom" 일 때 GM에게 전달할 판단 지침
+  tone: EndingTone;
+}
+
+export interface ScenarioEndings {
+  endings: EndingCondition[];
+}
+
+// ── Quest Tracker ──────────────────────────────────────────
+
+export interface QuestTracker {
+  primary_progress: number;       // 메인 목표 진척도 (0 ~ primary.progress_max)
+  secondary_progress: number[];   // 서브 목표별 진척도 배열
+  secret_triggered: boolean;      // 비밀 목표 달성 여부
+  quest_clock: number;            // 플레이어 행동으로 증가 (= primary_progress alias, UI용)
+  doom_clock: number;             // N턴마다 자동 증가
+  doom_clock_interval: number;    // Scenario.objectives에서 복사
+  doom_clock_max: number;         // Scenario.objectives에서 복사
+  turn_count: number;             // 총 턴 수 (doom_clock 계산용)
+  ended: boolean;                 // 게임 종료 여부
+  ending_id?: string;             // 달성된 엔딩 ID
+}
+
 // ── Scenario ──────────────────────────────────────────────
 
 export interface Scenario {
@@ -38,6 +105,8 @@ export interface Scenario {
   clear_conditions: string[];
   max_players: number;
   is_active: boolean;
+  objectives?: ScenarioObjectives | null;
+  endings?: ScenarioEndings | null;
   created_at: string;
   updated_at: string;
 }
@@ -117,10 +186,7 @@ export interface GameSession {
   // v2: 세션 환경 (날씨, 시간대)
   session_environment: { weather: string; time_of_day: string } | null;
   // v2: 퀘스트 트래커
-  quest_tracker: {
-    status: "IN_PROGRESS" | "CLEARED" | "FAILED";
-    milestones: Record<string, { type: "boolean" | "counter"; value: boolean | number; target?: number }>;
-  } | null;
+  quest_tracker: QuestTracker | null;
   // v3: 미뤄둔 Lore 키워드 대기열
   pending_lore_queue: string[];
   created_at: string;

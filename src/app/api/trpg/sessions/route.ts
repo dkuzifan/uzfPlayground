@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { initQuestTracker } from "@/lib/game/objective-engine";
+import type { ScenarioObjectives } from "@/lib/types/game";
 
 // ── GET /api/trpg/sessions — 대기 중인 방 목록 ──────────────────────
 export async function GET() {
@@ -90,13 +92,16 @@ export async function POST(request: Request) {
 
   const supabase = createServiceClient();
 
-  // Step 1: 시나리오 존재 확인
+  // Step 1: 시나리오 존재 확인 (objectives 포함)
   const { data: scenario, error: scenarioError } = await supabase
     .from("Scenario")
-    .select("id")
+    .select("id, objectives")
     .eq("id", scenario_id)
     .eq("is_active", true)
-    .single();
+    .single() as unknown as {
+      data: { id: string; objectives: ScenarioObjectives | null } | null;
+      error: { message: string } | null;
+    };
 
   if (scenarioError || !scenario) {
     return NextResponse.json(
@@ -104,6 +109,11 @@ export async function POST(request: Request) {
       { status: 404 }
     );
   }
+
+  // objectives가 있으면 QuestTracker 초기화, 없으면 null
+  const initialQuestTracker = scenario.objectives
+    ? initQuestTracker(scenario.objectives)
+    : null;
 
   // Step 2: Game_Session 생성
   const { data: session, error: sessionError } = await supabase
@@ -113,6 +123,7 @@ export async function POST(request: Request) {
       room_name: room_name.trim(),
       max_players: safeMaxPlayers,
       status: "waiting",
+      quest_tracker: initialQuestTracker,
     })
     .select("id")
     .single();

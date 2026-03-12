@@ -12,6 +12,7 @@ import GameControls from "@/components/trpg/game/GameControls";
 import DiceRollOverlay from "@/components/trpg/game/DiceRollOverlay";
 import NpcEmotionPanel from "@/components/trpg/game/NpcEmotionPanel";
 import QuestTrackerPanel from "@/components/trpg/game/QuestTrackerPanel";
+import EndingScreen from "@/components/trpg/game/EndingScreen";
 
 function weatherIcon(weather: string): string {
   if (weather.includes("폭우") || weather.includes("비")) return "🌧";
@@ -40,6 +41,7 @@ export default function GamePage() {
 
   const {
     session,
+    scenario,
     players,
     npcs,
     logs,
@@ -56,6 +58,7 @@ export default function GamePage() {
     resolveAndContinue,
     saveStatus,
     sessionDeleted,
+    gameEnded,
     leaveRoom,
     saveGame,
     deleteRoom,
@@ -129,7 +132,10 @@ export default function GamePage() {
             npcs={npcs}
             dynamicStates={session?.npc_dynamic_states ?? null}
           />
-          <QuestTrackerPanel questTracker={session?.quest_tracker ?? null} />
+          <QuestTrackerPanel
+            questTracker={session?.quest_tracker ?? null}
+            objectives={scenario?.objectives}
+          />
           <GameControls
             amIHost={amIHost}
             onLeave={leaveRoom}
@@ -139,6 +145,18 @@ export default function GamePage() {
           />
         </div>
       </div>
+
+      {/* 엔딩 화면 */}
+      {gameEnded && session?.quest_tracker?.ending_id && (
+        <EndingScreen
+          endingId={session.quest_tracker.ending_id}
+          endings={scenario?.endings}
+          finalNarration={
+            [...logs].reverse().find((l) => l.speaker_type === "gm")?.content
+          }
+          onLeave={() => router.replace("/trpg/lobby")}
+        />
+      )}
 
       {pendingDice && (
         <DiceRollOverlay

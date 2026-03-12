@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import type { ScenarioObjectives, ScenarioEndings } from "@/lib/types/game";
 
 const VALID_THEMES = new Set(["fantasy", "mystery", "horror", "sci-fi"]);
 
@@ -28,20 +29,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { title, theme, description, max_players, gm_system_prompt, character_creation_config } =
-    body as {
-      title?: string;
-      theme?: string;
-      description?: string;
-      max_players?: number;
-      gm_system_prompt?: string;
-      character_creation_config?: {
-        available_jobs: string[];
-        job_labels: Record<string, string>;
-        personality_test_theme: string;
-        character_name_hint: string;
-      };
+  const {
+    title,
+    theme,
+    description,
+    max_players,
+    gm_system_prompt,
+    character_creation_config,
+    objectives,
+    endings,
+  } = body as {
+    title?: string;
+    theme?: string;
+    description?: string;
+    max_players?: number;
+    gm_system_prompt?: string;
+    character_creation_config?: {
+      available_jobs: string[];
+      job_labels: Record<string, string>;
+      personality_test_theme: string;
+      character_name_hint: string;
     };
+    objectives?: ScenarioObjectives;
+    endings?: ScenarioEndings;
+  };
 
   if (!title?.trim()) {
     return NextResponse.json({ error: "제목은 필수입니다." }, { status: 400 });
@@ -72,6 +83,8 @@ export async function POST(request: Request) {
       max_players: safeMaxPlayers,
       gm_system_prompt: gm_system_prompt.trim(),
       character_creation_config,
+      objectives: objectives ?? null,
+      endings: endings ?? null,
       is_active: true,
     })
     .select("id, title, theme, description, max_players, character_creation_config")

@@ -1,6 +1,7 @@
 import { getGeminiModel } from "./client";
-import type { ActionLog, ActionOutcome, ActionChoice, DiceRoll, RawPlayer } from "@/lib/types/game";
+import type { ActionLog, ActionOutcome, ActionChoice, DiceRoll, RawPlayer, QuestTracker, ScenarioObjectives } from "@/lib/types/game";
 import type { ActionCategory } from "@/lib/game/dc-calculator";
+import type { GmObjectiveUpdate } from "@/lib/game/objective-engine";
 
 // ── checkDiceNeed ─────────────────────────────────────────────────────────────
 // AI는 판정 필요 여부와 행동 카테고리만 결정합니다.
@@ -68,6 +69,7 @@ interface GmRawResponse {
   state_changes: Array<{ target_id: string; hp_delta: number }>;
   next_scene_hint?: string;
   next_choices?: ActionChoice[];
+  quest_update?: GmObjectiveUpdate;
 }
 
 export interface NpcEmotionDelta {
@@ -89,6 +91,8 @@ export interface GmActionInput {
   outcome?: ActionOutcome;
   npcEmotionDeltas?: NpcEmotionDelta[];
   sessionSummary?: string;
+  questTracker?: QuestTracker | null;
+  objectives?: ScenarioObjectives | null;
 }
 
 export type { GmRawResponse };
@@ -162,6 +166,13 @@ ${scenarioSystemPrompt}
 - 판정 불필요(dice_check 생략): gift, none
 - dice_check의 dc는 반드시 0으로 고정하라. (서버에서 NPC 저항 스탯 기반으로 재계산됨)
 
+## quest_update 생성 규칙
+- 컨텍스트에 "현재 목표 상태"가 있을 경우, 플레이어 행동이 목표에 기여했다면 quest_update를 반환하라.
+- primary_delta: 메인 목표 진척도 변화 (-1 ~ +2 정수). 기여 없으면 0 또는 생략.
+- secondary_delta: 서브 목표 변화 배열 (index 순서 유지). 기여 없는 항목은 0.
+- secret_triggered: 비밀 목표 조건이 충족됐으면 true, 아니면 생략.
+- quest_update는 목표 상태가 없거나 기여가 전혀 없을 때 생략해도 됨.
+
 ## 제약
 - JSON 이외의 텍스트를 출력하지 마십시오.
 - outcome 필드는 반환하지 마십시오. 판정 결과는 이미 서버에서 확정되었습니다.
@@ -189,8 +200,24 @@ function buildEmotionSection(deltas?: NpcEmotionDelta[]): string {
   return `\n## NPC 감정 반응 (narration에 자연스럽게 녹여라. 수치는 절대 직접 언급하지 말 것)\n${lines.join("\n")}\n`;
 }
 
+function buildQuestSection(tracker?: QuestTracker | null, objectives?: ScenarioObjectives | null): string {
+  if (!tracker || !objectives) return "";
+  const lines: string[] = ["\n## 현재 목표 상태 (quest_update 판단 시 참고)"];
+  lines.push(`- 메인 목표: "${objectives.primary.target_description}" — ${tracker.primary_progress}/${objectives.primary.progress_max}`);
+  (objectives.secondary ?? []).forEach((obj, i) => {
+    const prog = tracker.secondary_progress[i] ?? 0;
+    const label = obj.is_hidden ? "(숨겨진 서브 목표)" : obj.target_description;
+    lines.push(`- 서브 목표[${i}]: "${label}" — ${prog}/${obj.progress_max}`);
+  });
+  if (objectives.secret) {
+    lines.push(`- 비밀 목표: "${objectives.secret.target_description}" — 달성 여부: ${tracker.secret_triggered ? "달성" : "미달성"}`);
+  }
+  lines.push(`- 위기 시계: ${tracker.doom_clock}/${tracker.doom_clock_max}`);
+  return lines.join("\n") + "\n";
+}
+
 function buildContext(input: GmActionInput): string {
-  const { fixedTruths, recentLogs, actingPlayer, action, diceRoll, outcome, npcEmotionDeltas, sessionSummary } = input;
+  const { fixedTruths, recentLogs, actingPlayer, action, diceRoll, outcome, npcEmotionDeltas, sessionSummary, questTracker, objectives } = input;
 
   const fixedTruthsText =
     Object.keys(fixedTruths).length > 0
@@ -220,7 +247,7 @@ function buildContext(input: GmActionInput): string {
     ? `\n## 캐릭터 성향 (next_choices 생성 시 참고)\n${actingPlayer.personality_summary}\n`
     : "";
 
-  return `${fixedTruthsText}${sessionSummarySection}
+  return `${fixedTruthsText}${sessionSummarySection}${buildQuestSection(questTracker, objectives)}
 ## 최근 행동 기록 (최신 10개)
 ${recentHistory}
 
