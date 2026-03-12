@@ -8,10 +8,11 @@ import { applyTasteModifiers, buildBaseDeltas } from "@/lib/game/taste-modifier-
 import { runMemorySummarize } from "@/lib/game/memory-pipeline";
 import { scanAndExtractLore } from "@/lib/game/lore-engine";
 import type { WorldDictionaryEntry } from "@/lib/game/lore-engine";
-import type { ActionOutcome, DiceRoll, HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory } from "@/lib/types/game";
+import type { ActionOutcome, DiceRoll, HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory, ActionChoice } from "@/lib/types/game";
 import type { NpcDynamicState } from "@/lib/types/character";
 import type { ActionCategory } from "@/lib/game/dc-calculator";
-import { JOB_MODIFIERS, defaultDynamicState, clamp, determineTargetedNpcs } from "@/lib/game/action-utils";
+import type { NpcEmotionDelta } from "@/lib/gemini/gm-agent";
+import { JOB_MODIFIERS, defaultDynamicState, clamp, determineReactingNpcs } from "@/lib/game/action-utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
     const player = playerData;
 
     // ── NPC + 최근 로그 조회 ──────────────────────────────────────────────────
-    const [{ data: recentLogsData }, { data: npcsData }, { data: memoriesData }, { data: loreData }] =
+    const [{ data: recentLogsData }, { data: npcsData }, { data: memoriesData }, { data: loreData }, { data: globalMemoryData }] =
       await Promise.all([
         supabase
           .from("Action_Log")
@@ -102,11 +103,26 @@ export async function POST(req: NextRequest) {
           .from("World_Dictionary")
           .select("*")
           .eq("scenario_id", session.scenario_id),
+        supabase
+          .from("Session_Memory")
+          .select("summary_text, key_facts, last_summarized_turn")
+          .eq("session_id", session_id)
+          .is("npc_id", null)
+          .order("last_summarized_turn", { ascending: false })
+          .limit(1)
+          .single(),
       ]);
 
     const recentLogs = ((recentLogsData ?? []).reverse()) as unknown as ActionLog[];
     const npcs = (npcsData ?? []) as unknown as NpcPersona[];
-    const targetedNpcs = determineTargetedNpcs(action_content, npcs);
+    const dynamicStates = (session.npc_dynamic_states ?? {}) as Record<string, NpcDynamicState>;
+    const targetedNpcs = await determineReactingNpcs(action_content, npcs, dynamicStates);
+
+    // 전역 세션 요약 포맷
+    const globalMemory = globalMemoryData as { summary_text: string; key_facts: string[]; last_summarized_turn: number } | null;
+    const sessionSummary = globalMemory
+      ? `${globalMemory.summary_text}${globalMemory.key_facts?.length > 0 ? `\n주요 사실: ${globalMemory.key_facts.join(" / ")}` : ""} (${globalMemory.last_summarized_turn}턴까지 요약)`
+      : undefined;
     const primaryNpc = targetedNpcs[0] ?? null; // DC 서버 재검증 기준 NPC
     const npcMemories = (memoriesData ?? []) as unknown as NpcMemory[];
     const loreEntries = (loreData ?? []) as unknown as WorldDictionaryEntry[];
@@ -148,6 +164,7 @@ export async function POST(req: NextRequest) {
 
     // ── 취향 모디파이어 + NPC 감정 상태 업데이트 ─────────────────────────────
     let updatedDynamicStates = (session.npc_dynamic_states ?? {}) as Record<string, NpcDynamicState>;
+    const npcEmotionDeltas: NpcEmotionDelta[] = [];
 
     if (targetedNpcs.length > 0) {
       // action_category → buildBaseDeltas actionType 변환 (NPC 공통)
@@ -174,6 +191,13 @@ export async function POST(req: NextRequest) {
           trust: clamp(currentState.trust + (modifiedDeltas.trust_delta ?? 0), -100, 100),
         };
         updatedDynamicStates = { ...updatedDynamicStates, [npc.id]: updatedState };
+        npcEmotionDeltas.push({
+          npc_name: npc.name,
+          affinity_delta: modifiedDeltas.affinity_delta,
+          stress_delta: modifiedDeltas.stress_delta,
+          fear_delta: modifiedDeltas.fear_delta,
+          trust_delta: modifiedDeltas.trust_delta,
+        });
       }
       await supabase
         .from("Game_Session")
@@ -190,6 +214,7 @@ export async function POST(req: NextRequest) {
 
     let gmNarration = "GM이 잠시 자리를 비웠습니다. 다음 플레이어로 턴을 넘깁니다.";
     let gmStateChanges: Array<{ target_id: string; hp_delta: number }> = [];
+    let gmNextChoices: ActionChoice[] = [];
     let geminiSucceeded = false;
 
     try {
@@ -203,11 +228,24 @@ export async function POST(req: NextRequest) {
         actionType: action_type as "choice" | "free_input",
         diceRoll,
         outcome,
+        npcEmotionDeltas: npcEmotionDeltas.length > 0 ? npcEmotionDeltas : undefined,
+        sessionSummary,
       });
       gmNarration = gmResponse.narration;
       gmStateChanges = gmResponse.state_changes ?? [];
+      // DC 오버라이드: Gemini가 반환한 dc=0을 NPC resistance_stats 기반 실제 DC로 교체
+      const resistance = primaryNpc?.resistance_stats ?? defaultResistanceStats();
+      gmNextChoices = (gmResponse.next_choices ?? []).map((choice) => {
+        if (!choice.dice_check) return choice;
+        const category = choice.dice_check.action_category as ActionCategory | undefined;
+        const realDc = category
+          ? (computeDCFromCategory(category, resistance) ?? defaultResistanceStats().mental_willpower)
+          : defaultResistanceStats().mental_willpower;
+        return { ...choice, dice_check: { ...choice.dice_check, dc: realDc } };
+      });
       geminiSucceeded = true;
-    } catch {
+    } catch (err) {
+      console.error("[ResolveRoute] runGmAction failed:", err);
       await supabase.from("Action_Log").insert({
         session_id,
         turn_number: session.turn_number,
@@ -228,7 +266,7 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", session_id);
-      return NextResponse.json({ rolled: d20, modifier, total, dc: verifiedDc, outcome });
+      return NextResponse.json({ rolled: d20, modifier, total, dc: verifiedDc, outcome, gm_error: true });
     }
 
     // ── HP 변환 + GM Action_Log INSERT ────────────────────────────────────────
@@ -319,13 +357,21 @@ export async function POST(req: NextRequest) {
           content: log.content,
         }));
 
+      const outcomeLabel: Record<string, string> = {
+        critical_success: "크리티컬 성공",
+        success: "성공",
+        partial: "부분 성공",
+        failure: "실패",
+      };
+      const npcContext = `[GM 서술 / 판정 결과: ${outcomeLabel[outcome ?? ""] ?? outcome}] ${gmNarration}\n[플레이어 행동] ${action_content}`;
+
       for (const npc of targetedNpcs) {
         try {
           const npcState = updatedDynamicStates[npc.id] ?? null;
           const npcSpecificMemories = npcMemories.filter(
             (m): m is NpcMemory => (m as NpcMemory).npc_id === npc.id
           );
-          const npcResponse = await runNpcDialogue(npc, conversationHistory, action_content, {
+          const npcResponse = await runNpcDialogue(npc, conversationHistory, npcContext, {
             dynamicState: npcState ?? undefined,
             playerName: player.player_name,
             memories: npcSpecificMemories,
@@ -342,8 +388,8 @@ export async function POST(req: NextRequest) {
             outcome: null,
             state_changes: {},
           });
-        } catch {
-          // 개별 NPC 대화 실패는 무시
+        } catch (err) {
+          console.error(`[ResolveRoute] runNpcDialogue failed for npc=${npc.id}:`, err);
         }
       }
     }
@@ -367,7 +413,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ rolled: d20, modifier, total, dc: verifiedDc, outcome });
+    return NextResponse.json({ rolled: d20, modifier, total, dc: verifiedDc, outcome, next_choices: gmNextChoices });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

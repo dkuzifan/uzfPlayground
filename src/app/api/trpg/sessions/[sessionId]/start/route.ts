@@ -55,7 +55,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     .eq("is_active", true);
 
   const playerIds = (pcs ?? []).map((p) => p.id);
-  const turnOrder = buildTurnOrder(playerIds, []);
+  const turnOrder = buildTurnOrder(playerIds);
   const firstTurnPlayerId = turnOrder[0]?.id ?? null;
 
   // status → in_progress + turn_order + current_turn_player_id 초기화

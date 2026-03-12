@@ -81,20 +81,29 @@ ${currentSituation}
 이 캐릭터의 성향에 맞는 행동 선택지 3개를 생성하세요.
 각 선택지는 서로 다른 접근 방식을 나타내야 합니다.
 
-## 주사위 판정 여부 결정
-각 선택지에 대해 d20 주사위 판정이 필요한지 판단하세요.
-- 판정 필요: 전투, 공격, 회피, 도주, 잠입, 설득, 협박, 수색, 물리적 도전, 위험한 행동
-- 판정 불필요: 대화, 단순 이동, 관찰, 정보 확인, 일상 행동
+## 행동 카테고리 분류
+모든 선택지에 action_category를 반드시 지정하세요.
+action_category는 반드시 다음 중 하나: "attack" | "threaten" | "persuade" | "deceive" | "stealth" | "gift" | "none"
+- attack: 물리적 공격, 격투
+- threaten: 위협, 협박, 공갈
+- persuade: 설득, 협상, 애원
+- deceive: 거짓말, 속임수
+- stealth: 은신, 잠입
+- gift: 선물, 호의, 도움 제공, 치유
+- none: 대화, 이동, 관찰, 정보 확인, 일상 행동
 
-판정이 필요한 선택지에는 "dice_check" 필드를 추가하세요.
-DC 기준: 쉬움 8~10 / 보통 12~14 / 어려움 15~17 / 매우 어려움 18~20
-check_label 예시: "전투 판정", "회피 판정", "설득 판정", "잠입 판정", "수색 판정"
+## 주사위 판정 여부 결정
+판정 필요(dice_check 추가): attack, threaten, persuade, deceive, stealth
+판정 불필요: gift, none
+
+판정이 필요한 선택지에만 "dice_check" 필드를 추가하세요.
+check_label 예시: "전투 판정", "위협 판정", "설득 판정", "기만 판정", "잠입 판정"
 
 JSON 배열로만 응답하세요:
 [
-  { "id": "choice_1", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice" },
-  { "id": "choice_2", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice", "dice_check": { "dc": 13, "check_label": "전투 판정" } },
-  { "id": "choice_3", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice" }
+  { "id": "choice_1", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice", "action_category": "none" },
+  { "id": "choice_2", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice", "action_category": "attack", "dice_check": { "action_category": "attack", "check_label": "전투 판정" } },
+  { "id": "choice_3", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice", "action_category": "gift" }
 ]
 `.trim();
 

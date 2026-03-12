@@ -98,9 +98,7 @@ export interface NpcMemory {
 
 // ── Game Session ──────────────────────────────────────────
 
-export type TurnParticipant =
-  | { type: "player"; id: string }
-  | { type: "npc"; id: string };
+export type TurnParticipant = { type: "player"; id: string };
 
 export interface GameSession {
   id: string;
@@ -236,9 +234,11 @@ export interface ActionChoice {
   label: string;
   description: string;
   action_type: "choice";
+  action_category?: string;
   dice_check?: {
     dc: number;
     check_label: string;
+    action_category: string;
   };
 }
 

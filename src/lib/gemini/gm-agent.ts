@@ -1,5 +1,5 @@
 import { getGeminiModel } from "./client";
-import type { ActionLog, ActionOutcome, DiceRoll, RawPlayer } from "@/lib/types/game";
+import type { ActionLog, ActionOutcome, ActionChoice, DiceRoll, RawPlayer } from "@/lib/types/game";
 import type { ActionCategory } from "@/lib/game/dc-calculator";
 
 // ── checkDiceNeed ─────────────────────────────────────────────────────────────
@@ -56,8 +56,8 @@ ${actionContent}
     });
     const text = result.response.text();
     return JSON.parse(text) as DiceNeedResult;
-  } catch {
-    // Gemini 실패 시 판정 불필요로 처리 (플로우 중단 방지)
+  } catch (err) {
+    console.error("[GmAgent] checkDiceNeed failed:", err);
     return { needs_check: false, action_category: "none" };
   }
 }
@@ -67,6 +67,15 @@ interface GmRawResponse {
   narration: string;
   state_changes: Array<{ target_id: string; hp_delta: number }>;
   next_scene_hint?: string;
+  next_choices?: ActionChoice[];
+}
+
+export interface NpcEmotionDelta {
+  npc_name: string;
+  affinity_delta: number;
+  stress_delta: number;
+  fear_delta: number;
+  trust_delta?: number;
 }
 
 export interface GmActionInput {
@@ -78,7 +87,11 @@ export interface GmActionInput {
   actionType: "choice" | "free_input";
   diceRoll?: DiceRoll;
   outcome?: ActionOutcome;
+  npcEmotionDeltas?: NpcEmotionDelta[];
+  sessionSummary?: string;
 }
+
+export type { GmRawResponse };
 
 export async function runGmAction(input: GmActionInput): Promise<GmRawResponse> {
   const model = getGeminiModel();
@@ -112,7 +125,8 @@ JSON 없이 순수 텍스트로만 응답하세요.`;
   try {
     const result = await model.generateContent(prompt);
     return result.response.text().trim();
-  } catch {
+  } catch (err) {
+    console.error("[GmAgent] generateOpeningNarration failed:", err);
     return "어둠 속에서 모험이 시작됩니다. 무엇을 하시겠습니까?";
   }
 }
@@ -132,8 +146,21 @@ ${scenarioSystemPrompt}
   "state_changes": [
     { "target_id": "Player_Character의 id 문자열", "hp_delta": -10 }
   ],
-  "next_scene_hint": "다음 장면 힌트 (생략 가능)"
+  "next_scene_hint": "다음 장면 힌트 (생략 가능)",
+  "next_choices": [
+    { "id": "choice_1", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice", "action_category": "none" },
+    { "id": "choice_2", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice", "action_category": "attack", "dice_check": { "action_category": "attack", "check_label": "전투 판정", "dc": 0 } },
+    { "id": "choice_3", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice", "action_category": "gift" }
+  ]
 }
+
+## next_choices 생성 규칙
+- narration 이후 상황에 맞는 행동 선택지 3개를 생성하라.
+- 컨텍스트의 "캐릭터 성향"이 있으면 그 성향에 맞는 다양한 접근 방식을 제시하라.
+- 모든 선택지에 action_category를 지정하라: "attack" | "threaten" | "persuade" | "deceive" | "stealth" | "gift" | "none"
+- 판정 필요(dice_check 포함): attack, threaten, persuade, deceive, stealth
+- 판정 불필요(dice_check 생략): gift, none
+- dice_check의 dc는 반드시 0으로 고정하라. (서버에서 NPC 저항 스탯 기반으로 재계산됨)
 
 ## 제약
 - JSON 이외의 텍스트를 출력하지 마십시오.
@@ -142,13 +169,37 @@ ${scenarioSystemPrompt}
 - 캐릭터 이름 "${characterName}"은 절대 변경하지 마십시오.`;
 }
 
+function buildEmotionSection(deltas?: NpcEmotionDelta[]): string {
+  if (!deltas || deltas.length === 0) return "";
+  const THRESHOLD = 8;
+  const lines: string[] = [];
+  for (const d of deltas) {
+    const parts: string[] = [];
+    if (Math.abs(d.affinity_delta) >= THRESHOLD)
+      parts.push(`친밀도 ${d.affinity_delta > 0 ? "+" : ""}${d.affinity_delta}`);
+    if (Math.abs(d.stress_delta) >= THRESHOLD)
+      parts.push(`스트레스 ${d.stress_delta > 0 ? "+" : ""}${d.stress_delta}`);
+    if (Math.abs(d.fear_delta) >= THRESHOLD)
+      parts.push(`두려움 ${d.fear_delta > 0 ? "+" : ""}${d.fear_delta}`);
+    if (d.trust_delta !== undefined && Math.abs(d.trust_delta) >= THRESHOLD)
+      parts.push(`신뢰 ${d.trust_delta > 0 ? "+" : ""}${d.trust_delta}`);
+    if (parts.length > 0) lines.push(`- ${d.npc_name}: ${parts.join(", ")}`);
+  }
+  if (lines.length === 0) return "";
+  return `\n## NPC 감정 반응 (narration에 자연스럽게 녹여라. 수치는 절대 직접 언급하지 말 것)\n${lines.join("\n")}\n`;
+}
+
 function buildContext(input: GmActionInput): string {
-  const { fixedTruths, recentLogs, actingPlayer, action, diceRoll, outcome } = input;
+  const { fixedTruths, recentLogs, actingPlayer, action, diceRoll, outcome, npcEmotionDeltas, sessionSummary } = input;
 
   const fixedTruthsText =
     Object.keys(fixedTruths).length > 0
       ? `\n## 고정 진실\n${JSON.stringify(fixedTruths, null, 2)}\n`
       : "";
+
+  const sessionSummarySection = sessionSummary
+    ? `\n## 세션 요약 (과거 전체 흐름)\n${sessionSummary}\n`
+    : "";
 
   const recentHistory =
     recentLogs.map((log) => `[${log.speaker_name}]: ${log.content}`).join("\n") ||
@@ -165,17 +216,21 @@ function buildContext(input: GmActionInput): string {
     ? `## 판정 결과 (서버 확정)\n- 주사위: d20=${diceRoll.rolled} + 보너스=${diceRoll.modifier} = ${diceRoll.total}\n- 결과: ${outcomeLabel[outcome] ?? outcome}\n\n위 판정 결과에 맞는 나레이션과 HP 상태 변화를 반환하라.`
     : `## 판정 없음\n이 행동은 주사위 판정 없이 자연스럽게 진행되었다. 행동 결과를 자연스럽게 서사로만 묘사하라. HP 변화가 없으면 state_changes는 []로 반환하라.`;
 
-  return `${fixedTruthsText}
-## 최근 행동 기록
+  const personalitySection = actingPlayer.personality_summary
+    ? `\n## 캐릭터 성향 (next_choices 생성 시 참고)\n${actingPlayer.personality_summary}\n`
+    : "";
+
+  return `${fixedTruthsText}${sessionSummarySection}
+## 최근 행동 기록 (최신 10개)
 ${recentHistory}
 
 ## 행동하는 캐릭터
 - 이름(원문 그대로 사용): "${actingPlayer.character_name}"
 - 직업: ${actingPlayer.job}
 - HP: ${actingPlayer.stats.hp}/${actingPlayer.stats.max_hp}
-
+${personalitySection}
 ## 현재 행동
 ["${actingPlayer.character_name}"]: ${action}
 
-${diceSection}`.trim();
+${diceSection}${buildEmotionSection(npcEmotionDeltas)}`.trim();
 }

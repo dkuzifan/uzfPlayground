@@ -12,24 +12,8 @@ export function getNextTurn(session: GameSession): TurnParticipant | null {
   return turn_order[nextIndex];
 }
 
-export function buildTurnOrder(
-  playerIds: string[],
-  npcIds: string[]
-): TurnParticipant[] {
-  const players: TurnParticipant[] = playerIds.map((id) => ({
-    type: "player",
-    id,
-  }));
-  const npcs: TurnParticipant[] = npcIds.map((id) => ({ type: "npc", id }));
-
-  // 플레이어와 NPC 교대 배치
-  const order: TurnParticipant[] = [];
-  const maxLen = Math.max(players.length, npcs.length);
-  for (let i = 0; i < maxLen; i++) {
-    if (i < players.length) order.push(players[i]);
-    if (i < npcs.length) order.push(npcs[i]);
-  }
-  return order;
+export function buildTurnOrder(playerIds: string[]): TurnParticipant[] {
+  return playerIds.map((id) => ({ type: "player", id }));
 }
 
 export function isPlayerTurn(

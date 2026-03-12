@@ -1,5 +1,6 @@
 import type { NpcDynamicState } from "@/lib/types/character";
 import type { NpcPersona } from "@/lib/types/game";
+import { evaluateBystanderReactions } from "@/lib/gemini/npc-agent";
 
 export const JOB_MODIFIERS: Record<string, number> = {
   warrior: 2,
@@ -34,15 +35,16 @@ export function clamp(val: number, min: number, max: number): number {
 }
 
 /**
- * 플레이어 액션 텍스트에서 언급된 NPC를 찾아 대상 NPC 목록을 반환합니다.
- * - NPC 이름이 텍스트에 포함되면 해당 NPC들만 반환
- * - 이름이 없으면 세션의 모든 NPC 반환 (전체 반응)
- * - NPC가 1명이면 항상 그 NPC 반환
+ * 플레이어 액션에 반응할 NPC 목록을 결정합니다.
+ * - 이름이 직접 언급된 NPC → 항상 반응
+ * - 언급되지 않은 NPC → Gemini가 가치관/성향/상태 기반으로 판단
+ * - NPC가 1명이면 항상 반환
  */
-export function determineTargetedNpcs(
+export async function determineReactingNpcs(
   actionContent: string,
-  npcs: NpcPersona[]
-): NpcPersona[] {
+  npcs: NpcPersona[],
+  dynamicStates: Record<string, NpcDynamicState>
+): Promise<NpcPersona[]> {
   if (npcs.length === 0) return [];
   if (npcs.length === 1) return npcs;
 
@@ -50,5 +52,17 @@ export function determineTargetedNpcs(
   const mentioned = npcs.filter((npc) =>
     lower.includes(npc.name.toLowerCase())
   );
-  return mentioned.length > 0 ? mentioned : npcs;
+
+  const bystanders = npcs
+    .filter((npc) => !mentioned.includes(npc))
+    .map((npc) => ({ npc, dynamicState: dynamicStates[npc.id] ?? null }));
+
+  if (bystanders.length === 0) return mentioned;
+
+  const reactingIds = await evaluateBystanderReactions(actionContent, bystanders);
+  const reactingBystanders = bystanders
+    .filter(({ npc }) => reactingIds.includes(npc.id))
+    .map(({ npc }) => npc);
+
+  return [...mentioned, ...reactingBystanders];
 }

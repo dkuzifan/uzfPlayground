@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import type { ActionLog, ActionChoice, RawPlayer, GameSession, Scenario, NpcPersona } from "@/lib/types/game";
 import { JOB_MODIFIERS } from "@/lib/game/action-utils";
@@ -73,7 +74,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
 
   // ── 선택지 생성 ──────────────────────────────────────────────────────
   const fetchChoices = useCallback(
-    async (sid: string, pid: string, lid: string) => {
+    async (sid: string, pid: string, lid: string): Promise<{ is_fallback?: boolean } | undefined> => {
       setChoicesLoading(true);
       try {
         const res = await fetch("/api/trpg/game/choices", {
@@ -83,8 +84,10 @@ export function useGameScreen(sessionId: string, localId: string | null) {
         });
         const data = await res.json();
         setChoices(data.choices ?? FALLBACK_CHOICES);
+        return { is_fallback: data.is_fallback ?? false };
       } catch {
         setChoices(FALLBACK_CHOICES);
+        return { is_fallback: true };
       } finally {
         setChoicesLoading(false);
       }
@@ -184,7 +187,8 @@ export function useGameScreen(sessionId: string, localId: string | null) {
     async (
       content: string,
       type: "choice" | "free_input",
-      diceCheck?: { dc: number; check_label: string }
+      diceCheck?: { dc: number; check_label: string; action_category?: string },
+      actionCategory?: string
     ) => {
       if (!myPlayer || !localId || isSubmitting) return;
 
@@ -197,6 +201,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
           check_label: diceCheck.check_label,
           action_content: content,
           action_type: type,
+          action_category: diceCheck.action_category,
         });
         return;
       }
@@ -214,13 +219,19 @@ export function useGameScreen(sessionId: string, localId: string | null) {
             local_id: localId,
             action_type: type,
             content,
+            action_category: actionCategory,
           }),
         });
         if (!res.ok) {
+          toast.error("행동 처리 중 오류가 발생했습니다. 다시 시도해 주세요.");
           setIsSubmitting(false);
           return;
         }
         const data = await res.json();
+
+        if (data.gm_error) {
+          toast.warning("GM이 일시적으로 응답하지 않았습니다. 자동으로 진행됩니다.");
+        }
 
         if (data.needs_dice_check) {
           setPendingDice({
@@ -234,7 +245,14 @@ export function useGameScreen(sessionId: string, localId: string | null) {
           setIsSubmitting(false);
         } else {
           await refreshLogs(sessionId);
-          await fetchChoices(sessionId, myPlayer.id, localId);
+          if (data.next_choices?.length > 0) {
+            setChoices(data.next_choices);
+          } else {
+            const fallback = await fetchChoices(sessionId, myPlayer.id, localId);
+            if (fallback?.is_fallback) {
+              toast.info("선택지 생성에 오류가 발생했습니다. 기본 선택지로 진행합니다.");
+            }
+          }
           setIsSubmitting(false);
         }
       } catch {
@@ -254,7 +272,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
       setPendingDice(null);
 
       try {
-        await fetch("/api/trpg/game/action/resolve", {
+        const res = await fetch("/api/trpg/game/action/resolve", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -268,7 +286,23 @@ export function useGameScreen(sessionId: string, localId: string | null) {
             action_category: captured.action_category,
           }),
         });
-      } finally {
+        const data = res.ok ? await res.json() : null;
+        if (!res.ok) {
+          toast.error("주사위 결과 처리 중 오류가 발생했습니다.");
+        } else if (data?.gm_error) {
+          toast.warning("GM이 일시적으로 응답하지 않았습니다. 자동으로 진행됩니다.");
+        }
+        await refreshLogs(sessionId);
+        if (data?.next_choices?.length > 0) {
+          setChoices(data.next_choices);
+        } else {
+          const fallback = await fetchChoices(sessionId, myPlayer.id, localId);
+          if (fallback?.is_fallback) {
+            toast.info("선택지 생성에 오류가 발생했습니다. 기본 선택지로 진행합니다.");
+          }
+        }
+      } catch {
+        toast.error("주사위 결과 처리 중 오류가 발생했습니다.");
         await refreshLogs(sessionId);
         fetchChoices(sessionId, myPlayer.id, localId);
       }

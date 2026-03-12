@@ -12,7 +12,8 @@ interface Props {
   onSubmit: (
     content: string,
     type: "choice" | "free_input",
-    diceCheck?: { dc: number; check_label: string }
+    diceCheck?: { dc: number; check_label: string; action_category?: string },
+    actionCategory?: string
   ) => Promise<void>;
 }
 
@@ -67,7 +68,7 @@ export default function ActionPanel({
           {choices.map((choice) => (
             <button
               key={choice.id}
-              onClick={() => onSubmit(choice.label, "choice", choice.dice_check)}
+              onClick={() => onSubmit(choice.label, "choice", choice.dice_check, choice.action_category)}
               className="w-full rounded-lg border border-black/10 bg-white/60 px-4 py-2.5 text-left text-sm transition-colors hover:border-indigo-400/50 hover:bg-indigo-50 dark:border-white/10 dark:bg-white/5 dark:hover:border-indigo-400/40 dark:hover:bg-white/10"
             >
               <div className="flex items-center justify-between gap-2">
