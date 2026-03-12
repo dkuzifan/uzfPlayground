@@ -4,8 +4,9 @@ import type { NpcPersona } from "@/lib/types/game";
 // ── 트리거 타입 ───────────────────────────────────────────────
 
 export type NpcTriggerType =
-  | "fear_flee"        // 공포 극한 → 도망 / 항복
-  | "affinity_confide"; // 호감 극대 → 비밀 공유
+  | "fear_flee"           // 공포 극한 → 도망 / 항복
+  | "affinity_confide"    // 호감 극대 → 비밀 공유
+  | "bystander_reaction"; // 방관자 목격 반응
 
 // 트리거 임계값
 const FEAR_FLEE_THRESHOLD    = 80;  // fear_survival ≥ 80

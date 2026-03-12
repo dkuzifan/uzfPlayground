@@ -9,7 +9,7 @@ import { runMemorySummarize } from "@/lib/game/memory-pipeline";
 import { scanAndExtractLore } from "@/lib/game/lore-engine";
 import { applyObjectiveUpdate, tickDoomClock, evaluateEndings, applyEnding } from "@/lib/game/objective-engine";
 import { evaluateTriggers, markTriggerFired } from "@/lib/game/npc-trigger-engine";
-import { runNpcAutonomousAction } from "@/lib/gemini/npc-agent";
+import { runNpcAutonomousAction, evaluateBystanderReactions } from "@/lib/gemini/npc-agent";
 import type { WorldDictionaryEntry } from "@/lib/game/lore-engine";
 import type { HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory, ActionChoice, ScenarioObjectives, ScenarioEndings } from "@/lib/types/game";
 import type { NpcDynamicState } from "@/lib/types/character";
@@ -408,6 +408,51 @@ export async function POST(req: NextRequest) {
           outcome: null,
           state_changes: {},
         });
+      }
+    }
+
+    // ── Step 8-B: 방관자 NPC 반응 ────────────────────────────────────────────
+    const targetedNpcIds = new Set(targetedNpcs.map((n) => n.id));
+    const bystanders = npcs.filter((n) => !targetedNpcIds.has(n.id));
+    if (bystanders.length > 0 && geminiSucceeded) {
+      try {
+        const reactingIds = await evaluateBystanderReactions(
+          content,
+          bystanders.map((npc) => ({
+            npc,
+            dynamicState: updatedDynamicStates[npc.id] ?? null,
+          }))
+        );
+        for (const npcId of reactingIds) {
+          const npc = bystanders.find((n) => n.id === npcId);
+          if (!npc) continue;
+          try {
+            const npcState = updatedDynamicStates[npc.id];
+            const contextHint = `${npc.name}이(가) 근처에서 이 장면을 목격했다. 자신의 성격에 맞게 짧게(1~2문장) 반응하라. 직접 개입하거나 무시해도 된다.`;
+            const reaction = await runNpcAutonomousAction(
+              npc,
+              "bystander_reaction",
+              contextHint,
+              recentLogs,
+              npcState
+            );
+            await supabase.from("Action_Log").insert({
+              session_id,
+              turn_number: session.turn_number,
+              speaker_type: "npc",
+              speaker_id: npc.id,
+              speaker_name: npc.name,
+              action_type: "npc_dialogue",
+              content: reaction,
+              outcome: null,
+              state_changes: { bystander: true },
+            });
+          } catch (err) {
+            console.error(`[ActionRoute] bystander reaction failed (npc=${npcId}):`, err);
+          }
+        }
+      } catch (err) {
+        console.error("[ActionRoute] evaluateBystanderReactions failed:", err);
       }
     }
 
