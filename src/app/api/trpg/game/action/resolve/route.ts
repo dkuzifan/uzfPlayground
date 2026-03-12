@@ -407,6 +407,21 @@ export async function POST(req: NextRequest) {
           console.error(`[ResolveRoute] runNpcDialogue failed for npc=${npc.id}:`, err);
         }
       }
+
+      // Lore 발견 로그 (NPC가 실제로 정보를 공개한 경우)
+      if (loreContext.currentLoreTexts.length > 0) {
+        await supabase.from("Action_Log").insert({
+          session_id,
+          turn_number: session.turn_number,
+          speaker_type: "system",
+          speaker_id: null,
+          speaker_name: "세계관 단서",
+          action_type: "lore_discovery",
+          content: loreContext.currentLoreTexts.join("\n\n"),
+          outcome: null,
+          state_changes: {},
+        });
+      }
     }
 
     // ── 목표 진척도 업데이트 + 엔딩 평가 ─────────────────────────────────────

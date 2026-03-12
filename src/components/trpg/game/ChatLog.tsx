@@ -164,6 +164,21 @@ export default function ChatLog({ logs }: Props) {
             );
           }
 
+          if (log.action_type === "lore_discovery") {
+            return (
+              <div key={log.id} className="flex justify-center">
+                <div className="w-full max-w-[90%] rounded-xl border border-violet-300/60 bg-violet-50/80 px-4 py-3 dark:border-violet-500/30 dark:bg-violet-500/10">
+                  <p className="mb-1.5 text-xs font-semibold text-violet-600 dark:text-violet-400">
+                    📜 세계관 단서 발견
+                  </p>
+                  <p className="whitespace-pre-line text-sm text-violet-900 dark:text-violet-200">
+                    {log.content}
+                  </p>
+                </div>
+              </div>
+            );
+          }
+
           return null;
         })}
 
