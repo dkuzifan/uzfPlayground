@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import type { ScenarioObjectives, ScenarioEndings } from "@/lib/types/game";
+import type { ScenarioObjectives, ScenarioEndings, CharacterConfig } from "@/lib/types/game";
 
 const VALID_THEMES = new Set(["fantasy", "mystery", "horror", "sci-fi"]);
 
@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     character_creation_config,
     objectives,
     endings,
+    character_config,
   } = body as {
     title?: string;
     theme?: string;
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
     };
     objectives?: ScenarioObjectives;
     endings?: ScenarioEndings;
+    character_config?: CharacterConfig;
   };
 
   if (!title?.trim()) {
@@ -85,6 +87,7 @@ export async function POST(request: Request) {
       character_creation_config,
       objectives: objectives ?? null,
       endings: endings ?? null,
+      character_config: character_config ?? null,
       is_active: true,
     })
     .select("id, title, theme, description, max_players, character_creation_config")

@@ -72,12 +72,6 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
   const safeAvatarIndex = Math.min(7, Math.max(0, avatarIndex ?? 0));
 
-  // job 검증
-  const safeJob: CharacterJob =
-    typeof job === "string" && VALID_JOBS.has(job as CharacterJob)
-      ? (job as CharacterJob)
-      : "adventurer";
-
   // personality 검증
   const safePersonality = validatePersonality(personality);
 
@@ -86,14 +80,14 @@ export async function POST(request: Request, { params }: RouteParams) {
   // 세션 존재 & waiting 상태 확인
   const { data: rawSession, error: sessionError } = await supabase
     .from("Game_Session")
-    .select("id, max_players, status")
+    .select("id, max_players, status, scenario_id")
     .eq("id", sessionId)
     .single();
 
   if (sessionError || !rawSession) {
     return NextResponse.json({ error: "세션을 찾을 수 없습니다." }, { status: 404 });
   }
-  const session = rawSession as { id: string; max_players: number; status: string };
+  const session = rawSession as { id: string; max_players: number; status: string; scenario_id: string };
   if (session.status !== "waiting") {
     // 이미 시작된 방이라도 기존 멤버라면 200 OK (멱등적 처리)
     const { data: existing } = await supabase
@@ -108,6 +102,22 @@ export async function POST(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "이미 시작된 방입니다." }, { status: 404 });
   }
 
+  // 시나리오 character_config 조회 (직업별 기본 스탯)
+  const { data: scenarioData } = await supabase
+    .from("Scenario")
+    .select("character_config")
+    .eq("id", session.scenario_id)
+    .single() as unknown as { data: { character_config: import("@/lib/types/game").CharacterConfig | null } | null };
+
+  const characterConfig = scenarioData?.character_config ?? null;
+
+  // job 검증 — character_config의 job 목록도 허용
+  const configJobIds = new Set((characterConfig?.jobs ?? []).map((j) => j.id));
+  const safeJob: string =
+    typeof job === "string" && (VALID_JOBS.has(job as CharacterJob) || configJobIds.has(job))
+      ? job
+      : "adventurer";
+
   // 현재 인원 확인
   const { count } = await supabase
     .from("Player_Character")
@@ -118,6 +128,14 @@ export async function POST(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "방이 가득 찼습니다." }, { status: 409 });
   }
 
+  // character_config 기반 기본 스탯 계산
+  const configJob = characterConfig?.jobs.find((j) => j.id === safeJob);
+  const baseStats = configJob?.base_stats ?? null;
+  const defaultStats = { hp: 100, max_hp: 100, attack: 10, defense: 8, speed: 10 };
+  const initialStats = baseStats
+    ? { ...baseStats, max_hp: baseStats.hp ?? 100 }
+    : defaultStats;
+
   // INSERT — 같은 브라우저 새로고침 시 중복(23505)은 무시
   const { error: insertError } = await supabase
     .from("Player_Character")
@@ -127,6 +145,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       player_name: nickname.trim(),
       character_name: (characterName?.trim() || nickname.trim()).slice(0, 16),
       job: safeJob,
+      stats: initialStats,
       personality_summary: `avatar:${safeAvatarIndex}`,
       ...(safePersonality?.mbti ? { mbti: safePersonality.mbti } : {}),
       ...(safePersonality?.enneagram != null ? { enneagram: safePersonality.enneagram } : {}),

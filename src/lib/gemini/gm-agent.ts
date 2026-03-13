@@ -79,6 +79,7 @@ interface GmRawResponse {
   scene_phase_transition?: ScenePhase | null;
   failure_penalty?: FailurePenalty | null;
   failure_twist?: string | null;
+  stat_growth?: { stat: string; delta: number; reason?: string } | null;
 }
 
 export interface NpcEmotionDelta {
@@ -210,6 +211,12 @@ outcome이 "failure" 또는 "partial"일 때만 적용한다.
 - 현재 상황이 다음 페이즈로 넘어가기에 충분히 극적이라고 판단되면 다음 페이즈 이름을 반환하라.
 - 불확실하거나 전환이 불필요하면 반드시 생략하거나 null로 남겨라.
 - exploration: 탐색·정보수집 단계. tension: 위협·긴장 고조. climax: 결전·클라이맥스. resolution: 해소·에필로그.
+
+## stat_growth 규칙
+- 플레이어가 의미 있는 성장을 경험한 순간(첫 전투 승리, 중요 기술 습득, 극적인 성공 등)에만 반환하라.
+- stat: 성장한 스탯 이름 (stat_schema에 있는 이름 그대로). delta: 증가량 (1~3 정수).
+- 매 턴마다 주지 말 것. 세션 전체에서 2~4회 정도만 의미 있게 부여하라.
+- 해당 없으면 반드시 생략하거나 null로 남겨라.
 
 ## 제약
 - JSON 이외의 텍스트를 출력하지 마십시오.

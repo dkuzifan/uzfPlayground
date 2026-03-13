@@ -107,6 +107,18 @@ export default function ChatLog({ logs }: Props) {
 
         {logs.map((log) => {
           if (log.speaker_type === "system") {
+            const statGrowth = (log.state_changes as { stat_growth?: { stat: string; delta: number } }).stat_growth;
+            if (statGrowth) {
+              return (
+                <div key={log.id} className="flex justify-center">
+                  <div className="rounded-xl border border-emerald-300/60 bg-emerald-50/80 px-4 py-2.5 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                    <p className="text-center text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                      📈 {log.content.replace(/^\[.*?\]\s*/, "")}
+                    </p>
+                  </div>
+                </div>
+              );
+            }
             return (
               <div key={log.id} className="py-1 text-center text-xs text-neutral-500">
                 — {log.content} —

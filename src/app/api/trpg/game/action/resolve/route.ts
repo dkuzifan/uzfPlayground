@@ -235,6 +235,7 @@ export async function POST(req: NextRequest) {
     let gmNextChoices: ActionChoice[] = [];
     let gmQuestUpdate: import("@/lib/game/objective-engine").GmObjectiveUpdate | undefined;
     let gmItemObtained: string | null = null;
+    let gmStatGrowth: { stat: string; delta: number; reason?: string } | null = null;
     let gmPhaseTransition: ScenePhase | null = null;
     let gmFailurePenalty: import("@/lib/gemini/gm-agent").FailurePenalty | null = null;
     let gmFailureTwist: string | null = null;
@@ -261,6 +262,7 @@ export async function POST(req: NextRequest) {
       gmStateChanges = gmResponse.state_changes ?? [];
       gmQuestUpdate = gmResponse.quest_update;
       gmItemObtained = gmResponse.item_obtained ?? null;
+      gmStatGrowth = gmResponse.stat_growth ?? null;
       gmFailurePenalty = gmResponse.failure_penalty ?? null;
       gmFailureTwist = gmResponse.failure_twist ?? null;
       if (gmResponse.scene_phase_transition) {
@@ -404,6 +406,33 @@ export async function POST(req: NextRequest) {
         outcome: null,
         state_changes: { item_obtained: gmItemObtained },
       });
+    }
+
+    // ── 스탯 성장 처리 ───────────────────────────────────────────────────────
+    if (gmStatGrowth && geminiSucceeded) {
+      const { stat, delta, reason } = gmStatGrowth;
+      const currentStats = player.stats as Record<string, number>;
+      if (typeof currentStats[stat] === "number") {
+        const newVal = currentStats[stat] + delta;
+        const updatedStats: Record<string, number> = { ...currentStats, [stat]: newVal };
+        // hp 성장 시 max_hp도 같이 증가
+        if (stat === "hp") updatedStats.max_hp = (currentStats.max_hp ?? currentStats.hp) + delta;
+        await supabase
+          .from("Player_Character")
+          .update({ stats: updatedStats })
+          .eq("id", player_id);
+        await supabase.from("Action_Log").insert({
+          session_id,
+          turn_number: session.turn_number,
+          speaker_type: "system",
+          speaker_id: null,
+          speaker_name: "시스템",
+          action_type: "system_event",
+          content: `📈 [${player.player_name}] ${stat} +${delta}${reason ? ` — ${reason}` : ""}`,
+          outcome: null,
+          state_changes: { stat_growth: { stat, delta, reason } },
+        });
+      }
     }
 
     // ── NPC 대화 생성 (대상 NPC 전체) ────────────────────────────────────────

@@ -96,6 +96,20 @@ export interface QuestTracker {
   ending_id?: string;             // 달성된 엔딩 ID
 }
 
+// ── Character Config ───────────────────────────────────────
+
+export interface JobDefinition {
+  id: string;           // 내부 식별자 (예: "warrior")
+  name: string;         // 표시 이름 (예: "전사")
+  description: string;  // 직업 설명
+  base_stats: Record<string, number>; // { hp: 120, attack: 15, ... }
+}
+
+export interface CharacterConfig {
+  stat_schema: string[];   // 이 시나리오에서 사용하는 스탯 종류 (예: ["hp", "attack", "defense", "speed"])
+  jobs: JobDefinition[];
+}
+
 // ── Scenario ──────────────────────────────────────────────
 
 export interface Scenario {
@@ -110,6 +124,7 @@ export interface Scenario {
   is_active: boolean;
   objectives?: ScenarioObjectives | null;
   endings?: ScenarioEndings | null;
+  character_config?: CharacterConfig | null;
   created_at: string;
   updated_at: string;
 }

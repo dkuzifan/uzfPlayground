@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import type { ScenarioSummary } from "./ScenarioSelectStep";
-import type { ObjectiveType, EndingTrigger, EndingTone, ScenarioObjectives, ScenarioEndings } from "@/lib/types/game";
+import type { ObjectiveType, EndingTrigger, EndingTone, ScenarioObjectives, ScenarioEndings, JobDefinition, CharacterConfig } from "@/lib/types/game";
 
 interface Props {
   onComplete: (scenario: ScenarioSummary) => void;
   onBack: () => void;
 }
 
-type SubStep = "basic" | "jobs" | "prompt" | "objectives";
+type SubStep = "basic" | "jobs" | "prompt" | "objectives" | "character";
 
 interface JobConfig {
   job: string;
@@ -117,8 +117,9 @@ const SUB_STEP_LABELS: Record<SubStep, string> = {
   jobs: "직업 설정",
   prompt: "GM 프롬프트",
   objectives: "게임 목표",
+  character: "캐릭터 설정",
 };
-const SUB_STEPS: SubStep[] = ["basic", "jobs", "prompt", "objectives"];
+const SUB_STEPS: SubStep[] = ["basic", "jobs", "prompt", "objectives", "character"];
 
 function defaultEndings(): EndingForm[] {
   return [
@@ -163,6 +164,13 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
   const [endings, setEndings]           = useState<EndingForm[]>(defaultEndings());
   const [generatingObj, setGeneratingObj] = useState(false);
   const [objError, setObjError]           = useState<string | null>(null);
+
+  // Step E
+  const [statSchema, setStatSchema]     = useState<string[]>(["hp", "attack", "defense", "speed"]);
+  const [jobDefs, setJobDefs]           = useState<JobDefinition[]>([]);
+  const [newStatName, setNewStatName]   = useState("");
+  const [generatingChar, setGeneratingChar] = useState(false);
+  const [charError, setCharError]       = useState<string | null>(null);
 
   // 저장
   const [saving, setSaving]     = useState(false);
@@ -274,6 +282,58 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
     setEndings((prev) => prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)));
   }
 
+  // ── Step E: AI 캐릭터 설정 생성 ─────────────────────────────────────
+  async function handleGenerateCharacterConfig() {
+    setGeneratingChar(true);
+    setCharError(null);
+    try {
+      const jobLabels = Object.fromEntries(enabledJobs.map((j) => [j.job, j.label]));
+      const res = await fetch("/api/trpg/scenarios/generate-character-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, theme, description, gm_system_prompt: gmPrompt, job_labels: jobLabels }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCharError(data.error ?? "생성에 실패했습니다.");
+        return;
+      }
+      const config = data.character_config as CharacterConfig;
+      setStatSchema(config.stat_schema);
+      setJobDefs(config.jobs);
+    } catch {
+      setCharError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setGeneratingChar(false);
+    }
+  }
+
+  // ── Step E: 직업 스탯 편집 ─────────────────────────────────────────
+  function updateJobStat(jobIdx: number, stat: string, value: number) {
+    setJobDefs((prev) =>
+      prev.map((j, i) =>
+        i === jobIdx ? { ...j, base_stats: { ...j.base_stats, [stat]: value } } : j
+      )
+    );
+  }
+
+  // ── Step D→E 전환 시 jobDefs 초기화 ─────────────────────────────────
+  function handleObjectivesNext() {
+    // jobDefs가 비어있으면 enabledJobs 기준으로 기본값 생성
+    if (jobDefs.length === 0) {
+      const defaultStats = Object.fromEntries(statSchema.map((s) => [s, s === "hp" ? 100 : 10]));
+      setJobDefs(
+        enabledJobs.map((j) => ({
+          id: j.job,
+          name: j.label,
+          description: "",
+          base_stats: { ...defaultStats },
+        }))
+      );
+    }
+    setSubStep("character");
+  }
+
   // ── 최종 저장 ────────────────────────────────────────────────────────
   async function handleSave() {
     setSaving(true);
@@ -321,6 +381,9 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
           },
           objectives,
           endings: endingsData,
+          character_config: jobDefs.length > 0
+            ? { stat_schema: statSchema, jobs: jobDefs }
+            : null,
         }),
       });
       const data = await res.json();
@@ -742,6 +805,148 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
             ))}
           </section>
 
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => setSubStep("prompt")}
+              className="flex-1 rounded-lg border border-black/10 py-2 text-sm text-neutral-600 transition hover:bg-neutral-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5"
+            >
+              ← 이전
+            </button>
+            <button
+              onClick={handleObjectivesNext}
+              className="flex-1 rounded-lg bg-yellow-400 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-500"
+            >
+              다음 →
+            </button>
+          </div>
+        </div>
+      )}
+      {/* ── Step E: 캐릭터 설정 ── */}
+      {subStep === "character" && (
+        <div className="space-y-5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              스탯 종류와 직업별 기본 수치를 설정하세요.
+            </p>
+            <button
+              onClick={handleGenerateCharacterConfig} disabled={generatingChar}
+              className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 whitespace-nowrap"
+            >
+              {generatingChar ? (
+                <><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white dark:border-neutral-900/30 dark:border-t-neutral-900" />생성 중…</>
+              ) : <>✨ AI 자동 제안</>}
+            </button>
+          </div>
+          {charError && <p className="text-xs text-red-400">{charError}</p>}
+
+          {/* 스탯 종류 편집 */}
+          <section className="space-y-2 rounded-xl border border-black/10 bg-white/60 p-3 dark:border-white/10 dark:bg-white/5">
+            <h4 className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">스탯 종류</h4>
+            <div className="flex flex-wrap gap-1.5">
+              {statSchema.map((stat) => (
+                <span
+                  key={stat}
+                  className="flex items-center gap-1 rounded-lg border border-black/10 bg-white px-2.5 py-1 text-xs dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                >
+                  {stat}
+                  {statSchema.length > 1 && (
+                    <button
+                      onClick={() => {
+                        setStatSchema((prev) => prev.filter((s) => s !== stat));
+                        setJobDefs((prev) =>
+                          prev.map((j) => {
+                            const { [stat]: _removed, ...rest } = j.base_stats;
+                            return { ...j, base_stats: rest };
+                          })
+                        );
+                      }}
+                      className="ml-0.5 text-neutral-400 hover:text-red-500"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newStatName}
+                onChange={(e) => setNewStatName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newStatName.trim() && !statSchema.includes(newStatName.trim())) {
+                    const s = newStatName.trim();
+                    setStatSchema((prev) => [...prev, s]);
+                    setJobDefs((prev) => prev.map((j) => ({ ...j, base_stats: { ...j.base_stats, [s]: 10 } })));
+                    setNewStatName("");
+                  }
+                }}
+                placeholder="스탯 추가 후 Enter"
+                maxLength={20}
+                className="flex-1 rounded-lg border border-black/10 bg-white/80 px-3 py-1.5 text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-white/5 dark:text-white"
+              />
+              <button
+                onClick={() => {
+                  const s = newStatName.trim();
+                  if (s && !statSchema.includes(s)) {
+                    setStatSchema((prev) => [...prev, s]);
+                    setJobDefs((prev) => prev.map((j) => ({ ...j, base_stats: { ...j.base_stats, [s]: 10 } })));
+                    setNewStatName("");
+                  }
+                }}
+                className="rounded-lg border border-black/10 px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5"
+              >
+                + 추가
+              </button>
+            </div>
+          </section>
+
+          {/* 직업별 기본 스탯 */}
+          {jobDefs.length > 0 && (
+            <section className="space-y-2">
+              <h4 className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">직업별 기본 스탯</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-black/10 dark:border-white/10">
+                      <th className="pb-2 text-left font-medium text-neutral-500">직업</th>
+                      {statSchema.map((stat) => (
+                        <th key={stat} className="pb-2 text-center font-medium text-neutral-500">{stat}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/5 dark:divide-white/5">
+                    {jobDefs.map((job, ji) => (
+                      <tr key={job.id}>
+                        <td className="py-2 pr-3 font-medium text-neutral-700 dark:text-neutral-300 whitespace-nowrap">
+                          {JOB_EMOJI[job.id] ?? "👤"} {job.name}
+                        </td>
+                        {statSchema.map((stat) => (
+                          <td key={stat} className="py-2 px-1 text-center">
+                            <input
+                              type="number"
+                              min={0}
+                              max={9999}
+                              value={job.base_stats[stat] ?? 10}
+                              onChange={(e) => updateJobStat(ji, stat, Number(e.target.value))}
+                              className="w-16 rounded-lg border border-black/10 bg-white/80 px-2 py-1 text-center text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {jobDefs.length === 0 && (
+            <p className="text-xs text-neutral-400">
+              AI 자동 제안 버튼을 누르거나 직업 설정 단계로 돌아가 직업을 활성화하면 자동으로 채워집니다.
+            </p>
+          )}
+
           {saveError && (
             <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-500 dark:text-red-400">
               {saveError}
@@ -750,7 +955,7 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
 
           <div className="flex gap-2 pt-1">
             <button
-              onClick={() => setSubStep("prompt")}
+              onClick={() => setSubStep("objectives")}
               className="flex-1 rounded-lg border border-black/10 py-2 text-sm text-neutral-600 transition hover:bg-neutral-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5"
             >
               ← 이전
