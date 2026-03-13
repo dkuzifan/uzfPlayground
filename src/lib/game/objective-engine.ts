@@ -3,7 +3,40 @@ import type {
   ScenarioObjectives,
   ScenarioEndings,
   EndingCondition,
+  ScenePhase,
 } from "@/lib/types/game";
+
+// ── 씬 페이즈 상수 ─────────────────────────────────────────────
+
+export const PHASE_ORDER: ScenePhase[] = ["exploration", "tension", "climax", "resolution"];
+
+/** QuestTracker 진척도 → 씬 페이즈 도출 (objectives 없으면 null 반환) */
+export function deriveScenePhase(
+  tracker: QuestTracker,
+  objectives: ScenarioObjectives
+): ScenePhase {
+  const ratio = tracker.primary_progress / objectives.primary.progress_max;
+  const doomRatio = tracker.doom_clock / tracker.doom_clock_max;
+
+  // 진척도 기반 기본 페이즈
+  let phase: ScenePhase;
+  if (ratio < 0.3) phase = "exploration";
+  else if (ratio < 0.65) phase = "tension";
+  else if (ratio < 0.9) phase = "climax";
+  else phase = "resolution";
+
+  // Doom Clock이 50% 이상이면 최소 "tension"으로 끌어올림
+  if (doomRatio >= 0.5 && PHASE_ORDER.indexOf(phase) < PHASE_ORDER.indexOf("tension")) {
+    phase = "tension";
+  }
+
+  return phase;
+}
+
+/** 씬 페이즈를 앞으로만 전진 (역행 불가) */
+export function advancePhase(current: ScenePhase, proposed: ScenePhase): ScenePhase {
+  return PHASE_ORDER.indexOf(proposed) > PHASE_ORDER.indexOf(current) ? proposed : current;
+}
 
 // ── GM이 반환하는 목표 진척도 업데이트 구조 ──────────────────
 

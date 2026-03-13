@@ -1,5 +1,5 @@
 import { getGeminiModel } from "./client";
-import type { ActionLog, ActionOutcome, ActionChoice, DiceRoll, RawPlayer, QuestTracker, ScenarioObjectives } from "@/lib/types/game";
+import type { ActionLog, ActionOutcome, ActionChoice, DiceRoll, RawPlayer, QuestTracker, ScenarioObjectives, ScenePhase } from "@/lib/types/game";
 import type { ActionCategory } from "@/lib/game/dc-calculator";
 import type { GmObjectiveUpdate } from "@/lib/game/objective-engine";
 
@@ -71,6 +71,7 @@ interface GmRawResponse {
   next_choices?: ActionChoice[];
   quest_update?: GmObjectiveUpdate;
   item_obtained?: string | null;
+  scene_phase_transition?: ScenePhase | null;
 }
 
 export interface NpcEmotionDelta {
@@ -94,6 +95,7 @@ export interface GmActionInput {
   sessionSummary?: string;
   questTracker?: QuestTracker | null;
   objectives?: ScenarioObjectives | null;
+  scenePhase?: ScenePhase;
 }
 
 export type { GmRawResponse };
@@ -179,6 +181,13 @@ ${scenarioSystemPrompt}
 - 획득이 없거나 불확실하면 반드시 생략하거나 null로 남겨라.
 - 예: "낡은 열쇠", "비밀 메모", "마법 포션", "금화 5개"
 
+## scene_phase_transition 규칙
+- 컨텍스트에 "현재 씬 페이즈"가 있을 때만 적용한다.
+- 페이즈 순서: exploration → tension → climax → resolution (단방향, 역행 불가)
+- 현재 상황이 다음 페이즈로 넘어가기에 충분히 극적이라고 판단되면 다음 페이즈 이름을 반환하라.
+- 불확실하거나 전환이 불필요하면 반드시 생략하거나 null로 남겨라.
+- exploration: 탐색·정보수집 단계. tension: 위협·긴장 고조. climax: 결전·클라이맥스. resolution: 해소·에필로그.
+
 ## 제약
 - JSON 이외의 텍스트를 출력하지 마십시오.
 - outcome 필드는 반환하지 마십시오. 판정 결과는 이미 서버에서 확정되었습니다.
@@ -222,8 +231,21 @@ function buildQuestSection(tracker?: QuestTracker | null, objectives?: ScenarioO
   return lines.join("\n") + "\n";
 }
 
+const PHASE_TONE: Record<string, string> = {
+  exploration: "차분하고 묘사적으로. 세계를 탐색하는 분위기. 긴장보다는 호기심과 발견을 강조하라.",
+  tension: "긴장감을 고조시켜라. 위협과 불안이 서서히 스며든다. 선택의 무게를 강조하라.",
+  climax: "폭발적인 긴장감. 모든 것이 결판나는 느낌. 강렬하고 짧은 문장으로 속도감을 높여라.",
+  resolution: "여운과 정리. 감정의 해소. 사건이 남긴 흔적을 묘사하며 이야기를 마무리하라.",
+};
+
+function buildScenePhaseSection(phase?: string): string {
+  if (!phase) return "";
+  const tone = PHASE_TONE[phase] ?? "";
+  return `\n## 현재 씬 페이즈: ${phase}\n나레이션 톤 지시: ${tone}\n`;
+}
+
 function buildContext(input: GmActionInput): string {
-  const { fixedTruths, recentLogs, actingPlayer, action, diceRoll, outcome, npcEmotionDeltas, sessionSummary, questTracker, objectives } = input;
+  const { fixedTruths, recentLogs, actingPlayer, action, diceRoll, outcome, npcEmotionDeltas, sessionSummary, questTracker, objectives, scenePhase } = input;
 
   const fixedTruthsText =
     Object.keys(fixedTruths).length > 0
@@ -253,7 +275,7 @@ function buildContext(input: GmActionInput): string {
     ? `\n## 캐릭터 성향 (next_choices 생성 시 참고)\n${actingPlayer.personality_summary}\n`
     : "";
 
-  return `${fixedTruthsText}${sessionSummarySection}${buildQuestSection(questTracker, objectives)}
+  return `${fixedTruthsText}${sessionSummarySection}${buildQuestSection(questTracker, objectives)}${buildScenePhaseSection(scenePhase)}
 ## 최근 행동 기록 (최신 10개)
 ${recentHistory}
 

@@ -6,6 +6,8 @@ import type { PlayerCharacter, NpcDynamicState } from "./character";
 
 export type SessionStatus = "waiting" | "in_progress" | "completed" | "abandoned";
 
+export type ScenePhase = "exploration" | "tension" | "climax" | "resolution";
+
 export type SpeakerType = "player" | "npc" | "gm" | "system";
 
 export type ActionType =
@@ -190,6 +192,8 @@ export interface GameSession {
   quest_tracker: QuestTracker | null;
   // v3: 미뤄둔 Lore 키워드 대기열
   pending_lore_queue: string[];
+  // v3: 씬 페이즈
+  scene_phase: ScenePhase;
   created_at: string;
   updated_at: string;
 }

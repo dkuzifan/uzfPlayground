@@ -7,11 +7,11 @@ import { computeDCFromCategory, defaultResistanceStats } from "@/lib/game/dc-cal
 import { applyTasteModifiers, buildBaseDeltas } from "@/lib/game/taste-modifier-engine";
 import { runMemorySummarize } from "@/lib/game/memory-pipeline";
 import { scanAndExtractLore } from "@/lib/game/lore-engine";
-import { applyObjectiveUpdate, tickDoomClock, evaluateEndings, applyEnding } from "@/lib/game/objective-engine";
+import { applyObjectiveUpdate, tickDoomClock, evaluateEndings, applyEnding, deriveScenePhase, advancePhase } from "@/lib/game/objective-engine";
 import { evaluateTriggers, markTriggerFired } from "@/lib/game/npc-trigger-engine";
 import { runNpcAutonomousAction, evaluateBystanderReactions } from "@/lib/gemini/npc-agent";
 import type { WorldDictionaryEntry } from "@/lib/game/lore-engine";
-import type { HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory, ActionChoice, ScenarioObjectives, ScenarioEndings } from "@/lib/types/game";
+import type { HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory, ActionChoice, ScenarioObjectives, ScenarioEndings, ScenePhase } from "@/lib/types/game";
 import type { NpcDynamicState } from "@/lib/types/character";
 import type { NpcEmotionDelta } from "@/lib/gemini/gm-agent";
 import type { ActionCategory } from "@/lib/game/dc-calculator";
@@ -218,11 +218,19 @@ export async function POST(req: NextRequest) {
       };
     const scenario = scenarioRaw;
 
+    // 씬 페이즈: QuestTracker 기반 계산 (objectives 없으면 세션 저장값 유지)
+    const currentScenePhase = (session.scene_phase ?? "exploration") as ScenePhase;
+    const derivedPhase = (session.quest_tracker && scenario?.objectives)
+      ? deriveScenePhase(session.quest_tracker, scenario.objectives)
+      : currentScenePhase;
+    const activeScenePhase: ScenePhase = advancePhase(currentScenePhase, derivedPhase);
+
     let gmNarration = "GM이 잠시 자리를 비웠습니다. 다음 플레이어로 턴을 넘깁니다.";
     let gmStateChanges: Array<{ target_id: string; hp_delta: number }> = [];
     let gmNextChoices: ActionChoice[] = [];
     let gmQuestUpdate: import("@/lib/game/objective-engine").GmObjectiveUpdate | undefined;
     let gmItemObtained: string | null = null;
+    let gmPhaseTransition: ScenePhase | null = null;
     let geminiSucceeded = false;
 
     try {
@@ -238,11 +246,15 @@ export async function POST(req: NextRequest) {
         sessionSummary,
         questTracker: session.quest_tracker,
         objectives: scenario?.objectives,
+        scenePhase: activeScenePhase,
       });
       gmNarration = gmResponse.narration;
       gmStateChanges = gmResponse.state_changes ?? [];
       gmQuestUpdate = gmResponse.quest_update;
       gmItemObtained = gmResponse.item_obtained ?? null;
+      if (gmResponse.scene_phase_transition) {
+        gmPhaseTransition = advancePhase(activeScenePhase, gmResponse.scene_phase_transition);
+      }
       // DC 오버라이드: Gemini가 반환한 dc=0을 NPC resistance_stats 기반 실제 DC로 교체
       const resistance = primaryNpc?.resistance_stats ?? defaultResistanceStats();
       gmNextChoices = (gmResponse.next_choices ?? []).map((choice) => {
@@ -505,6 +517,7 @@ export async function POST(req: NextRequest) {
     // ── Step 10: 턴 전진 ──────────────────────────────────────────────────────
     const nextTurnNumber = session.turn_number + 1;
     const nextTurn = getNextTurn(session);
+    const finalScenePhase: ScenePhase = gmPhaseTransition ?? activeScenePhase;
     await supabase
       .from("Game_Session")
       .update({
@@ -512,6 +525,7 @@ export async function POST(req: NextRequest) {
         turn_number: nextTurnNumber,
         status: sessionEnded ? "completed" : session.status,
         quest_tracker: updatedQuestTracker,
+        scene_phase: sessionEnded ? "resolution" : finalScenePhase,
         updated_at: new Date().toISOString(),
       })
       .eq("id", session_id);

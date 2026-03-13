@@ -12,6 +12,7 @@ import GameControls from "@/components/trpg/game/GameControls";
 import DiceRollOverlay from "@/components/trpg/game/DiceRollOverlay";
 import NpcEmotionPanel from "@/components/trpg/game/NpcEmotionPanel";
 import QuestTrackerPanel from "@/components/trpg/game/QuestTrackerPanel";
+import ScenePhaseIndicator from "@/components/trpg/game/ScenePhaseIndicator";
 import EndingScreen from "@/components/trpg/game/EndingScreen";
 
 function weatherIcon(weather: string): string {
@@ -89,6 +90,11 @@ export default function GamePage() {
       <div className="flex h-[calc(100vh-56px)] gap-4 p-4">
         {/* 좌: 채팅 로그 + 행동 패널 */}
         <div className="flex min-w-0 flex-1 flex-col gap-4">
+          {/* 씬 페이즈 인디케이터 */}
+          {session?.scene_phase && (
+            <ScenePhaseIndicator phase={session.scene_phase} />
+          )}
+
           {/* 세션 환경 배지 */}
           {session?.session_environment && (
             session.session_environment.weather || session.session_environment.time_of_day
