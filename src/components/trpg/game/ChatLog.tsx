@@ -132,8 +132,9 @@ export default function ChatLog({ logs }: Props) {
           }
 
           if (log.speaker_type === "gm") {
-            const hpChanges = (log.state_changes as { hp_changes?: HpChange[] })
-              .hp_changes;
+            const stateChanges = log.state_changes as { hp_changes?: HpChange[]; failure_twist?: string };
+            const hpChanges = stateChanges.hp_changes;
+            const failureTwist = stateChanges.failure_twist;
             return (
               <div key={log.id} className="flex flex-col items-start">
                 <div className="max-w-[90%]">
@@ -143,6 +144,16 @@ export default function ChatLog({ logs }: Props) {
                   </div>
                   {hpChanges && hpChanges.length > 0 && (
                     <HpChangeCard changes={hpChanges} />
+                  )}
+                  {failureTwist && (
+                    <div className="mt-2 rounded-xl border border-orange-300/60 bg-orange-50/80 px-4 py-2.5 dark:border-orange-500/30 dark:bg-orange-500/10">
+                      <p className="mb-1 text-xs font-semibold text-orange-600 dark:text-orange-400">
+                        ⚡ 그러나...
+                      </p>
+                      <p className="text-sm text-orange-900 dark:text-orange-200">
+                        {failureTwist}
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>

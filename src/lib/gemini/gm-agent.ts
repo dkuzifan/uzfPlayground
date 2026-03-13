@@ -63,6 +63,11 @@ ${actionContent}
   }
 }
 
+export interface FailurePenalty {
+  doom_delta?: number;   // Doom Clock 추가 증가 (보통 1~2)
+  npc_hostility?: Array<{ npc_name: string; delta: number }>; // NPC 적대감 (음수 = 호감 감소)
+}
+
 // Gemini가 실제로 반환하는 형태 (outcome은 서버 확정이므로 제외)
 interface GmRawResponse {
   narration: string;
@@ -72,6 +77,8 @@ interface GmRawResponse {
   quest_update?: GmObjectiveUpdate;
   item_obtained?: string | null;
   scene_phase_transition?: ScenePhase | null;
+  failure_penalty?: FailurePenalty | null;
+  failure_twist?: string | null;
 }
 
 export interface NpcEmotionDelta {
@@ -180,6 +187,22 @@ ${scenarioSystemPrompt}
 - 플레이어가 나레이션 중에 실제로 아이템/물건/정보를 획득한 경우 item_obtained에 아이템 이름을 짧게(10자 이내) 적어라.
 - 획득이 없거나 불확실하면 반드시 생략하거나 null로 남겨라.
 - 예: "낡은 열쇠", "비밀 메모", "마법 포션", "금화 5개"
+
+## 실패 설계 규칙 (failure_penalty + failure_twist)
+outcome이 "failure" 또는 "partial"일 때만 적용한다.
+
+### failure_penalty (실질적 손해)
+- doom_delta: Doom Clock 추가 증가량 (1~2 정수). 실패가 위기를 앞당길 때. 사소한 실패면 생략.
+- npc_hostility: 적대감이 올라간 NPC 목록. npc_name은 실제 등장 NPC 이름, delta는 음수(예: -20).
+  최근 행동 기록에 등장한 NPC만 대상으로 할 것. 관계없는 NPC는 포함하지 말 것.
+- 두 항목 모두 해당 없으면 failure_penalty 전체를 생략.
+
+### failure_twist (No, but... 반전)
+- 실패가 이야기를 막는 게 아니라 새 가능성을 여는 1문장.
+- "하지만 ~했다", "그러나 ~가 눈에 들어왔다" 형식으로.
+- 예: "문은 잠겼지만, 안에서 비명 소리가 들렸다."
+- 예: "설득은 실패했지만, 상인이 당신의 배짱에 흥미를 보였다."
+- outcome이 "success" 또는 "critical_success"면 반드시 생략.
 
 ## scene_phase_transition 규칙
 - 컨텍스트에 "현재 씬 페이즈"가 있을 때만 적용한다.

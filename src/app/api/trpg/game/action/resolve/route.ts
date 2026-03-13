@@ -236,6 +236,8 @@ export async function POST(req: NextRequest) {
     let gmQuestUpdate: import("@/lib/game/objective-engine").GmObjectiveUpdate | undefined;
     let gmItemObtained: string | null = null;
     let gmPhaseTransition: ScenePhase | null = null;
+    let gmFailurePenalty: import("@/lib/gemini/gm-agent").FailurePenalty | null = null;
+    let gmFailureTwist: string | null = null;
     let geminiSucceeded = false;
 
     try {
@@ -259,6 +261,8 @@ export async function POST(req: NextRequest) {
       gmStateChanges = gmResponse.state_changes ?? [];
       gmQuestUpdate = gmResponse.quest_update;
       gmItemObtained = gmResponse.item_obtained ?? null;
+      gmFailurePenalty = gmResponse.failure_penalty ?? null;
+      gmFailureTwist = gmResponse.failure_twist ?? null;
       if (gmResponse.scene_phase_transition) {
         gmPhaseTransition = advancePhase(activeScenePhase, gmResponse.scene_phase_transition);
       }
@@ -336,7 +340,10 @@ export async function POST(req: NextRequest) {
       action_type: "gm_narration",
       content: gmNarration,
       outcome,
-      state_changes: { hp_changes: hpChanges },
+      state_changes: {
+        hp_changes: hpChanges,
+        ...(gmFailureTwist ? { failure_twist: gmFailureTwist } : {}),
+      },
     });
 
     // HP 업데이트
@@ -357,6 +364,25 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", hpChange.target_id);
+    }
+
+    // ── 실패 페널티 적용 ─────────────────────────────────────────────────────
+    if (gmFailurePenalty && geminiSucceeded) {
+      if (gmFailurePenalty.npc_hostility && gmFailurePenalty.npc_hostility.length > 0) {
+        for (const { npc_name, delta } of gmFailurePenalty.npc_hostility) {
+          const npc = npcs.find((n) => n.name === npc_name);
+          if (!npc) continue;
+          const cur = updatedDynamicStates[npc.id] ?? defaultDynamicState();
+          updatedDynamicStates = {
+            ...updatedDynamicStates,
+            [npc.id]: { ...cur, affinity: clamp(cur.affinity + delta, -100, 100) },
+          };
+        }
+        await supabase
+          .from("Game_Session")
+          .update({ npc_dynamic_states: updatedDynamicStates })
+          .eq("id", session_id);
+      }
     }
 
     // ── 아이템 획득 처리 ─────────────────────────────────────────────────────
@@ -510,6 +536,17 @@ export async function POST(req: NextRequest) {
 
     if (updatedQuestTracker && scenario?.objectives) {
       updatedQuestTracker = tickDoomClock(updatedQuestTracker);
+
+      // 실패 페널티 — Doom Clock 추가 가속
+      if (gmFailurePenalty?.doom_delta) {
+        updatedQuestTracker = {
+          ...updatedQuestTracker,
+          doom_clock: Math.min(
+            updatedQuestTracker.doom_clock + gmFailurePenalty.doom_delta,
+            updatedQuestTracker.doom_clock_max
+          ),
+        };
+      }
 
       if (gmQuestUpdate) {
         updatedQuestTracker = applyObjectiveUpdate(updatedQuestTracker, gmQuestUpdate, scenario.objectives);
