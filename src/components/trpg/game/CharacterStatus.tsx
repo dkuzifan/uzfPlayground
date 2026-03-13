@@ -59,6 +59,22 @@ export default function CharacterStatus({ player }: Props) {
           </div>
         ))}
       </div>
+
+      {player.inventory && player.inventory.length > 0 && (
+        <div>
+          <p className="mb-1 text-xs text-neutral-500 dark:text-neutral-400">🎒 소지품</p>
+          <div className="flex flex-wrap gap-1">
+            {player.inventory.map((item, i) => (
+              <span
+                key={i}
+                className="rounded-full bg-amber-100/80 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-500/15 dark:text-amber-300"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

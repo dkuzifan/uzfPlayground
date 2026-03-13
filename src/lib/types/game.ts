@@ -13,7 +13,8 @@ export type ActionType =
   | "free_input"
   | "gm_narration"
   | "npc_dialogue"
-  | "system_event";
+  | "system_event"
+  | "lore_discovery";
 
 export type ActionOutcome =
   | "critical_success"
@@ -280,6 +281,7 @@ export interface RawPlayer {
   job: string;
   personality_summary: string | null;
   stats: { hp: number; max_hp: number; attack: number; defense: number; speed: number };
+  inventory: string[];
   is_active: boolean;
 }
 

@@ -222,6 +222,7 @@ export async function POST(req: NextRequest) {
     let gmStateChanges: Array<{ target_id: string; hp_delta: number }> = [];
     let gmNextChoices: ActionChoice[] = [];
     let gmQuestUpdate: import("@/lib/game/objective-engine").GmObjectiveUpdate | undefined;
+    let gmItemObtained: string | null = null;
     let geminiSucceeded = false;
 
     try {
@@ -241,6 +242,7 @@ export async function POST(req: NextRequest) {
       gmNarration = gmResponse.narration;
       gmStateChanges = gmResponse.state_changes ?? [];
       gmQuestUpdate = gmResponse.quest_update;
+      gmItemObtained = gmResponse.item_obtained ?? null;
       // DC 오버라이드: Gemini가 반환한 dc=0을 NPC resistance_stats 기반 실제 DC로 교체
       const resistance = primaryNpc?.resistance_stats ?? defaultResistanceStats();
       gmNextChoices = (gmResponse.next_choices ?? []).map((choice) => {
@@ -336,6 +338,27 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", hpChange.target_id);
+    }
+
+    // ── Step 7-B: 아이템 획득 처리 ───────────────────────────────────────────
+    if (gmItemObtained && geminiSucceeded) {
+      const currentInventory = (player.inventory ?? []) as string[];
+      const newInventory = [...currentInventory, gmItemObtained];
+      await supabase
+        .from("Player_Character")
+        .update({ inventory: newInventory })
+        .eq("id", player_id);
+      await supabase.from("Action_Log").insert({
+        session_id,
+        turn_number: session.turn_number,
+        speaker_type: "system",
+        speaker_id: null,
+        speaker_name: "시스템",
+        action_type: "system_event",
+        content: `🎒 [${player.player_name}] 아이템 획득: ${gmItemObtained}`,
+        outcome: null,
+        state_changes: { item_obtained: gmItemObtained },
+      });
     }
 
     // ── Step 8: NPC 대화 생성 (대상 NPC 전체) ────────────────────────────────

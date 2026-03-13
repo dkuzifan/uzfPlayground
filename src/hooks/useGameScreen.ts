@@ -173,10 +173,10 @@ export function useGameScreen(sessionId: string, localId: string | null) {
       }, (payload) => {
         const updated = payload.new as RawPlayer;
         setPlayers((prev) =>
-          prev.map((p) => p.id === updated.id ? { ...p, stats: updated.stats } : p)
+          prev.map((p) => p.id === updated.id ? { ...p, stats: updated.stats, inventory: updated.inventory } : p)
         );
         setMyPlayer((prev) =>
-          prev && prev.id === updated.id ? { ...prev, stats: updated.stats } : prev
+          prev && prev.id === updated.id ? { ...prev, stats: updated.stats, inventory: updated.inventory } : prev
         );
       })
       .subscribe();

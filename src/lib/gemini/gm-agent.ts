@@ -70,6 +70,7 @@ interface GmRawResponse {
   next_scene_hint?: string;
   next_choices?: ActionChoice[];
   quest_update?: GmObjectiveUpdate;
+  item_obtained?: string | null;
 }
 
 export interface NpcEmotionDelta {
@@ -172,6 +173,11 @@ ${scenarioSystemPrompt}
 - secondary_delta: 서브 목표 변화 배열 (index 순서 유지). 기여 없는 항목은 0.
 - secret_triggered: 비밀 목표 조건이 충족됐으면 true, 아니면 생략.
 - quest_update는 목표 상태가 없거나 기여가 전혀 없을 때 생략해도 됨.
+
+## item_obtained 규칙
+- 플레이어가 나레이션 중에 실제로 아이템/물건/정보를 획득한 경우 item_obtained에 아이템 이름을 짧게(10자 이내) 적어라.
+- 획득이 없거나 불확실하면 반드시 생략하거나 null로 남겨라.
+- 예: "낡은 열쇠", "비밀 메모", "마법 포션", "금화 5개"
 
 ## 제약
 - JSON 이외의 텍스트를 출력하지 마십시오.
