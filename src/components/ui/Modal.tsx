@@ -28,15 +28,19 @@ export default function Modal({ open, onClose, title, size = "md", children }: M
       onClick={onClose}
     >
       <div
-        className={`w-full rounded-xl border border-black/10 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-neutral-900 ${size === "lg" ? "max-w-2xl" : "max-w-md"}`}
+        className={`w-full rounded-xl border border-black/10 bg-white shadow-xl dark:border-white/10 dark:bg-neutral-900 ${size === "lg" ? "max-w-2xl" : "max-w-md"} flex max-h-[90vh] flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
         {title && (
-          <h2 className="mb-4 text-lg font-semibold text-neutral-900 dark:text-white">
-            {title}
-          </h2>
+          <div className="flex-shrink-0 px-6 pt-6 pb-4">
+            <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
+              {title}
+            </h2>
+          </div>
         )}
-        {children}
+        <div className="flex-1 overflow-y-auto px-6 pb-6">
+          {children}
+        </div>
       </div>
     </div>
   );
