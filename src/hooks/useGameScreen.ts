@@ -274,9 +274,10 @@ export function useGameScreen(sessionId: string, localId: string | null) {
     async (rolled: number) => {
       if (!pendingDice || !myPlayer || !localId) return;
 
-      // 오버레이 즉시 닫기
+      // 오버레이 즉시 닫고, resolve API 대기 중 로딩 표시
       const captured = pendingDice;
       setPendingDice(null);
+      setIsSubmitting(true);
 
       try {
         const res = await fetch("/api/trpg/game/action/resolve", {
@@ -311,10 +312,12 @@ export function useGameScreen(sessionId: string, localId: string | null) {
             toast.info("선택지 생성에 오류가 발생했습니다. 기본 선택지로 진행합니다.");
           }
         }
+        setIsSubmitting(false);
       } catch {
         toast.error("주사위 결과 처리 중 오류가 발생했습니다.");
         await refreshLogs(sessionId);
         fetchChoices(sessionId, myPlayer.id, localId);
+        setIsSubmitting(false);
       }
     },
     [pendingDice, myPlayer, localId, sessionId, fetchChoices, refreshLogs]
