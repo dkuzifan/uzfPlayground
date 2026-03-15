@@ -140,6 +140,8 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
 
   // Step B
   const [jobs, setJobs] = useState<JobConfig[]>(THEME_JOB_PRESETS.fantasy);
+  const [newJobId, setNewJobId]     = useState("");
+  const [newJobLabel, setNewJobLabel] = useState("");
 
   // Step C
   const [gmPrompt, setGmPrompt]     = useState("");
@@ -185,12 +187,21 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
     setSubStep("jobs");
   }
 
-  // ── Step B: 직업 토글/라벨 편집 ──────────────────────────────────────
+  // ── Step B: 직업 토글/라벨 편집/추가 ────────────────────────────────
   function toggleJob(idx: number) {
     setJobs((prev) => prev.map((j, i) => (i === idx ? { ...j, enabled: !j.enabled } : j)));
   }
   function updateLabel(idx: number, label: string) {
     setJobs((prev) => prev.map((j, i) => (i === idx ? { ...j, label } : j)));
+  }
+  function addCustomJob() {
+    const id = newJobId.trim().toLowerCase().replace(/\s+/g, "_");
+    const label = newJobLabel.trim();
+    if (!id || !label) return;
+    if (jobs.some((j) => j.job === id)) return;
+    setJobs((prev) => [...prev, { job: id, label, enabled: true }]);
+    setNewJobId("");
+    setNewJobLabel("");
   }
 
   // ── Step C: AI 초안 생성 ─────────────────────────────────────────────
@@ -534,6 +545,34 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
                 <span className="text-xs text-neutral-400 dark:text-neutral-500">{j.job}</span>
               </div>
             ))}
+          </div>
+
+          {/* 직업 추가 */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="직업 ID (영문)"
+              value={newJobId}
+              onChange={(e) => setNewJobId(e.target.value)}
+              maxLength={20}
+              className="w-28 rounded-lg border border-black/10 bg-white/80 px-2.5 py-1.5 text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-white/5 dark:text-white"
+            />
+            <input
+              type="text"
+              placeholder="표시 이름"
+              value={newJobLabel}
+              onChange={(e) => setNewJobLabel(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") addCustomJob(); }}
+              maxLength={12}
+              className="flex-1 rounded-lg border border-black/10 bg-white/80 px-2.5 py-1.5 text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-white/5 dark:text-white"
+            />
+            <button
+              onClick={addCustomJob}
+              disabled={!newJobId.trim() || !newJobLabel.trim()}
+              className="rounded-lg border border-black/10 px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50 disabled:opacity-40 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5"
+            >
+              + 추가
+            </button>
           </div>
 
           {enabledJobs.length === 0 && (
