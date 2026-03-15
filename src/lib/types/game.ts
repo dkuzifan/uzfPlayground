@@ -183,6 +183,16 @@ export interface NpcMemory {
   decayed_emotion_level: number;     // 망각 연산 적용 후 감정 강도 (0~100)
 }
 
+// ── ActiveTurnState ────────────────────────────────────────
+
+// 다른 플레이어에게 보여줄 현재 턴 진행 상태
+export interface ActiveTurnState {
+  choices: ActionChoice[];
+  status: "choosing" | "rolling";
+  selected_label?: string;  // rolling 상태일 때 선택한 행동 텍스트
+  player_name: string;
+}
+
 // ── Game Session ──────────────────────────────────────────
 
 export type TurnParticipant = { type: "player"; id: string };
@@ -209,6 +219,8 @@ export interface GameSession {
   pending_lore_queue: string[];
   // v3: 씬 페이즈
   scene_phase: ScenePhase;
+  // v4: 활성 턴 상태 (다른 플레이어에게 선택지/주사위 상태 공개)
+  active_turn_state: ActiveTurnState | null;
   created_at: string;
   updated_at: string;
 }

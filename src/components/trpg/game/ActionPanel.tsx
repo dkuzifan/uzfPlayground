@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ActionChoice } from "@/lib/types/game";
+import type { ActionChoice, ActiveTurnState } from "@/lib/types/game";
 
 interface Props {
   isMyTurn: boolean;
@@ -9,6 +9,7 @@ interface Props {
   choices: ActionChoice[];
   choicesLoading: boolean;
   isSubmitting: boolean;
+  activeTurnState?: ActiveTurnState | null;
   onSubmit: (
     content: string,
     type: "choice" | "free_input",
@@ -23,6 +24,7 @@ export default function ActionPanel({
   choices,
   choicesLoading,
   isSubmitting,
+  activeTurnState,
   onSubmit,
 }: Props) {
   const [freeInput, setFreeInput] = useState("");
@@ -40,13 +42,67 @@ export default function ActionPanel({
 
   if (!isMyTurn) {
     return (
-      <div className="rounded-xl border border-black/10 bg-black/[0.04] p-4 text-center dark:border-white/10 dark:bg-white/5">
-        <div className="flex items-center justify-center gap-2 text-neutral-500">
-          <span className="animate-pulse text-lg">◌</span>
-          <span className="text-sm">
-            {currentTurnName ? `${currentTurnName}의 턴입니다...` : "대기 중..."}
-          </span>
+      <div className="rounded-xl border border-black/10 bg-black/[0.04] p-4 dark:border-white/10 dark:bg-white/5 space-y-3">
+        {/* 상태 헤더 */}
+        <div className="flex items-center gap-2 text-neutral-500">
+          {activeTurnState?.status === "rolling" ? (
+            <>
+              <span className="animate-bounce text-lg">🎲</span>
+              <span className="text-sm">
+                {activeTurnState.player_name}이(가) 주사위를 굴리고 있습니다...
+              </span>
+            </>
+          ) : activeTurnState?.status === "choosing" ? (
+            <>
+              <span className="animate-pulse text-lg">◌</span>
+              <span className="text-sm">
+                {activeTurnState.player_name}이(가) 행동을 선택하고 있습니다...
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="animate-pulse text-lg">◌</span>
+              <span className="text-sm">
+                {currentTurnName ? `${currentTurnName}의 턴입니다...` : "대기 중..."}
+              </span>
+            </>
+          )}
         </div>
+
+        {/* rolling 상태: 선택한 행동 표시 */}
+        {activeTurnState?.status === "rolling" && activeTurnState.selected_label && (
+          <div className="rounded-lg border border-amber-300/40 bg-amber-50/50 px-4 py-2.5 dark:border-amber-500/20 dark:bg-amber-500/5">
+            <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-0.5">선택한 행동</p>
+            <p className="text-sm text-neutral-800 dark:text-neutral-200">{activeTurnState.selected_label}</p>
+          </div>
+        )}
+
+        {/* choosing 상태: 선택지 목록 표시 (read-only) */}
+        {activeTurnState?.status === "choosing" && activeTurnState.choices.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs text-neutral-400">제시된 선택지</p>
+            {activeTurnState.choices.map((choice, i) => (
+              <div
+                key={choice.id ?? i}
+                className="w-full rounded-lg border border-black/8 bg-white/40 px-4 py-2.5 dark:border-white/8 dark:bg-white/[0.03]"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                    {choice.label}
+                  </span>
+                  {choice.dice_check && (
+                    <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                      ⚄ {choice.dice_check.dc}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">
+                  {choice.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }

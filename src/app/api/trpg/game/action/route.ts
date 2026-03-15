@@ -291,6 +291,7 @@ export async function POST(req: NextRequest) {
         .update({
           current_turn_player_id: nextTurn?.id ?? null,
           turn_number: session.turn_number + 1,
+          active_turn_state: null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", session_id);
@@ -595,6 +596,7 @@ export async function POST(req: NextRequest) {
         status: sessionEnded ? "completed" : session.status,
         quest_tracker: updatedQuestTracker,
         scene_phase: sessionEnded ? "resolution" : finalScenePhase,
+        active_turn_state: null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", session_id);

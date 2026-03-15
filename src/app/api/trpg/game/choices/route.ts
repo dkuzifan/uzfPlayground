@@ -104,9 +104,32 @@ export async function POST(req: NextRequest) {
         };
       });
 
+      // active_turn_state 저장 (다른 플레이어에게 선택지 공개)
+      await (supabase
+        .from("Game_Session")
+        .update({
+          active_turn_state: {
+            choices,
+            status: "choosing",
+            player_name: player.player_name,
+          },
+        } as unknown as Record<string, unknown>)
+        .eq("id", session_id));
+
       return NextResponse.json({ choices });
     } catch (err) {
       console.error("[ChoicesRoute] generateChoices failed:", err);
+      // 폴백 선택지도 active_turn_state에 저장
+      await (supabase
+        .from("Game_Session")
+        .update({
+          active_turn_state: {
+            choices: FALLBACK_CHOICES,
+            status: "choosing",
+            player_name: player.player_name,
+          },
+        } as unknown as Record<string, unknown>)
+        .eq("id", session_id));
       return NextResponse.json({ choices: FALLBACK_CHOICES, is_fallback: true });
     }
   } catch (err) {

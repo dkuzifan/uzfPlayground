@@ -207,6 +207,18 @@ export function useGameScreen(sessionId: string, localId: string | null) {
           action_type: type,
           action_category: diceCheck.action_category,
         });
+
+        // Fire-and-forget: 다른 플레이어에게 주사위 굴리는 중 표시
+        fetch(`/api/trpg/game/${sessionId}/turn-state`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            selected_label: content,
+            player_name: myPlayer.player_name,
+            local_id: localId,
+            player_id: myPlayer.id,
+          }),
+        }).catch(() => {});
         return;
       }
 
@@ -249,6 +261,18 @@ export function useGameScreen(sessionId: string, localId: string | null) {
             action_type: type,
             action_category: data.action_category,
           });
+
+          // Fire-and-forget: 다른 플레이어에게 주사위 굴리는 중 표시
+          fetch(`/api/trpg/game/${sessionId}/turn-state`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              selected_label: content,
+              player_name: myPlayer.player_name,
+              local_id: localId,
+              player_id: myPlayer.id,
+            }),
+          }).catch(() => {});
           setIsSubmitting(false);
         } else {
           await refreshLogs(sessionId);

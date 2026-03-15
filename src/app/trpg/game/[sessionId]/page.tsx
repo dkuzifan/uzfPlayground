@@ -118,6 +118,7 @@ export default function GamePage() {
             choices={choices}
             choicesLoading={choicesLoading}
             isSubmitting={isSubmitting}
+            activeTurnState={session?.active_turn_state ?? null}
             onSubmit={submitAction}
           />
         </div>
