@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
 `.trim();
 
   try {
-    const model = getGeminiModel("gemini-2.0-flash");
+    const model = getGeminiModel("gemini-2.5-pro");
     const result = await model.generateContent(prompt);
     const raw = result.response.text().trim();
 
