@@ -189,3 +189,88 @@ export async function generateNpcProfile(
 
   return JSON.parse(result.response.text());
 }
+
+// ── 시나리오 컨텍스트 기반 NPC 일괄 생성 ────────────────────────────────────
+
+export interface GeneratedNpcData {
+  name: string;
+  role: "enemy" | "ally" | "neutral" | "boss";
+  appearance: string;
+  personality: string;
+  mbti: string;
+  enneagram: number;
+  dnd_alignment: string;
+  hidden_motivation: { goal: string; secret: string };
+  system_prompt: string;
+  linguistic_profile: {
+    speech_style: string;
+    sentence_ending: string;
+    honorific_rules: string;
+    vocal_tics: string;
+    evasion_style: string;
+    forbidden_words: string[];
+  };
+  knowledge_level: number;
+}
+
+export async function generateNpcsForScenario(scenarioContext: {
+  gm_system_prompt: string;
+  theme?: string | null;
+  description?: string | null;
+}): Promise<GeneratedNpcData[]> {
+  const model = getGeminiModel();
+
+  const contextParts = [
+    scenarioContext.theme ? `테마: ${scenarioContext.theme}` : null,
+    scenarioContext.description ? `시나리오 설명: ${scenarioContext.description}` : null,
+    `GM 지침:\n${scenarioContext.gm_system_prompt}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const prompt = `다음 TRPG 시나리오에 등장할 NPC 2~4명을 생성하세요.
+
+${contextParts}
+
+조건:
+- 시나리오 맥락에 자연스럽게 어울리는 인물들
+- 플레이어가 마주칠 가능성이 높은 인물 위주
+- 성향 다양화: ally(우호적), neutral(중립), enemy(적대적), boss(주요 적/보스) 중 섞어서 구성
+- 각자 뚜렷한 개성과 말투
+
+JSON 배열로만 응답하세요:
+[
+  {
+    "name": "NPC 이름",
+    "role": "ally | neutral | enemy | boss 중 하나",
+    "appearance": "외형 묘사 (2~3문장)",
+    "personality": "성격 묘사 (2~3문장)",
+    "mbti": "MBTI 4자리",
+    "enneagram": 에니어그램 번호(1-9),
+    "dnd_alignment": "lawful-good | neutral-evil 등 9가지 중 하나",
+    "hidden_motivation": { "goal": "숨겨진 목표", "secret": "비밀" },
+    "system_prompt": "이 NPC로 대화할 때의 역할 지시어 (3~5문장, 한국어)",
+    "linguistic_profile": {
+      "speech_style": "말투 설명",
+      "sentence_ending": "자주 쓰는 어미 패턴 (없으면 빈 문자열)",
+      "honorific_rules": "존댓말/하대 기준",
+      "vocal_tics": "말버릇 (없으면 빈 문자열)",
+      "evasion_style": "화제를 돌릴 때 방식",
+      "forbidden_words": []
+    },
+    "knowledge_level": 세계관 지식 수준(1-10, 평민=1-3, 상인/군인=4-5, 학자/귀족=6-7, 극비=8-10)
+  }
+]`;
+
+  try {
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
+    });
+    const parsed = JSON.parse(result.response.text());
+    return Array.isArray(parsed) ? (parsed as GeneratedNpcData[]) : [];
+  } catch (err) {
+    console.error("[NpcAgent] generateNpcsForScenario 실패:", err);
+    return [];
+  }
+}

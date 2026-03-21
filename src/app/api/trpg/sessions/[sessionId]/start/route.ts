@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { buildTurnOrder } from "@/lib/game/turn-manager";
 import { generateOpeningNarration } from "@/lib/gemini/gm-agent";
+import { generateNpcsForScenario } from "@/lib/gemini/npc-agent";
 
 interface RouteParams {
   params: Promise<{ sessionId: string }>;
@@ -74,13 +75,15 @@ export async function POST(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "게임 시작에 실패했습니다.", detail: updateError.message }, { status: 500 });
   }
 
-  // 오프닝 서사 생성 (비동기 — 실패해도 게임 시작은 이미 완료)
+  // NPC 자동 생성 + 오프닝 서사 생성 (비동기 — 실패해도 게임 시작은 이미 완료)
   try {
+    const scenarioId = (session as { scenario_id?: string }).scenario_id ?? "";
+
     const [{ data: scenarioData }, { data: playerList }] = await Promise.all([
       supabase
         .from("Scenario")
-        .select("gm_system_prompt")
-        .eq("id", (session as { scenario_id?: string }).scenario_id ?? "")
+        .select("gm_system_prompt, theme, description")
+        .eq("id", scenarioId)
         .single(),
       supabase
         .from("Player_Character")
@@ -89,9 +92,62 @@ export async function POST(request: Request, { params }: RouteParams) {
         .eq("is_active", true),
     ]);
 
-    const prompt = scenarioData?.gm_system_prompt ?? "당신은 TRPG 게임 마스터입니다.";
+    const prompt = (scenarioData as { gm_system_prompt?: string } | null)?.gm_system_prompt ?? "당신은 TRPG 게임 마스터입니다.";
     const names = (playerList ?? []).map((p) => p.player_name);
-    const opening = await generateOpeningNarration(prompt, names);
+
+    // 이미 이 세션에 NPC가 있으면 스킵, 없으면 자동 생성
+    const { data: existingNpcs } = await supabase
+      .from("NPC_Persona")
+      .select("id, name, role, personality")
+      .eq("session_id", sessionId);
+
+    let sessionNpcs: Array<{ name: string; role: string; personality: string }> = [];
+
+    if (!existingNpcs?.length && scenarioId) {
+      const generated = await generateNpcsForScenario({
+        gm_system_prompt: prompt,
+        theme: (scenarioData as { theme?: string } | null)?.theme,
+        description: (scenarioData as { description?: string } | null)?.description,
+      });
+
+      if (generated.length > 0) {
+        const { data: insertedNpcs } = await supabase
+          .from("NPC_Persona")
+          .insert(
+            generated.map((npc) => ({
+              scenario_id: scenarioId,
+              session_id: sessionId,
+              name: npc.name,
+              role: npc.role,
+              appearance: npc.appearance,
+              personality: npc.personality,
+              mbti: npc.mbti,
+              enneagram: npc.enneagram,
+              dnd_alignment: npc.dnd_alignment,
+              hidden_motivation: npc.hidden_motivation,
+              system_prompt: npc.system_prompt,
+              stats: { hp: 30, max_hp: 30, attack: 5, defense: 5 },
+              linguistic_profile: npc.linguistic_profile,
+              knowledge_level: npc.knowledge_level,
+            }))
+          )
+          .select("name, role, personality");
+
+        sessionNpcs = (insertedNpcs ?? []).map((n) => ({
+          name: n.name,
+          role: n.role,
+          personality: n.personality ?? "",
+        }));
+      }
+    } else if (existingNpcs?.length) {
+      sessionNpcs = existingNpcs.map((n) => ({
+        name: n.name,
+        role: n.role,
+        personality: (n as { personality?: string }).personality ?? "",
+      }));
+    }
+
+    const opening = await generateOpeningNarration(prompt, names, sessionNpcs);
 
     await supabase.from("Action_Log").insert({
       session_id: sessionId,
@@ -105,7 +161,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       state_changes: {},
     });
   } catch (e) {
-    console.error("[start] opening narration failed:", e);
+    console.error("[start] NPC 생성 또는 오프닝 서사 실패:", e);
   }
 
   return NextResponse.json({ ok: true });

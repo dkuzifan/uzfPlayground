@@ -124,17 +124,24 @@ export async function runGmAction(input: GmActionInput): Promise<GmRawResponse> 
 /** 게임 시작 시 오프닝 서사 생성 */
 export async function generateOpeningNarration(
   scenarioSystemPrompt: string,
-  playerNames: string[]
+  playerNames: string[],
+  npcs?: Array<{ name: string; role: string; personality: string }>
 ): Promise<string> {
   const model = getGeminiModel();
-  const prompt = `${scenarioSystemPrompt}
 
+  const npcSection =
+    npcs && npcs.length > 0
+      ? `\n## 이 세션의 등장 NPC\n${npcs.map((n) => `- ${n.name} (${n.role}): ${n.personality}`).join("\n")}\n`
+      : "";
+
+  const prompt = `${scenarioSystemPrompt}
+${npcSection}
 ## 지시
 지금 TRPG 세션이 막 시작되었습니다.
 참가 플레이어: ${playerNames.join(", ")}
 
 플레이어들이 처음 마주하는 장면을 200~350자 한국어로 묘사하세요.
-배경, 분위기, 첫 번째 상황을 생생하게 전달하고 플레이어의 행동을 유도하는 문장으로 마무리하세요.
+배경, 분위기, 첫 번째 상황을 생생하게 전달하고${npcs?.length ? " 등장 NPC 중 1~2명을 자연스럽게 등장시키며" : ""} 플레이어의 행동을 유도하는 문장으로 마무리하세요.
 JSON 없이 순수 텍스트로만 응답하세요.`;
 
   try {
