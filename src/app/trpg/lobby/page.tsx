@@ -7,11 +7,23 @@ import Button from "@/components/ui/Button";
 import { useGuestProfile } from "@/hooks/useGuestProfile";
 import type { LobbySession } from "@/lib/types/lobby";
 
+const DRAFT_KEY = "trpg_onboarding_draft";
+
 export default function LobbyPage() {
   const { profile, mounted, saveProfile } = useGuestProfile();
   const [sessions, setSessions] = useState<LobbySession[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [resumeDraft, setResumeDraft] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
+
+  useEffect(() => {
+    try {
+      setHasDraft(!!sessionStorage.getItem(DRAFT_KEY));
+    } catch {
+      // sessionStorage 사용 불가 환경 무시
+    }
+  }, []);
 
   const fetchSessions = useCallback(async () => {
     setLoading(true);
@@ -32,6 +44,35 @@ export default function LobbyPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
+      {/* 이어서 하기 배너 */}
+      {mounted && hasDraft && (
+        <div className="mb-5 flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50/80 px-4 py-3 text-sm dark:border-indigo-500/30 dark:bg-indigo-500/10">
+          <p className="text-indigo-700 dark:text-indigo-300">
+            🔖 이전에 진행 중이던 캐릭터 생성이 있습니다.
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setResumeDraft(true);
+                setCreateOpen(true);
+              }}
+              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+            >
+              이어서 하기
+            </button>
+            <button
+              onClick={() => {
+                sessionStorage.removeItem(DRAFT_KEY);
+                setHasDraft(false);
+              }}
+              className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 헤더 */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -106,9 +147,14 @@ export default function LobbyPage() {
       {mounted && profile && (
         <CreateRoomModal
           open={createOpen}
-          onClose={() => setCreateOpen(false)}
+          onClose={() => {
+            setCreateOpen(false);
+            setResumeDraft(false);
+            setHasDraft(false);
+          }}
           profile={profile}
           onSaveProfile={saveProfile}
+          resumeDraft={resumeDraft}
         />
       )}
     </div>

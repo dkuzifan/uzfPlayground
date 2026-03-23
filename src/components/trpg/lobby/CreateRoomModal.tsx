@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
@@ -11,11 +11,20 @@ import type { GuestProfile } from "@/lib/types/lobby";
 import type { PersonalityProfile, CharacterJob, CharacterCreationConfig } from "@/lib/types/character";
 import { AVATAR_COLORS } from "@/lib/types/lobby";
 
+const DRAFT_KEY = "trpg_onboarding_draft";
+
+interface OnboardingDraft {
+  scenario: ScenarioSummary;
+  sceneIdx: number;
+  choices: number[];
+}
+
 interface CreateRoomModalProps {
   open: boolean;
   onClose: () => void;
   profile: GuestProfile;
   onSaveProfile: (nickname: string, avatarIndex: number) => void;
+  resumeDraft?: boolean;
 }
 
 type Step = "scenario" | "create-scenario" | "character" | "room";
@@ -41,11 +50,13 @@ const JOB_EMOJI: Record<string, string> = {
   detective: "🔍", journalist: "📰", doctor: "🩺", lawyer: "⚖️", civilian: "👤",
 };
 
-export default function CreateRoomModal({ open, onClose, profile, onSaveProfile }: CreateRoomModalProps) {
+export default function CreateRoomModal({ open, onClose, profile, onSaveProfile, resumeDraft }: CreateRoomModalProps) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("scenario");
   const [selectedScenario, setSelectedScenario] = useState<ScenarioSummary | null>(null);
   const [characterData, setCharacterData] = useState<CharacterData | null>(null);
+  const [draftSceneIdx, setDraftSceneIdx] = useState<number | undefined>(undefined);
+  const [draftChoices, setDraftChoices] = useState<number[] | undefined>(undefined);
 
   // room step state
   const [roomName, setRoomName] = useState("");
@@ -54,19 +65,50 @@ export default function CreateRoomModal({ open, onClose, profile, onSaveProfile 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 드래프트 복원: resumeDraft=true이고 모달이 열릴 때 sessionStorage 확인
+  useEffect(() => {
+    if (!open || !resumeDraft) return;
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const draft: OnboardingDraft = JSON.parse(raw);
+      setSelectedScenario(draft.scenario);
+      setMaxPlayers(draft.scenario.max_players);
+      setDraftSceneIdx(draft.sceneIdx);
+      setDraftChoices(draft.choices);
+      setStep("character");
+    } catch {
+      sessionStorage.removeItem(DRAFT_KEY);
+    }
+  }, [open, resumeDraft]);
+
   function handleClose() {
+    sessionStorage.removeItem(DRAFT_KEY);
     setStep("scenario");
     setSelectedScenario(null);
     setCharacterData(null);
+    setDraftSceneIdx(undefined);
+    setDraftChoices(undefined);
     setRoomName("");
     setError(null);
     onClose();
+  }
+
+  function handleSceneProgress(sceneIdx: number, choices: number[]) {
+    if (!selectedScenario) return;
+    const draft: OnboardingDraft = { scenario: selectedScenario, sceneIdx, choices };
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
   }
 
   // ── Step 1: 시나리오 선택 완료 ─────────────────────────────────────
   function handleScenarioSelect(scenario: ScenarioSummary) {
     setSelectedScenario(scenario);
     setMaxPlayers(scenario.max_players);
+    setDraftSceneIdx(undefined);
+    setDraftChoices(undefined);
+    // 새 시나리오 선택 시 기존 드래프트 초기화 후 새 드래프트 시작
+    const draft: OnboardingDraft = { scenario, sceneIdx: 0, choices: [] };
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     setStep("character");
   }
 
@@ -74,6 +116,10 @@ export default function CreateRoomModal({ open, onClose, profile, onSaveProfile 
   function handleScenarioCreated(scenario: ScenarioSummary) {
     setSelectedScenario(scenario);
     setMaxPlayers(scenario.max_players);
+    setDraftSceneIdx(undefined);
+    setDraftChoices(undefined);
+    const draft: OnboardingDraft = { scenario, sceneIdx: 0, choices: [] };
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     setStep("character");
   }
 
@@ -111,6 +157,7 @@ export default function CreateRoomModal({ open, onClose, profile, onSaveProfile 
         setError(data.error ?? "방 생성에 실패했습니다.");
         return;
       }
+      sessionStorage.removeItem(DRAFT_KEY);
       onSaveProfile(characterData.characterName, avatarIndex);
       router.push(`/trpg/lobby/${data.sessionId}`);
     } catch {
@@ -192,6 +239,9 @@ export default function CreateRoomModal({ open, onClose, profile, onSaveProfile 
           onComplete={handleCharacterComplete}
           availableJobs={buildAvailableJobs(selectedScenario.character_creation_config)}
           characterNameHint={selectedScenario.character_creation_config.character_name_hint}
+          initialSceneIdx={draftSceneIdx}
+          initialChoices={draftChoices}
+          onSceneProgress={handleSceneProgress}
         />
       )}
 

@@ -13,6 +13,9 @@ interface Props {
   onComplete: (personality: PersonalityProfile, characterName: string, job: CharacterJob) => void;
   availableJobs?: { value: CharacterJob; label: string; desc?: string; icon?: string }[];
   characterNameHint?: string;
+  initialSceneIdx?: number;
+  initialChoices?: number[];
+  onSceneProgress?: (sceneIdx: number, choices: number[]) => void;
 }
 
 interface ChoiceScore {
@@ -436,10 +439,10 @@ function calcDnD(sc: TotalScores, ch: number[]): DnDAlignment {
 
 type Phase = "intro" | "scenes" | "result" | "character";
 
-export default function PersonalityTest({ onComplete, availableJobs, characterNameHint }: Props) {
-  const [phase, setPhase] = useState<Phase>("intro");
-  const [sceneIdx, setSceneIdx] = useState(0);
-  const [choices, setChoices] = useState<number[]>([]);
+export default function PersonalityTest({ onComplete, availableJobs, characterNameHint, initialSceneIdx, initialChoices, onSceneProgress }: Props) {
+  const [phase, setPhase] = useState<Phase>((initialSceneIdx ?? 0) > 0 ? "scenes" : "intro");
+  const [sceneIdx, setSceneIdx] = useState(initialSceneIdx ?? 0);
+  const [choices, setChoices] = useState<number[]>(initialChoices ?? []);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [result, setResult] = useState<{ mbti: MBTIType; enneagram: EnneagramType; dnd: DnDAlignment } | null>(null);
   const [characterName, setCharacterName] = useState("");
@@ -453,8 +456,11 @@ export default function PersonalityTest({ onComplete, availableJobs, characterNa
       setChoices(next);
       setSelectedIdx(null);
       if (sceneIdx < SCENES.length - 1) {
-        setSceneIdx((s) => s + 1);
+        const nextIdx = sceneIdx + 1;
+        onSceneProgress?.(nextIdx, next);
+        setSceneIdx(nextIdx);
       } else {
+        onSceneProgress?.(SCENES.length, next);
         const sc = calcScores(next);
         setResult({ mbti: calcMBTI(sc, next), enneagram: calcEnneagram(sc, next), dnd: calcDnD(sc, next) });
         setPhase("result");
