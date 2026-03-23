@@ -1,13 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ScenarioSummary } from "./ScenarioSelectStep";
 import type { ObjectiveType, EndingTrigger, EndingTone, ScenarioObjectives, ScenarioEndings, JobDefinition, CharacterConfig } from "@/lib/types/game";
 import type { StatSchemaEntry } from "@/lib/types/character";
+import { normalizeStatSchema } from "@/lib/types/character";
+
+export interface ScenarioInitialData {
+  title: string;
+  theme: string;
+  description: string;
+  max_players: number;
+  gm_system_prompt: string;
+  character_creation_config?: {
+    available_jobs: string[];
+    job_labels: Record<string, string>;
+  };
+  objectives?: ScenarioObjectives | null;
+  endings?: ScenarioEndings | null;
+  character_config?: CharacterConfig | null;
+  lore_items?: LoreItem[];
+}
 
 interface Props {
   onComplete: (scenario: ScenarioSummary) => void;
   onBack: () => void;
+  initialData?: ScenarioInitialData;
 }
 
 type SubStep = "basic" | "jobs" | "prompt" | "objectives" | "character" | "lore";
@@ -141,7 +159,7 @@ function defaultEndings(): EndingForm[] {
   ];
 }
 
-export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
+export default function ScenarioCreateStep({ onComplete, onBack, initialData }: Props) {
   const [subStep, setSubStep] = useState<SubStep>("basic");
 
   // Step A
@@ -205,6 +223,83 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
   // 저장
   const [saving, setSaving]     = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // initialData로 폼 사전 채우기 (복사 기능)
+  useEffect(() => {
+    if (!initialData) return;
+
+    setTitle(initialData.title ? `${initialData.title} (복사본)` : "");
+    setTheme(initialData.theme ?? "fantasy");
+    setDescription(initialData.description ?? "");
+    setMaxPlayers(initialData.max_players ?? 4);
+    setGmPrompt(initialData.gm_system_prompt ?? "");
+
+    // 직업 목록 복원
+    const config = initialData.character_creation_config;
+    if (config?.available_jobs?.length) {
+      const restored: JobConfig[] = config.available_jobs.map((jobId) => ({
+        job: jobId,
+        label: config.job_labels?.[jobId] ?? jobId,
+        enabled: true,
+      }));
+      setJobs(restored);
+    }
+
+    // 목표 복원
+    const obj = initialData.objectives;
+    if (obj?.primary) {
+      setPrimaryObj({
+        type: obj.primary.type,
+        target_description: obj.primary.target_description,
+        progress_max: obj.primary.progress_max,
+      });
+    }
+    if (obj?.secondary?.length) {
+      setSecondaryObjs(obj.secondary.map((s) => ({
+        type: s.type,
+        target_description: s.target_description,
+        progress_max: s.progress_max,
+      })));
+    }
+    if (obj?.secret) {
+      setSecretObj({
+        type: obj.secret.type,
+        target_description: obj.secret.target_description,
+        progress_max: obj.secret.progress_max,
+        is_hidden: true,
+      });
+    }
+    if (obj) {
+      setDoomInterval(obj.doom_clock_interval ?? 4);
+      setDoomMax(obj.doom_clock_max ?? 8);
+    }
+
+    // 엔딩 복원
+    const endingData = initialData.endings;
+    if (endingData?.endings?.length) {
+      setEndings(endingData.endings.map((e) => ({
+        id: e.id,
+        label: e.label,
+        description: e.description,
+        trigger: e.trigger,
+        tone: e.tone,
+      })));
+    }
+
+    // 스탯/직업 정의 복원
+    const cc = initialData.character_config;
+    if (cc) {
+      const schema = normalizeStatSchema(cc.stat_schema);
+      if (schema.length > 0) setStatSchema(schema);
+      if (cc.jobs?.length) setJobDefs(cc.jobs);
+    }
+
+    // Lore 복원
+    if (initialData.lore_items?.length) {
+      setLoreItems(initialData.lore_items);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData]);
 
   const enabledJobs = jobs.filter((j) => j.enabled);
 

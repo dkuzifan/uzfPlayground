@@ -15,6 +15,7 @@ export interface ScenarioSummary {
 interface Props {
   onSelect: (scenario: ScenarioSummary) => void;
   onCreateNew: () => void;
+  onCopyScenario?: (scenarioId: string) => void;
 }
 
 const THEME_LABEL: Record<string, string> = {
@@ -42,7 +43,7 @@ const THEME_ICON: Record<string, string> = {
   "sci-fi": "🚀",
 };
 
-export default function ScenarioSelectStep({ onSelect, onCreateNew }: Props) {
+export default function ScenarioSelectStep({ onSelect, onCreateNew, onCopyScenario }: Props) {
   const [scenarios, setScenarios] = useState<ScenarioSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,37 +86,47 @@ export default function ScenarioSelectStep({ onSelect, onCreateNew }: Props) {
         {scenarios.map((scenario) => {
           const themeKey = scenario.theme in THEME_LABEL ? scenario.theme : "fantasy";
           return (
-            <button
-              key={scenario.id}
-              onClick={() => onSelect(scenario)}
-              className="group w-full rounded-xl border border-black/10 bg-white p-4 text-left transition hover:border-yellow-400/60 hover:bg-yellow-50/50 dark:border-white/10 dark:bg-white/5 dark:hover:border-yellow-500/40 dark:hover:bg-yellow-900/10"
-            >
-              <div className="mb-1.5 flex items-center gap-2">
-                <span className="text-lg">{THEME_ICON[themeKey]}</span>
-                <span className="font-semibold text-neutral-900 dark:text-white">
-                  {scenario.title}
-                </span>
-                <span
-                  className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold ${THEME_COLOR[themeKey] ?? THEME_COLOR.fantasy}`}
+            <div key={scenario.id} className="group relative">
+              <button
+                onClick={() => onSelect(scenario)}
+                className="w-full rounded-xl border border-black/10 bg-white p-4 text-left transition hover:border-yellow-400/60 hover:bg-yellow-50/50 dark:border-white/10 dark:bg-white/5 dark:hover:border-yellow-500/40 dark:hover:bg-yellow-900/10"
+              >
+                <div className="mb-1.5 flex items-center gap-2">
+                  <span className="text-lg">{THEME_ICON[themeKey]}</span>
+                  <span className="font-semibold text-neutral-900 dark:text-white">
+                    {scenario.title}
+                  </span>
+                  <span
+                    className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold ${THEME_COLOR[themeKey] ?? THEME_COLOR.fantasy}`}
+                  >
+                    {THEME_LABEL[themeKey] ?? scenario.theme}
+                  </span>
+                </div>
+
+                {scenario.description && (
+                  <p className="mb-2 line-clamp-2 text-xs text-neutral-500 dark:text-neutral-400">
+                    {scenario.description}
+                  </p>
+                )}
+
+                <div className="flex items-center gap-3 text-xs text-neutral-400 dark:text-neutral-500">
+                  <span>최대 {scenario.max_players}명</span>
+                  <span>·</span>
+                  <span>
+                    {scenario.character_creation_config.available_jobs.length}가지 직업
+                  </span>
+                </div>
+              </button>
+
+              {onCopyScenario && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onCopyScenario(scenario.id); }}
+                  className="absolute right-3 top-3 rounded-lg border border-black/10 bg-white px-2 py-1 text-[10px] font-medium text-neutral-500 opacity-0 transition hover:border-indigo-400/60 hover:bg-indigo-50 hover:text-indigo-600 group-hover:opacity-100 dark:border-white/10 dark:bg-neutral-800 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-400"
                 >
-                  {THEME_LABEL[themeKey] ?? scenario.theme}
-                </span>
-              </div>
-
-              {scenario.description && (
-                <p className="mb-2 line-clamp-2 text-xs text-neutral-500 dark:text-neutral-400">
-                  {scenario.description}
-                </p>
+                  복사해서 편집
+                </button>
               )}
-
-              <div className="flex items-center gap-3 text-xs text-neutral-400 dark:text-neutral-500">
-                <span>최대 {scenario.max_players}명</span>
-                <span>·</span>
-                <span>
-                  {scenario.character_creation_config.available_jobs.length}가지 직업
-                </span>
-              </div>
-            </button>
+            </div>
           );
         })}
 
