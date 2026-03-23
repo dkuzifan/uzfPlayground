@@ -250,6 +250,7 @@ export async function POST(req: NextRequest) {
         questTracker: session.quest_tracker,
         objectives: scenario?.objectives,
         scenePhase: activeScenePhase,
+        storyBlueprint: session.story_blueprint,
       });
       gmNarration = gmResponse.narration;
       gmStateChanges = gmResponse.state_changes ?? [];

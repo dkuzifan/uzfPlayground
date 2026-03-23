@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { buildTurnOrder } from "@/lib/game/turn-manager";
-import { generateOpeningNarration } from "@/lib/gemini/gm-agent";
+import { generateOpeningNarration, generateStoryBlueprint } from "@/lib/gemini/gm-agent";
 import { generateNpcsForScenario } from "@/lib/gemini/npc-agent";
 
 interface RouteParams {
@@ -145,6 +145,28 @@ export async function POST(request: Request, { params }: RouteParams) {
         role: n.role,
         personality: (n as { personality?: string }).personality ?? "",
       }));
+    }
+
+    // Story Blueprint 생성 (objectives도 함께 전달)
+    const { data: objectivesData } = await supabase
+      .from("Scenario")
+      .select("objectives")
+      .eq("id", scenarioId)
+      .single();
+
+    const blueprint = await generateStoryBlueprint({
+      scenarioSystemPrompt: prompt,
+      theme: (scenarioData as { theme?: string } | null)?.theme,
+      description: (scenarioData as { description?: string } | null)?.description,
+      objectives: (objectivesData as { objectives?: unknown } | null)?.objectives as Parameters<typeof generateStoryBlueprint>[0]["objectives"],
+      npcs: sessionNpcs,
+    });
+
+    if (blueprint) {
+      await supabase
+        .from("Game_Session")
+        .update({ story_blueprint: blueprint })
+        .eq("id", sessionId);
     }
 
     const opening = await generateOpeningNarration(prompt, names, sessionNpcs);

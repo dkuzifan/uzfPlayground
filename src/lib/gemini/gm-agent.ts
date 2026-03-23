@@ -1,5 +1,5 @@
 import { getGeminiModel } from "./client";
-import type { ActionLog, ActionOutcome, ActionChoice, DiceRoll, RawPlayer, QuestTracker, ScenarioObjectives, ScenePhase } from "@/lib/types/game";
+import type { ActionLog, ActionOutcome, ActionChoice, DiceRoll, RawPlayer, QuestTracker, ScenarioObjectives, ScenePhase, StoryBlueprint, StoryAct } from "@/lib/types/game";
 import type { ActionCategory } from "@/lib/game/dc-calculator";
 import type { GmObjectiveUpdate } from "@/lib/game/objective-engine";
 
@@ -104,6 +104,7 @@ export interface GmActionInput {
   questTracker?: QuestTracker | null;
   objectives?: ScenarioObjectives | null;
   scenePhase?: ScenePhase;
+  storyBlueprint?: StoryBlueprint | null;
 }
 
 export type { GmRawResponse };
@@ -119,6 +120,79 @@ export async function runGmAction(input: GmActionInput): Promise<GmRawResponse> 
 
   const text = result.response.text();
   return JSON.parse(text) as GmRawResponse;
+}
+
+/** 게임 시작 시 4막 이야기 설계도 생성 */
+export async function generateStoryBlueprint(context: {
+  scenarioSystemPrompt: string;
+  theme?: string | null;
+  description?: string | null;
+  objectives?: ScenarioObjectives | null;
+  npcs: Array<{ name: string; role: string; personality: string }>;
+}): Promise<StoryBlueprint | null> {
+  const model = getGeminiModel();
+
+  const npcList = context.npcs.length > 0
+    ? context.npcs.map((n) => `- ${n.name} (${n.role}): ${n.personality}`).join("\n")
+    : "등장 NPC 없음";
+
+  const objectiveSummary = context.objectives
+    ? `메인 목표: ${context.objectives.primary.target_description}`
+    : "목표 미설정";
+
+  const prompt = `당신은 TRPG 시나리오 작가입니다. 아래 정보를 바탕으로 이번 세션의 4막 이야기 설계도를 작성하세요.
+
+## 시나리오 정보
+테마: ${context.theme ?? "판타지"}
+설명: ${context.description ?? "없음"}
+GM 지침: ${context.scenarioSystemPrompt}
+
+## 게임 목표
+${objectiveSummary}
+
+## 등장 NPC
+${npcList}
+
+## 설계 원칙
+- 1막(탐색): 플레이어가 세계에 몰입할 시간. NPC 등장 없이 분위기와 단서 위주.
+- 2막(긴장): 첫 번째 NPC와 조우. 위협 또는 갈등 등장. 긴장감 고조.
+- 3막(절정): 핵심 갈등 폭발. 가장 중요한 NPC와 대결 또는 협상.
+- 4막(해소): 목표 달성/실패 결말. 여운 있는 마무리.
+- NPC는 막별로 한 명씩 등장. 같은 막에 2명 이상 동시 첫 등장 금지.
+- 동료 NPC(ally)는 처음부터 함께할 수 있음.
+
+JSON 형식으로만 응답하세요:
+{
+  "story_title": "이번 세션의 이야기 제목 (10자 이내)",
+  "thematic_motif": "핵심 테마 한 줄 (예: 배신과 신뢰, 생존을 건 선택)",
+  "acts": [
+    {
+      "act": 1,
+      "phase": "exploration",
+      "title": "1막 제목",
+      "summary": "이 막에서 일어나는 일 (2~3문장)",
+      "npcs_to_introduce": [],
+      "key_events": ["이벤트1", "이벤트2"],
+      "gm_tone": "서사 톤 지침 한 줄",
+      "transition_hint": "다음 막으로 넘어가는 신호"
+    },
+    { "act": 2, "phase": "tension", ... },
+    { "act": 3, "phase": "climax", ... },
+    { "act": 4, "phase": "resolution", ... }
+  ]
+}`;
+
+  try {
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
+    });
+    const parsed = JSON.parse(result.response.text()) as StoryBlueprint;
+    return parsed;
+  } catch (err) {
+    console.error("[GmAgent] generateStoryBlueprint 실패:", err);
+    return null;
+  }
 }
 
 /** 게임 시작 시 오프닝 서사 생성 */
@@ -281,8 +355,38 @@ function buildScenePhaseSection(phase?: string): string {
   return `\n## 현재 씬 페이즈: ${phase}\n나레이션 톤 지시: ${tone}\n`;
 }
 
+function buildBlueprintSection(blueprint?: StoryBlueprint | null, scenePhase?: ScenePhase): string {
+  if (!blueprint) return "";
+  const phaseToAct: Record<ScenePhase, number> = {
+    exploration: 1, tension: 2, climax: 3, resolution: 4,
+  };
+  const currentActNum = scenePhase ? phaseToAct[scenePhase] : 1;
+  const act: StoryAct | undefined = blueprint.acts.find((a) => a.act === currentActNum);
+  if (!act) return "";
+
+  const lines = [
+    `\n## 이야기 설계도 (Story Blueprint)`,
+    `이야기 제목: ${blueprint.story_title}`,
+    `핵심 테마: ${blueprint.thematic_motif}`,
+    ``,
+    `### 현재 막: ${act.act}막 — ${act.title} (${act.phase})`,
+    `이 막의 내용: ${act.summary}`,
+    `서사 톤: ${act.gm_tone}`,
+    `이 막에서 처음 등장할 NPC: ${act.npcs_to_introduce.length > 0 ? act.npcs_to_introduce.join(", ") : "없음 (기존 등장 NPC만 반응)"}`,
+    `계획된 이벤트: ${act.key_events.join(" / ")}`,
+    `다음 막으로의 전환 신호: ${act.transition_hint}`,
+    ``,
+    `### 연출 원칙`,
+    `- 위 설계도를 따라 이야기를 능동적으로 이끌어라.`,
+    `- 이 막에서 처음 등장할 NPC 이외의 미등장 NPC는 절대 등장시키지 마라.`,
+    `- 매 서사마다 상황이 최소 1가지 변해야 한다. 같은 정보를 반복하지 마라.`,
+    `- 전환 신호가 충족되면 scene_phase_transition으로 다음 페이즈를 반환하라.`,
+  ];
+  return lines.join("\n") + "\n";
+}
+
 function buildContext(input: GmActionInput): string {
-  const { fixedTruths, recentLogs, actingPlayer, action, diceRoll, outcome, npcEmotionDeltas, sessionSummary, questTracker, objectives, scenePhase } = input;
+  const { fixedTruths, recentLogs, actingPlayer, action, diceRoll, outcome, npcEmotionDeltas, sessionSummary, questTracker, objectives, scenePhase, storyBlueprint } = input;
 
   const fixedTruthsText =
     Object.keys(fixedTruths).length > 0
@@ -312,7 +416,7 @@ function buildContext(input: GmActionInput): string {
     ? `\n## 캐릭터 성향 (next_choices 생성 시 참고)\n${actingPlayer.personality_summary}\n`
     : "";
 
-  return `${fixedTruthsText}${sessionSummarySection}${buildQuestSection(questTracker, objectives)}${buildScenePhaseSection(scenePhase)}
+  return `${fixedTruthsText}${sessionSummarySection}${buildBlueprintSection(storyBlueprint, scenePhase)}${buildQuestSection(questTracker, objectives)}${buildScenePhaseSection(scenePhase)}
 ## 최근 행동 기록 (최신 10개)
 ${recentHistory}
 

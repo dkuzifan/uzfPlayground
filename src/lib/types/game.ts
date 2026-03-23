@@ -8,6 +8,25 @@ export type SessionStatus = "waiting" | "in_progress" | "completed" | "abandoned
 
 export type ScenePhase = "exploration" | "tension" | "climax" | "resolution";
 
+// ── Story Blueprint ────────────────────────────────────────
+
+export interface StoryAct {
+  act: 1 | 2 | 3 | 4;
+  phase: ScenePhase;
+  title: string;                  // 예: "유적의 그림자"
+  summary: string;                // 이 막에서 일어나는 일
+  npcs_to_introduce: string[];    // 이 막에서 처음 등장하는 NPC 이름 목록
+  key_events: string[];           // 계획된 핵심 이벤트/비트
+  gm_tone: string;                // 서사 톤 지침
+  transition_hint: string;        // 다음 막으로 넘어가는 조건/신호
+}
+
+export interface StoryBlueprint {
+  story_title: string;            // 이번 세션의 이야기 제목
+  thematic_motif: string;         // 핵심 테마/분위기
+  acts: StoryAct[];               // 4막 구조
+}
+
 export type SpeakerType = "player" | "npc" | "gm" | "system";
 
 export type ActionType =
@@ -221,6 +240,8 @@ export interface GameSession {
   scene_phase: ScenePhase;
   // v4: 활성 턴 상태 (다른 플레이어에게 선택지/주사위 상태 공개)
   active_turn_state: ActiveTurnState | null;
+  // v5: 이야기 설계도
+  story_blueprint: StoryBlueprint | null;
   created_at: string;
   updated_at: string;
 }
