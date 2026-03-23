@@ -92,14 +92,23 @@ action_category는 반드시 다음 중 하나: "attack" | "threaten" | "persuad
 - gift: 선물, 호의, 도움 제공, 치유
 - none: 대화, 이동, 관찰, 정보 확인, 일상 행동
 
-## 주사위 판정 여부 결정
-판정 필요(dice_check 추가): attack, threaten, persuade, deceive, stealth
-판정 불필요: gift, none
+## 주사위 판정 부여 기준 (매우 중요)
+dice_check는 3개 선택지 중 최대 1개에만 부여하세요. 상황이 안전하거나 갈등이 없다면 0개도 허용합니다.
 
-판정이 필요한 선택지에만 "dice_check" 필드를 추가하세요.
+dice_check를 붙여야 하는 조건 (모두 충족해야 함):
+1. 성공과 실패 모두 가능한 진짜 불확실한 상황일 것
+2. 실패했을 때 스토리에 의미 있는 변화가 생길 것 (단순 실패가 아니라 새로운 전개)
+3. 캐릭터의 현재 역량으로 결과가 갈릴 수 있을 것
+
+dice_check를 붙이면 안 되는 경우:
+- 단순 이동, 관찰, 대화, 정보 수집
+- 이미 성공이 거의 확정된 행동
+- 실패해도 이야기가 막히거나 변화가 없는 행동
+- 상황이 이미 해결되었거나 갈등이 없는 경우
+
 check_label 예시: "전투 판정", "위협 판정", "설득 판정", "기만 판정", "잠입 판정"
 
-JSON 배열로만 응답하세요:
+JSON 배열로만 응답하세요 (dc 필드는 포함하지 마세요 — 서버에서 자동 계산됨):
 [
   { "id": "choice_1", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice", "action_category": "none" },
   { "id": "choice_2", "label": "선택지 짧은 제목", "description": "행동 상세 설명", "action_type": "choice", "action_category": "attack", "dice_check": { "action_category": "attack", "check_label": "전투 판정" } },

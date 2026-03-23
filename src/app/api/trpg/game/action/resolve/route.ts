@@ -3,7 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { runGmAction } from "@/lib/gemini/gm-agent";
 import { runNpcDialogue } from "@/lib/gemini/npc-agent";
 import { getNextTurn } from "@/lib/game/turn-manager";
-import { computeDCFromCategory, defaultResistanceStats } from "@/lib/game/dc-calculator";
+import { computeDynamicDC, computeStatModifier, defaultResistanceStats } from "@/lib/game/dc-calculator";
 import { applyTasteModifiers, buildBaseDeltas } from "@/lib/game/taste-modifier-engine";
 import { runMemorySummarize } from "@/lib/game/memory-pipeline";
 import { scanAndExtractLore } from "@/lib/game/lore-engine";
@@ -15,7 +15,7 @@ import type { ActionOutcome, DiceRoll, HpChange, RawPlayer, GameSession, ActionL
 import type { NpcDynamicState } from "@/lib/types/character";
 import type { ActionCategory } from "@/lib/game/dc-calculator";
 import type { NpcEmotionDelta } from "@/lib/gemini/gm-agent";
-import { JOB_MODIFIERS, defaultDynamicState, clamp, determineReactingNpcs } from "@/lib/game/action-utils";
+import { defaultDynamicState, clamp, determineReactingNpcs } from "@/lib/game/action-utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -132,18 +132,29 @@ export async function POST(req: NextRequest) {
     const npcMemories = (memoriesData ?? []) as unknown as NpcMemory[];
     const loreEntries = (loreData ?? []) as unknown as WorldDictionaryEntry[];
 
-    // ── DC 서버측 재검증 (클라이언트 조작 방지) ───────────────────────────────
-    // 클라이언트가 보낸 dc를 신뢰하지 않고, action_category로 서버에서 재계산
+    // ── DC 서버측 재검증 — 동적 DC (NPC 심리 상태 + 환경 반영) ──────────────
+    const resistance = (primaryNpc?.resistance_stats ?? defaultResistanceStats()) as import("@/lib/types/character").ResistanceStats;
+    const primaryDynamicState = primaryNpc && session.npc_dynamic_states
+      ? (session.npc_dynamic_states as Record<string, import("@/lib/types/character").NpcDynamicState>)[primaryNpc.id] ?? null
+      : null;
+    const environment = session.session_environment ?? null;
+
     let verifiedDc = Number(dc);
-    if (action_category && action_category !== "none") {
-      const resistance = primaryNpc?.resistance_stats ?? defaultResistanceStats();
-      const serverDc = computeDCFromCategory(action_category, resistance);
+    if (action_category && action_category !== "none" && action_category !== "gift") {
+      const serverDc = computeDynamicDC({
+        category: action_category,
+        resistance,
+        dynamicState: primaryDynamicState,
+        environment,
+      });
       if (serverDc !== null) verifiedDc = serverDc;
     }
 
-    // ── 주사위 결과 처리 ──────────────────────────────────────────────────────
+    // ── 주사위 결과 처리 — 스탯 기반 modifier ─────────────────────────────────
     const d20 = Math.min(20, Math.max(1, Math.round(rolled)));
-    const modifier = JOB_MODIFIERS[player.job] ?? 0;
+    const modifier = action_category
+      ? computeStatModifier(player.stats as Record<string, number>, action_category)
+      : 0;
     const total = d20 + modifier;
 
     let outcome: ActionOutcome;
@@ -283,13 +294,12 @@ export async function POST(req: NextRequest) {
       if (gmResponse.scene_phase_transition) {
         gmPhaseTransition = advancePhase(activeScenePhase, gmResponse.scene_phase_transition);
       }
-      // DC 오버라이드: Gemini가 반환한 dc=0을 NPC resistance_stats 기반 실제 DC로 교체
-      const resistance = primaryNpc?.resistance_stats ?? defaultResistanceStats();
+      // DC 오버라이드: Gemini가 반환한 dc를 동적 DC로 교체
       gmNextChoices = (gmResponse.next_choices ?? []).map((choice) => {
         if (!choice.dice_check) return choice;
         const category = choice.dice_check.action_category as ActionCategory | undefined;
         const realDc = category
-          ? (computeDCFromCategory(category, resistance) ?? defaultResistanceStats().mental_willpower)
+          ? (computeDynamicDC({ category, resistance, dynamicState: primaryDynamicState, environment }) ?? defaultResistanceStats().mental_willpower)
           : defaultResistanceStats().mental_willpower;
         return { ...choice, dice_check: { ...choice.dice_check, dc: realDc } };
       });

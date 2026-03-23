@@ -92,7 +92,7 @@ export default function ActionPanel({
                   </span>
                   {choice.dice_check && (
                     <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
-                      ⚄ {choice.dice_check.dc}
+                      🎲 {choice.dice_check.check_label ?? "판정 필요"}
                     </span>
                   )}
                 </div>
@@ -133,7 +133,7 @@ export default function ActionPanel({
                 </span>
                 {choice.dice_check && (
                   <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:bg-amber-400/15 dark:text-amber-400">
-                    ⚄ {choice.dice_check.dc} 이상 시 성공
+                    🎲 {choice.dice_check.check_label ?? "판정 필요"}
                   </span>
                 )}
               </div>

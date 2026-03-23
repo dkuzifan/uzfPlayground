@@ -3,7 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { runGmAction, checkDiceNeed } from "@/lib/gemini/gm-agent";
 import { runNpcDialogue } from "@/lib/gemini/npc-agent";
 import { getNextTurn } from "@/lib/game/turn-manager";
-import { computeDCFromCategory, defaultResistanceStats } from "@/lib/game/dc-calculator";
+import { computeDynamicDC, defaultResistanceStats } from "@/lib/game/dc-calculator";
 import { applyTasteModifiers, buildBaseDeltas } from "@/lib/game/taste-modifier-engine";
 import { runMemorySummarize } from "@/lib/game/memory-pipeline";
 import { scanAndExtractLore } from "@/lib/game/lore-engine";
@@ -132,9 +132,17 @@ export async function POST(req: NextRequest) {
     if (action_type === "free_input") {
       const diceNeed = await checkDiceNeed(content, recentLogs);
       if (diceNeed.needs_check && diceNeed.action_category) {
-        // DC 계산: NPC resistance_stats 기반 deterministic (AI hallucination 없음)
-        const resistance = primaryNpc?.resistance_stats ?? defaultResistanceStats();
-        const dc = computeDCFromCategory(diceNeed.action_category, resistance) ?? 13;
+        // DC 계산: 동적 DC (NPC 저항 + 심리 상태 + 환경)
+        const resistance = (primaryNpc?.resistance_stats ?? defaultResistanceStats()) as import("@/lib/types/character").ResistanceStats;
+        const primaryDynamicState = primaryNpc && session.npc_dynamic_states
+          ? (session.npc_dynamic_states as Record<string, import("@/lib/types/character").NpcDynamicState>)[primaryNpc.id] ?? null
+          : null;
+        const dc = computeDynamicDC({
+          category: diceNeed.action_category,
+          resistance,
+          dynamicState: primaryDynamicState,
+          environment: session.session_environment ?? null,
+        }) ?? 13;
 
         return NextResponse.json({
           needs_dice_check: true,
@@ -277,13 +285,16 @@ export async function POST(req: NextRequest) {
       if (gmResponse.scene_phase_transition) {
         gmPhaseTransition = advancePhase(activeScenePhase, gmResponse.scene_phase_transition);
       }
-      // DC 오버라이드: Gemini가 반환한 dc=0을 NPC resistance_stats 기반 실제 DC로 교체
-      const resistance = primaryNpc?.resistance_stats ?? defaultResistanceStats();
+      // DC 오버라이드: 동적 DC로 교체
+      const resistance = (primaryNpc?.resistance_stats ?? defaultResistanceStats()) as import("@/lib/types/character").ResistanceStats;
+      const primaryDynamicState = primaryNpc && session.npc_dynamic_states
+        ? (session.npc_dynamic_states as Record<string, import("@/lib/types/character").NpcDynamicState>)[primaryNpc.id] ?? null
+        : null;
       gmNextChoices = (gmResponse.next_choices ?? []).map((choice) => {
         if (!choice.dice_check) return choice;
         const category = choice.dice_check.action_category as ActionCategory | undefined;
         const realDc = category
-          ? (computeDCFromCategory(category, resistance) ?? defaultResistanceStats().mental_willpower)
+          ? (computeDynamicDC({ category, resistance, dynamicState: primaryDynamicState, environment: session.session_environment ?? null }) ?? defaultResistanceStats().mental_willpower)
           : defaultResistanceStats().mental_willpower;
         return { ...choice, dice_check: { ...choice.dice_check, dc: realDc } };
       });

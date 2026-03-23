@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { generateChoices } from "@/lib/game/choice-generator";
-import { computeDCFromCategory, defaultResistanceStats } from "@/lib/game/dc-calculator";
-import type { ActionChoice, RawPlayer, NpcPersona } from "@/lib/types/game";
-import type { PersonalityProfile, ResistanceStats } from "@/lib/types/character";
+import { computeDynamicDC, defaultResistanceStats } from "@/lib/game/dc-calculator";
+import type { ActionChoice, RawPlayer, NpcPersona, GameSession } from "@/lib/types/game";
+import type { PersonalityProfile, ResistanceStats, NpcDynamicState } from "@/lib/types/character";
 import type { ActionCategory } from "@/lib/game/dc-calculator";
 
 type PlayerWithPersonality = RawPlayer & { personality: PersonalityProfile | null };
@@ -58,8 +58,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ choices: FALLBACK_CHOICES });
     }
 
-    // 최근 로그 + 세션 NPC 조회 병렬 실행
-    const [{ data: logs }, { data: npcsData }] = await Promise.all([
+    // 최근 로그 + NPC + 세션 정보 병렬 조회
+    const [{ data: logs }, { data: npcsData }, { data: sessionData }] = await Promise.all([
       supabase
         .from("Action_Log")
         .select("speaker_name, content")
@@ -71,6 +71,11 @@ export async function POST(req: NextRequest) {
         .select("id, resistance_stats")
         .eq("session_id", session_id)
         .limit(1),
+      supabase
+        .from("Game_Session")
+        .select("npc_dynamic_states, session_environment")
+        .eq("id", session_id)
+        .single(),
     ]);
 
     const currentSituation =
@@ -79,10 +84,15 @@ export async function POST(req: NextRequest) {
         .map((l) => `[${l.speaker_name}]: ${l.content}`)
         .join("\n") || "게임이 방금 시작되었습니다.";
 
-    // 판정 DC 계산 기준 NPC의 저항 스탯 (없으면 기본값)
     const primaryNpc = ((npcsData ?? []) as unknown as NpcPersona[])[0] ?? null;
     const resistance: ResistanceStats =
       (primaryNpc?.resistance_stats as ResistanceStats | undefined) ?? defaultResistanceStats();
+
+    const session = sessionData as Pick<GameSession, "npc_dynamic_states" | "session_environment"> | null;
+    const dynamicState: NpcDynamicState | null = primaryNpc && session?.npc_dynamic_states
+      ? ((session.npc_dynamic_states as Record<string, NpcDynamicState>)[primaryNpc.id] ?? null)
+      : null;
+    const environment = session?.session_environment ?? null;
 
     try {
       const rawChoices = await generateChoices(
@@ -91,12 +101,12 @@ export async function POST(req: NextRequest) {
         player.character_name
       );
 
-      // Gemini가 action_category를 출력하면 실제 NPC 저항 스탯으로 DC 계산
+      // 동적 DC 계산: NPC 저항 + 심리 상태 + 환경 반영
       const choices: ActionChoice[] = rawChoices.map((choice) => {
         if (!choice.dice_check) return choice;
         const category = choice.dice_check.action_category as ActionCategory | undefined;
         const realDc = category
-          ? (computeDCFromCategory(category, resistance) ?? defaultResistanceStats().mental_willpower)
+          ? (computeDynamicDC({ category, resistance, dynamicState, environment }) ?? defaultResistanceStats().mental_willpower)
           : defaultResistanceStats().mental_willpower;
         return {
           ...choice,
