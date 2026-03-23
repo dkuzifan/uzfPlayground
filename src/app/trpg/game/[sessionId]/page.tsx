@@ -125,7 +125,7 @@ export default function GamePage() {
 
         {/* 우: 사이드바 */}
         <div className="flex w-64 flex-shrink-0 flex-col gap-4">
-          <CharacterStatus player={myPlayer} />
+          <CharacterStatus player={myPlayer} statSchema={scenario?.character_config?.stat_schema} />
           <TurnIndicator
             currentTurnName={currentTurnPlayer?.player_name ?? ""}
             isMyTurn={isMyTurn}
@@ -134,6 +134,7 @@ export default function GamePage() {
             players={players}
             currentTurnPlayerId={session?.current_turn_player_id ?? null}
             myPlayerId={myPlayer?.id ?? null}
+            statSchema={scenario?.character_config?.stat_schema}
           />
           <NpcEmotionPanel
             npcs={npcs}

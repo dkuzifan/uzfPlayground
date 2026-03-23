@@ -3,18 +3,29 @@
 import { useState } from "react";
 import type { ScenarioSummary } from "./ScenarioSelectStep";
 import type { ObjectiveType, EndingTrigger, EndingTone, ScenarioObjectives, ScenarioEndings, JobDefinition, CharacterConfig } from "@/lib/types/game";
+import type { StatSchemaEntry } from "@/lib/types/character";
 
 interface Props {
   onComplete: (scenario: ScenarioSummary) => void;
   onBack: () => void;
 }
 
-type SubStep = "basic" | "jobs" | "prompt" | "objectives" | "character";
+type SubStep = "basic" | "jobs" | "prompt" | "objectives" | "character" | "lore";
 
 interface JobConfig {
   job: string;
   label: string;
   enabled: boolean;
+}
+
+interface LoreItem {
+  domain: "WORLD_LORE" | "PERSONAL_LORE";
+  category: string;
+  lore_text: string;
+  trigger_keywords: string[];
+  cluster_tags: string[];
+  importance_weight: number;
+  required_access_level: number;
 }
 
 interface ObjectiveForm {
@@ -118,8 +129,9 @@ const SUB_STEP_LABELS: Record<SubStep, string> = {
   prompt: "GM 프롬프트",
   objectives: "게임 목표",
   character: "캐릭터 설정",
+  lore: "세계관 Lore",
 };
-const SUB_STEPS: SubStep[] = ["basic", "jobs", "prompt", "objectives", "character"];
+const SUB_STEPS: SubStep[] = ["basic", "jobs", "prompt", "objectives", "character", "lore"];
 
 function defaultEndings(): EndingForm[] {
   return [
@@ -168,11 +180,27 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
   const [objError, setObjError]           = useState<string | null>(null);
 
   // Step E
-  const [statSchema, setStatSchema]     = useState<string[]>(["hp", "attack", "defense", "speed"]);
+  const [statSchema, setStatSchema] = useState<StatSchemaEntry[]>([
+    { key: "hp",      label: "체력",   icon: "❤️", display: "bar",    max_key: "hp_max", color: "green"   },
+    { key: "attack",  label: "공격력", icon: "⚔️", display: "number", color: "neutral" },
+    { key: "defense", label: "방어력", icon: "🛡️", display: "number", color: "neutral" },
+    { key: "speed",   label: "속도",   icon: "💨", display: "number", color: "neutral" },
+  ]);
   const [jobDefs, setJobDefs]           = useState<JobDefinition[]>([]);
-  const [newStatName, setNewStatName]   = useState("");
+  const [showAddStat, setShowAddStat]   = useState(false);
+  const [newStatKey, setNewStatKey]     = useState("");
+  const [newStatLabel, setNewStatLabel] = useState("");
+  const [newStatIcon, setNewStatIcon]   = useState("📊");
+  const [newStatDisplay, setNewStatDisplay] = useState<StatSchemaEntry["display"]>("number");
+  const [newStatMaxKey, setNewStatMaxKey]   = useState("");
   const [generatingChar, setGeneratingChar] = useState(false);
   const [charError, setCharError]       = useState<string | null>(null);
+
+  // Step F: Lore
+  const [loreItems, setLoreItems] = useState<LoreItem[]>([]);
+  const [generatingLore, setGeneratingLore] = useState(false);
+  const [loreError, setLoreError] = useState<string | null>(null);
+  const [editingLoreIdx, setEditingLoreIdx] = useState<number | null>(null);
 
   // 저장
   const [saving, setSaving]     = useState(false);
@@ -310,7 +338,7 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
         return;
       }
       const config = data.character_config as CharacterConfig;
-      setStatSchema(config.stat_schema);
+      setStatSchema(config.stat_schema as StatSchemaEntry[]);
       setJobDefs(config.jobs);
     } catch {
       setCharError("네트워크 오류가 발생했습니다.");
@@ -330,9 +358,16 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
 
   // ── Step D→E 전환 시 jobDefs 초기화 ─────────────────────────────────
   function handleObjectivesNext() {
-    // jobDefs가 비어있으면 enabledJobs 기준으로 기본값 생성
     if (jobDefs.length === 0) {
-      const defaultStats = Object.fromEntries(statSchema.map((s) => [s, s === "hp" ? 100 : 10]));
+      // StatSchemaEntry 기반 기본 스탯 계산
+      const defaultStats: Record<string, number> = {};
+      statSchema.forEach((s) => {
+        defaultStats[s.key] = s.display === "bar" ? 100 : 10;
+      });
+      // bar 타입의 max_key 값도 자동 추가
+      statSchema.filter((s) => s.display === "bar" && s.max_key).forEach((s) => {
+        defaultStats[s.max_key!] = defaultStats[s.key] ?? 100;
+      });
       setJobDefs(
         enabledJobs.map((j) => ({
           id: j.job,
@@ -343,6 +378,62 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
       );
     }
     setSubStep("character");
+  }
+
+  // ── Step F: Lore AI 자동 생성 ────────────────────────────────────────
+  async function handleGenerateLore() {
+    setGeneratingLore(true);
+    setLoreError(null);
+    try {
+      const res = await fetch("/api/trpg/scenarios/generate-lore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          theme,
+          description,
+          gm_system_prompt: gmPrompt,
+          primary_objective: primaryObj.target_description,
+          secret_objective: secretObj.target_description,
+          ending_descriptions: endings.filter((e) => e.description.trim()).map((e) => e.description),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLoreError(data.error ?? "생성에 실패했습니다.");
+        return;
+      }
+      setLoreItems(data.lore_items as LoreItem[]);
+    } catch {
+      setLoreError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setGeneratingLore(false);
+    }
+  }
+
+  function updateLoreItem(idx: number, patch: Partial<LoreItem>) {
+    setLoreItems((prev) => prev.map((item, i) => (i === idx ? { ...item, ...patch } : item)));
+  }
+
+  function removeLoreItem(idx: number) {
+    setLoreItems((prev) => prev.filter((_, i) => i !== idx));
+    if (editingLoreIdx === idx) setEditingLoreIdx(null);
+  }
+
+  function addEmptyLoreItem() {
+    setLoreItems((prev) => [
+      ...prev,
+      {
+        domain: "WORLD_LORE",
+        category: "기타",
+        lore_text: "",
+        trigger_keywords: [],
+        cluster_tags: [],
+        importance_weight: 5,
+        required_access_level: 1,
+      },
+    ]);
+    setEditingLoreIdx(loreItems.length);
   }
 
   // ── 최종 저장 ────────────────────────────────────────────────────────
@@ -395,6 +486,7 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
           character_config: jobDefs.length > 0
             ? { stat_schema: statSchema, jobs: jobDefs }
             : null,
+          lore_items: loreItems.filter((l) => l.lore_text.trim()),
         }),
       });
       const data = await res.json();
@@ -881,63 +973,91 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
           {/* 스탯 종류 편집 */}
           <section className="space-y-2 rounded-xl border border-black/10 bg-white/60 p-3 dark:border-white/10 dark:bg-white/5">
             <h4 className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">스탯 종류</h4>
-            <div className="flex flex-wrap gap-1.5">
-              {statSchema.map((stat) => (
-                <span
-                  key={stat}
-                  className="flex items-center gap-1 rounded-lg border border-black/10 bg-white px-2.5 py-1 text-xs dark:border-white/10 dark:bg-neutral-800 dark:text-white"
-                >
-                  {stat}
+            <div className="space-y-1.5">
+              {statSchema.map((stat, i) => (
+                <div key={stat.key} className="flex items-center gap-2 rounded-lg border border-black/5 bg-white/80 px-2.5 py-1.5 text-xs dark:border-white/5 dark:bg-white/5">
+                  <span className="w-5 text-center">{stat.icon}</span>
+                  <span className="w-16 font-medium text-neutral-700 dark:text-neutral-300 truncate">{stat.label}</span>
+                  <span className="text-neutral-400">({stat.key})</span>
+                  <select
+                    value={stat.display}
+                    onChange={(e) => {
+                      const display = e.target.value as StatSchemaEntry["display"];
+                      setStatSchema((prev) => prev.map((s, idx) => idx === i ? { ...s, display, max_key: display === "number" ? undefined : s.max_key } : s));
+                    }}
+                    className="rounded border border-black/10 bg-white px-1.5 py-0.5 text-xs dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                  >
+                    <option value="bar">바 (게이지)</option>
+                    <option value="counter">카운터 (X/Y)</option>
+                    <option value="number">숫자</option>
+                  </select>
+                  {(stat.display === "bar" || stat.display === "counter") && (
+                    <input
+                      type="text"
+                      value={stat.max_key ?? ""}
+                      onChange={(e) => setStatSchema((prev) => prev.map((s, idx) => idx === i ? { ...s, max_key: e.target.value || undefined } : s))}
+                      placeholder="최대값 키 (예: hp_max)"
+                      maxLength={20}
+                      className="w-24 rounded border border-black/10 bg-white/80 px-1.5 py-0.5 text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                    />
+                  )}
                   {statSchema.length > 1 && (
                     <button
                       onClick={() => {
-                        setStatSchema((prev) => prev.filter((s) => s !== stat));
-                        setJobDefs((prev) =>
-                          prev.map((j) => {
-                            const { [stat]: _removed, ...rest } = j.base_stats;
-                            return { ...j, base_stats: rest };
-                          })
-                        );
+                        const removed = stat.key;
+                        setStatSchema((prev) => prev.filter((_, idx) => idx !== i));
+                        setJobDefs((prev) => prev.map((j) => {
+                          const { [removed]: _r, ...rest } = j.base_stats;
+                          return { ...j, base_stats: rest };
+                        }));
                       }}
-                      className="ml-0.5 text-neutral-400 hover:text-red-500"
-                    >
-                      ✕
-                    </button>
+                      className="ml-auto text-neutral-400 hover:text-red-500"
+                    >✕</button>
                   )}
-                </span>
+                </div>
               ))}
             </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newStatName}
-                onChange={(e) => setNewStatName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newStatName.trim() && !statSchema.includes(newStatName.trim())) {
-                    const s = newStatName.trim();
-                    setStatSchema((prev) => [...prev, s]);
-                    setJobDefs((prev) => prev.map((j) => ({ ...j, base_stats: { ...j.base_stats, [s]: 10 } })));
-                    setNewStatName("");
-                  }
-                }}
-                placeholder="스탯 추가 후 Enter"
-                maxLength={20}
-                className="flex-1 rounded-lg border border-black/10 bg-white/80 px-3 py-1.5 text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-white/5 dark:text-white"
-              />
-              <button
-                onClick={() => {
-                  const s = newStatName.trim();
-                  if (s && !statSchema.includes(s)) {
-                    setStatSchema((prev) => [...prev, s]);
-                    setJobDefs((prev) => prev.map((j) => ({ ...j, base_stats: { ...j.base_stats, [s]: 10 } })));
-                    setNewStatName("");
-                  }
-                }}
-                className="rounded-lg border border-black/10 px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5"
-              >
-                + 추가
+
+            {/* 스탯 추가 폼 */}
+            {showAddStat ? (
+              <div className="space-y-1.5 rounded-lg border border-dashed border-yellow-300 bg-yellow-50/50 p-2 dark:border-yellow-600/40 dark:bg-yellow-900/10">
+                <div className="flex gap-1.5">
+                  <input type="text" value={newStatIcon} onChange={(e) => setNewStatIcon(e.target.value)} placeholder="아이콘" maxLength={4} className="w-10 rounded border border-black/10 bg-white px-1.5 py-1 text-center text-xs outline-none dark:border-white/10 dark:bg-neutral-800 dark:text-white" />
+                  <input type="text" value={newStatLabel} onChange={(e) => setNewStatLabel(e.target.value)} placeholder="레이블 (예: 수사력)" maxLength={10} className="flex-1 rounded border border-black/10 bg-white px-2 py-1 text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-neutral-800 dark:text-white" />
+                  <input type="text" value={newStatKey} onChange={(e) => setNewStatKey(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))} placeholder="키 (예: investigation)" maxLength={20} className="flex-1 rounded border border-black/10 bg-white px-2 py-1 text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-neutral-800 dark:text-white" />
+                </div>
+                <div className="flex gap-1.5 items-center">
+                  <select value={newStatDisplay} onChange={(e) => setNewStatDisplay(e.target.value as StatSchemaEntry["display"])} className="rounded border border-black/10 bg-white px-1.5 py-1 text-xs dark:border-white/10 dark:bg-neutral-800 dark:text-white">
+                    <option value="bar">바 (게이지)</option>
+                    <option value="counter">카운터 (X/Y)</option>
+                    <option value="number">숫자</option>
+                  </select>
+                  {(newStatDisplay === "bar" || newStatDisplay === "counter") && (
+                    <input type="text" value={newStatMaxKey} onChange={(e) => setNewStatMaxKey(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))} placeholder={`최대값 키 (예: ${newStatKey || "stat"}_max)`} maxLength={20} className="flex-1 rounded border border-black/10 bg-white px-2 py-1 text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-neutral-800 dark:text-white" />
+                  )}
+                  <button
+                    onClick={() => {
+                      const key = newStatKey.trim();
+                      const label = newStatLabel.trim();
+                      if (!key || !label || statSchema.find(s => s.key === key)) return;
+                      const entry: StatSchemaEntry = { key, label, icon: newStatIcon || "📊", display: newStatDisplay, max_key: (newStatDisplay !== "number" && newStatMaxKey.trim()) ? newStatMaxKey.trim() : undefined, color: "neutral" };
+                      setStatSchema((prev) => [...prev, entry]);
+                      const defaultVal = newStatDisplay === "bar" ? 100 : 10;
+                      const newBase: Record<string, number> = { [key]: defaultVal };
+                      if (entry.max_key) newBase[entry.max_key] = defaultVal;
+                      setJobDefs((prev) => prev.map((j) => ({ ...j, base_stats: { ...j.base_stats, ...newBase } })));
+                      setNewStatKey(""); setNewStatLabel(""); setNewStatIcon("📊"); setNewStatDisplay("number"); setNewStatMaxKey(""); setShowAddStat(false);
+                    }}
+                    className="rounded-lg bg-yellow-400 px-3 py-1 text-xs font-semibold text-neutral-900 hover:bg-yellow-500"
+                  >추가</button>
+                  <button onClick={() => setShowAddStat(false)} className="text-xs text-neutral-400 hover:text-neutral-600">취소</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setShowAddStat(true)} className="rounded-lg border border-black/10 px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5">
+                + 스탯 추가
               </button>
-            </div>
+            )}
           </section>
 
           {/* 직업별 기본 스탯 */}
@@ -949,9 +1069,21 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
                   <thead>
                     <tr className="border-b border-black/10 dark:border-white/10">
                       <th className="pb-2 text-left font-medium text-neutral-500">직업</th>
-                      {statSchema.map((stat) => (
-                        <th key={stat} className="pb-2 text-center font-medium text-neutral-500">{stat}</th>
-                      ))}
+                      {statSchema.flatMap((stat) => {
+                        const cols = [
+                          <th key={stat.key} className="pb-2 text-center font-medium text-neutral-500 whitespace-nowrap">
+                            {stat.icon} {stat.label}
+                          </th>,
+                        ];
+                        if (stat.max_key) {
+                          cols.push(
+                            <th key={stat.max_key} className="pb-2 text-center font-medium text-neutral-400 whitespace-nowrap text-[10px]">
+                              {stat.label} 최대
+                            </th>
+                          );
+                        }
+                        return cols;
+                      })}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black/5 dark:divide-white/5">
@@ -960,18 +1092,36 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
                         <td className="py-2 pr-3 font-medium text-neutral-700 dark:text-neutral-300 whitespace-nowrap">
                           {JOB_EMOJI[job.id] ?? "👤"} {job.name}
                         </td>
-                        {statSchema.map((stat) => (
-                          <td key={stat} className="py-2 px-1 text-center">
-                            <input
-                              type="number"
-                              min={0}
-                              max={9999}
-                              value={job.base_stats[stat] ?? 10}
-                              onChange={(e) => updateJobStat(ji, stat, Number(e.target.value))}
-                              className="w-16 rounded-lg border border-black/10 bg-white/80 px-2 py-1 text-center text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-white/5 dark:text-white"
-                            />
-                          </td>
-                        ))}
+                        {statSchema.flatMap((stat) => {
+                          const defaultVal = stat.display === "bar" ? 100 : 10;
+                          const cols = [
+                            <td key={stat.key} className="py-2 px-1 text-center">
+                              <input
+                                type="number"
+                                min={0}
+                                max={9999}
+                                value={job.base_stats[stat.key] ?? defaultVal}
+                                onChange={(e) => updateJobStat(ji, stat.key, Number(e.target.value))}
+                                className="w-16 rounded-lg border border-black/10 bg-white/80 px-2 py-1 text-center text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                              />
+                            </td>,
+                          ];
+                          if (stat.max_key) {
+                            cols.push(
+                              <td key={stat.max_key} className="py-2 px-1 text-center">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={9999}
+                                  value={job.base_stats[stat.max_key] ?? defaultVal}
+                                  onChange={(e) => updateJobStat(ji, stat.max_key!, Number(e.target.value))}
+                                  className="w-16 rounded-lg border border-black/10 bg-white/80 px-2 py-1 text-center text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-white/5 dark:text-white opacity-70"
+                                />
+                              </td>
+                            );
+                          }
+                          return cols;
+                        })}
                       </tr>
                     ))}
                   </tbody>
@@ -995,6 +1145,165 @@ export default function ScenarioCreateStep({ onComplete, onBack }: Props) {
           <div className="flex gap-2 pt-1">
             <button
               onClick={() => setSubStep("objectives")}
+              className="flex-1 rounded-lg border border-black/10 py-2 text-sm text-neutral-600 transition hover:bg-neutral-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5"
+            >
+              ← 이전
+            </button>
+            <button
+              onClick={() => setSubStep("lore")}
+              className="flex-1 rounded-lg bg-neutral-900 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+            >
+              다음 →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step F: 세계관 Lore ─────────────────────────────────────── */}
+      {subStep === "lore" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              플레이어가 조사 행동 시 발동될 세계관 정보 조각을 설계합니다. 생략해도 게임은 진행됩니다.
+            </p>
+          </div>
+
+          {/* AI 자동 생성 */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleGenerateLore}
+              disabled={generatingLore}
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {generatingLore ? (
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              ) : "✨"}
+              AI 자동 제안
+            </button>
+            <span className="text-xs text-neutral-400">
+              {loreItems.length > 0 ? `${loreItems.length}개 항목` : "시나리오 설정을 바탕으로 Lore를 자동 생성합니다"}
+            </span>
+          </div>
+
+          {loreError && (
+            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-500">{loreError}</p>
+          )}
+
+          {/* Lore 목록 */}
+          {loreItems.length > 0 && (
+            <div className="space-y-2">
+              {loreItems.map((item, idx) => (
+                <div key={idx} className="rounded-xl border border-black/10 bg-white/60 dark:border-white/10 dark:bg-white/5">
+                  {/* 요약 행 */}
+                  <div
+                    className="flex cursor-pointer items-center gap-2 px-3 py-2"
+                    onClick={() => setEditingLoreIdx(editingLoreIdx === idx ? null : idx)}
+                  >
+                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${item.domain === "WORLD_LORE" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" : "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"}`}>
+                      {item.domain === "WORLD_LORE" ? "세계" : "개인"}
+                    </span>
+                    <span className="text-xs text-neutral-500">[{item.category}]</span>
+                    <span className="flex-1 truncate text-xs text-neutral-700 dark:text-neutral-300">{item.lore_text || "(내용 없음)"}</span>
+                    <span className="text-xs text-neutral-400">⚡{item.importance_weight}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeLoreItem(idx); }}
+                      className="text-neutral-400 hover:text-red-500"
+                    >✕</button>
+                  </div>
+
+                  {/* 편집 폼 */}
+                  {editingLoreIdx === idx && (
+                    <div className="border-t border-black/5 px-3 py-3 space-y-2 dark:border-white/5">
+                      <div className="flex gap-2">
+                        <select
+                          value={item.domain}
+                          onChange={(e) => updateLoreItem(idx, { domain: e.target.value as LoreItem["domain"] })}
+                          className="rounded border border-black/10 bg-white px-2 py-1 text-xs dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                        >
+                          <option value="WORLD_LORE">WORLD_LORE (세계관)</option>
+                          <option value="PERSONAL_LORE">PERSONAL_LORE (개인)</option>
+                        </select>
+                        <input
+                          type="text"
+                          value={item.category}
+                          onChange={(e) => updateLoreItem(idx, { category: e.target.value })}
+                          placeholder="카테고리 (장소, 인물, 역사…)"
+                          className="flex-1 rounded border border-black/10 bg-white px-2 py-1 text-xs outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                        />
+                      </div>
+                      <textarea
+                        value={item.lore_text}
+                        onChange={(e) => updateLoreItem(idx, { lore_text: e.target.value })}
+                        placeholder="Lore 내용 (150자 이내 권장)"
+                        rows={2}
+                        className="w-full rounded border border-black/10 bg-white px-2 py-1 text-xs outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-neutral-800 dark:text-white resize-none"
+                      />
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <p className="mb-1 text-xs text-neutral-400">트리거 키워드 (쉼표 구분)</p>
+                          <input
+                            type="text"
+                            value={item.trigger_keywords.join(", ")}
+                            onChange={(e) => updateLoreItem(idx, { trigger_keywords: e.target.value.split(",").map((k) => k.trim()).filter(Boolean) })}
+                            placeholder="신전, 고대 문자, 유물"
+                            className="w-full rounded border border-black/10 bg-white px-2 py-1 text-xs outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <p className="mb-1 text-xs text-neutral-400">클러스터 태그 (쉼표 구분)</p>
+                          <input
+                            type="text"
+                            value={item.cluster_tags.join(", ")}
+                            onChange={(e) => updateLoreItem(idx, { cluster_tags: e.target.value.split(",").map((k) => k.trim()).filter(Boolean) })}
+                            placeholder="엘프, 마법, 역사"
+                            className="w-full rounded border border-black/10 bg-white px-2 py-1 text-xs outline-none focus:border-indigo-400 dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-4 items-center">
+                        <label className="flex items-center gap-1.5 text-xs text-neutral-500">
+                          중요도
+                          <input
+                            type="range" min={1} max={10} value={item.importance_weight}
+                            onChange={(e) => updateLoreItem(idx, { importance_weight: Number(e.target.value) })}
+                            className="w-20"
+                          />
+                          <span className="w-4 text-center font-bold text-neutral-700 dark:text-neutral-300">{item.importance_weight}</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs text-neutral-500">
+                          접근 레벨
+                          <input
+                            type="range" min={1} max={10} value={item.required_access_level}
+                            onChange={(e) => updateLoreItem(idx, { required_access_level: Number(e.target.value) })}
+                            className="w-20"
+                          />
+                          <span className="w-4 text-center font-bold text-neutral-700 dark:text-neutral-300">{item.required_access_level}</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 직접 추가 */}
+          <button
+            onClick={addEmptyLoreItem}
+            className="rounded-lg border border-dashed border-black/20 px-3 py-2 text-xs text-neutral-500 hover:bg-neutral-50 dark:border-white/20 dark:hover:bg-white/5 w-full"
+          >
+            + Lore 항목 직접 추가
+          </button>
+
+          {saveError && (
+            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-500 dark:text-red-400">
+              {saveError}
+            </p>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => setSubStep("character")}
               className="flex-1 rounded-lg border border-black/10 py-2 text-sm text-neutral-600 transition hover:bg-neutral-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5"
             >
               ← 이전

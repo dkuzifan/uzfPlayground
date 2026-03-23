@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { normalizeStatSchema } from "@/lib/types/character";
 import type { PersonalityProfile, CharacterJob } from "@/lib/types/character";
 
 // ── 화이트리스트 검증 ──────────────────────────────────────────────────────────
@@ -129,12 +130,22 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
 
   // character_config 기반 기본 스탯 계산
-  const configJob = characterConfig?.jobs.find((j) => j.id === safeJob);
-  const baseStats = configJob?.base_stats ?? null;
-  const defaultStats = { hp: 100, max_hp: 100, attack: 10, defense: 8, speed: 10 };
-  const initialStats = baseStats
-    ? { ...baseStats, max_hp: baseStats.hp ?? 100 }
-    : defaultStats;
+  const configJob = characterConfig?.jobs?.find((j) => j.id === safeJob);
+  let initialStats: Record<string, number>;
+  if (configJob?.base_stats && Object.keys(configJob.base_stats).length > 0) {
+    initialStats = configJob.base_stats;
+  } else {
+    const schema = normalizeStatSchema(characterConfig?.stat_schema);
+    initialStats = {};
+    for (const stat of schema) {
+      const defaultVal = stat.display === "bar" ? 100 : 10;
+      initialStats[stat.key] = defaultVal;
+      if (stat.max_key) initialStats[stat.max_key] = defaultVal;
+    }
+    if (schema.length === 0) {
+      initialStats = { hp: 100, max_hp: 100, attack: 10, defense: 8, speed: 10 };
+    }
+  }
 
   // INSERT — 같은 브라우저 새로고침 시 중복(23505)은 무시
   const { error: insertError } = await supabase

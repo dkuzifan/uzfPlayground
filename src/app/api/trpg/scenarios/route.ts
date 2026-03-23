@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { ScenarioObjectives, ScenarioEndings, CharacterConfig } from "@/lib/types/game";
+import type { LoreItemInput } from "./generate-lore/route";
 
 const VALID_THEMES = new Set(["fantasy", "mystery", "horror", "sci-fi"]);
 
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
     objectives,
     endings,
     character_config,
+    lore_items,
   } = body as {
     title?: string;
     theme?: string;
@@ -54,6 +56,7 @@ export async function POST(request: Request) {
     objectives?: ScenarioObjectives;
     endings?: ScenarioEndings;
     character_config?: CharacterConfig;
+    lore_items?: LoreItemInput[];
   };
 
   if (!title?.trim()) {
@@ -96,6 +99,25 @@ export async function POST(request: Request) {
   if (error || !data) {
     console.error("[POST /api/trpg/scenarios]", error);
     return NextResponse.json({ error: "시나리오 저장에 실패했습니다." }, { status: 500 });
+  }
+
+  // Lore 항목 일괄 저장
+  if (lore_items && lore_items.length > 0) {
+    const loreRows = lore_items.map((item) => ({
+      scenario_id: data.id,
+      domain: item.domain,
+      category: item.category,
+      lore_text: item.lore_text.slice(0, 500),
+      trigger_keywords: item.trigger_keywords,
+      cluster_tags: item.cluster_tags,
+      importance_weight: Math.min(10, Math.max(1, item.importance_weight)),
+      required_access_level: Math.min(10, Math.max(1, item.required_access_level)),
+    }));
+    const { error: loreError } = await supabase.from("World_Dictionary").insert(loreRows);
+    if (loreError) {
+      console.error("[POST /api/trpg/scenarios] Lore 저장 실패:", loreError);
+      // Lore 저장 실패는 시나리오 자체를 실패시키지 않음
+    }
   }
 
   return NextResponse.json(data, { status: 201 });

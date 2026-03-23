@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { initQuestTracker } from "@/lib/game/objective-engine";
-import type { ScenarioObjectives } from "@/lib/types/game";
+import { normalizeStatSchema } from "@/lib/types/character";
+import type { ScenarioObjectives, CharacterConfig } from "@/lib/types/game";
 
 // ── GET /api/trpg/sessions — 대기 중인 방 목록 ──────────────────────
 export async function GET() {
@@ -43,7 +44,7 @@ export async function GET() {
   return NextResponse.json(result);
 }
 
-const VALID_JOBS_SET = new Set([
+const FALLBACK_JOBS = new Set([
   "warrior","mage","rogue","cleric","ranger","paladin","bard","adventurer",
 ]);
 
@@ -87,19 +88,18 @@ export async function POST(request: Request) {
   }
   const safeMaxPlayers = Math.min(7, Math.max(2, max_players ?? 4));
   const safeAvatarIndex = Math.min(7, Math.max(0, avatarIndex ?? 0));
-  const safeJob = typeof job === "string" && VALID_JOBS_SET.has(job) ? job : "adventurer";
   const safeCharName = (characterName?.trim() || nickname.trim()).slice(0, 16);
 
   const supabase = createServiceClient();
 
-  // Step 1: 시나리오 존재 확인 (objectives 포함)
+  // Step 1: 시나리오 존재 확인 (objectives + character_config 포함)
   const { data: scenario, error: scenarioError } = await supabase
     .from("Scenario")
-    .select("id, objectives")
+    .select("id, objectives, character_config")
     .eq("id", scenario_id)
     .eq("is_active", true)
     .single() as unknown as {
-      data: { id: string; objectives: ScenarioObjectives | null } | null;
+      data: { id: string; objectives: ScenarioObjectives | null; character_config: CharacterConfig | null } | null;
       error: { message: string } | null;
     };
 
@@ -108,6 +108,34 @@ export async function POST(request: Request) {
       { error: "유효한 시나리오를 찾을 수 없습니다." },
       { status: 404 }
     );
+  }
+
+  // job 유효성: character_config.jobs에 있는 id 우선, 없으면 레거시 fallback
+  const scenarioJobIds = scenario.character_config?.jobs?.map((j) => j.id) ?? [];
+  const safeJob =
+    typeof job === "string" && (scenarioJobIds.includes(job) || FALLBACK_JOBS.has(job))
+      ? job
+      : (scenarioJobIds[0] ?? "adventurer");
+
+  // character_config의 해당 직업 base_stats 가져오기
+  const jobDef = scenario.character_config?.jobs?.find((j) => j.id === safeJob);
+  const schema = normalizeStatSchema(scenario.character_config?.stat_schema);
+
+  let initialStats: Record<string, number>;
+  if (jobDef?.base_stats && Object.keys(jobDef.base_stats).length > 0) {
+    initialStats = jobDef.base_stats;
+  } else {
+    // fallback: stat_schema 기반 기본값 생성
+    initialStats = {};
+    for (const stat of schema) {
+      const defaultVal = stat.display === "bar" ? 100 : 10;
+      initialStats[stat.key] = defaultVal;
+      if (stat.max_key) initialStats[stat.max_key] = defaultVal;
+    }
+    // stat_schema가 없으면 구형 기본값
+    if (schema.length === 0) {
+      initialStats = { hp: 100, max_hp: 100, attack: 10, defense: 5, speed: 5 };
+    }
   }
 
   // objectives가 있으면 QuestTracker 초기화, 없으면 null
@@ -146,6 +174,7 @@ export async function POST(request: Request) {
       character_name: safeCharName,
       job: safeJob,
       personality_summary: `avatar:${safeAvatarIndex}`,
+      stats: initialStats,
       ...(personality?.mbti ? { mbti: personality.mbti } : {}),
       ...(personality?.enneagram != null ? { enneagram: personality.enneagram } : {}),
       ...(personality?.dnd_alignment ? { dnd_alignment: personality.dnd_alignment } : {}),

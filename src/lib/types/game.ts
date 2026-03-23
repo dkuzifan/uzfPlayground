@@ -125,7 +125,7 @@ export interface JobDefinition {
 }
 
 export interface CharacterConfig {
-  stat_schema: string[];   // 이 시나리오에서 사용하는 스탯 종류 (예: ["hp", "attack", "defense", "speed"])
+  stat_schema: StatSchemaEntry[] | string[];  // StatSchemaEntry[] 신규, string[] 레거시 호환
   jobs: JobDefinition[];
 }
 
@@ -155,6 +155,7 @@ import type {
   ResistanceStats,
   LinguisticProfile,
   TastePreference,
+  StatSchemaEntry,
 } from "./character";
 
 export interface NpcStats {
@@ -334,7 +335,7 @@ export interface RawPlayer {
   character_name: string;
   job: string;
   personality_summary: string | null;
-  stats: { hp: number; max_hp: number; attack: number; defense: number; speed: number };
+  stats: Record<string, number>;
   inventory: string[];
   is_active: boolean;
 }

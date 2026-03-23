@@ -104,6 +104,39 @@ export interface StatusEffect {
 // "modern" | "mystery": 추후 구현 예정
 export type PersonalityTestTheme = "fantasy" | "modern" | "mystery";
 
+// 스탯 스키마 항목 — 표시 방식 포함
+export interface StatSchemaEntry {
+  key: string;       // DB 키: "hp", "investigation_chance"
+  label: string;     // 표시 레이블: "체력", "수사 기회"
+  icon: string;      // 이모지: "❤️", "🔍"
+  display: "bar" | "counter" | "number";
+    // bar     → 최대값 프로그레스 바 (max_key 필수)
+    // counter → X/Y 텍스트 (max_key 있으면 사용)
+    // number  → 단순 숫자
+  max_key?: string;  // bar/counter 타입에서 최대값 키 (예: "max_hp")
+  color: "green" | "blue" | "yellow" | "red" | "purple" | "neutral";
+}
+
+// 레거시 string[] stat_schema를 StatSchemaEntry[]로 변환
+export function normalizeStatSchema(
+  schema: StatSchemaEntry[] | string[] | null | undefined
+): StatSchemaEntry[] {
+  if (!schema || schema.length === 0) return [];
+  if (typeof schema[0] === "string") {
+    return (schema as string[])
+      .filter((key) => key !== "max_hp") // max_hp는 hp bar의 max_key로만 사용
+      .map((key) => ({
+        key,
+        label: key === "hp" ? "체력" : key === "attack" ? "공격력" : key === "defense" ? "방어력" : key === "speed" ? "속도" : key,
+        icon: key === "hp" ? "❤️" : key === "attack" ? "⚔️" : key === "defense" ? "🛡️" : key === "speed" ? "💨" : "📊",
+        display: (key === "hp" ? "bar" : "number") as StatSchemaEntry["display"],
+        max_key: key === "hp" ? "max_hp" : undefined,
+        color: (key === "hp" ? "green" : "neutral") as StatSchemaEntry["color"],
+      }));
+  }
+  return schema as StatSchemaEntry[];
+}
+
 // 시나리오별 캐릭터 생성 설정 (Scenario.character_creation_config)
 export interface CharacterCreationConfig {
   available_jobs: CharacterJob[];

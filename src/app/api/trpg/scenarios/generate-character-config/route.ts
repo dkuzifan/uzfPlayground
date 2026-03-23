@@ -37,21 +37,32 @@ export async function POST(req: NextRequest) {
 ${jobList}
 
 ## 요구사항
-1. stat_schema: 이 시나리오에 적합한 스탯 3~5개를 결정하라. "hp"는 반드시 포함. 테마에 맞게 창의적으로 구성 가능 (예: 판타지=마력, SF=해킹, 호러=정신력).
-2. jobs: 위 직업 목록 각각에 대해 base_stats를 설계하라. stat_schema에 정의된 스탯만 포함. hp는 60~150 범위, 나머지 스탯은 5~25 범위.
-3. 직업 간 스탯 합계는 비슷하게 유지하되, 각 직업의 특성이 드러나야 한다.
-4. description은 1~2문장으로 그 직업의 역할을 설명.
+1. stat_schema: 이 시나리오에 적합한 스탯 2~5개를 결정하라. 시나리오 장르에 맞게 창의적으로 구성하라.
+   - 판타지: hp(체력), attack(공격력), defense(방어력), speed(속도) 등
+   - 미스터리: investigation(수사력), social(사회력), composure(침착도) 등 — HP 없어도 됨
+   - 호러: sanity(정신력), stealth(은신), luck(운) 등
+   - 스탯이 불필요한 시나리오라면 stat_schema를 빈 배열로 해도 됨
+2. display 타입 선택:
+   - "bar": 최대값이 있는 게이지(HP, 정신력 등). max_key도 반드시 설정
+   - "counter": X/Y 형식으로 표시(기회 횟수 등). max_key 선택적
+   - "number": 단순 수치 표시(공격력, 속도 등)
+3. bar 타입 스탯은 max_key를 "{key}_max" 형식으로 설정하고, base_stats에도 max_key 값을 포함하라.
+4. jobs: 위 직업 목록 각각에 대해 base_stats를 설계하라. stat_schema에 정의된 스탯 + bar 타입의 max_key 값 포함.
+5. 직업 간 특성이 뚜렷하게 드러나야 한다. description은 1~2문장으로 직업 역할 설명.
 
 JSON 형식으로만 응답하라:
 {
   "character_config": {
-    "stat_schema": ["hp", "attack", "defense", "speed"],
+    "stat_schema": [
+      { "key": "hp", "label": "체력", "icon": "❤️", "display": "bar", "max_key": "hp_max", "color": "green" },
+      { "key": "attack", "label": "공격력", "icon": "⚔️", "display": "number", "color": "neutral" }
+    ],
     "jobs": [
       {
         "id": "warrior",
         "name": "전사",
         "description": "근접 전투에 특화된 강인한 전사.",
-        "base_stats": { "hp": 120, "attack": 15, "defense": 12, "speed": 8 }
+        "base_stats": { "hp": 120, "hp_max": 120, "attack": 15 }
       }
     ]
   }
