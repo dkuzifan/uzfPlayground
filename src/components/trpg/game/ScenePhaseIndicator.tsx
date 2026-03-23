@@ -1,6 +1,6 @@
 "use client";
 
-import type { ScenePhase } from "@/lib/types/game";
+import type { ScenePhase } from "@/lib/trpg/types/game";
 
 interface Props {
   phase: ScenePhase;

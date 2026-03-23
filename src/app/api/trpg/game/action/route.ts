@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { runGmAction, checkDiceNeed } from "@/lib/gemini/gm-agent";
-import { runNpcDialogue } from "@/lib/gemini/npc-agent";
-import { getNextTurn } from "@/lib/game/turn-manager";
-import { computeDynamicDC, defaultResistanceStats } from "@/lib/game/dc-calculator";
-import { applyTasteModifiers, buildBaseDeltas } from "@/lib/game/taste-modifier-engine";
-import { runMemorySummarize } from "@/lib/game/memory-pipeline";
-import { scanAndExtractLore } from "@/lib/game/lore-engine";
-import { applyObjectiveUpdate, tickDoomClock, evaluateEndings, applyEnding, deriveScenePhase, advancePhase } from "@/lib/game/objective-engine";
-import { evaluateTriggers, markTriggerFired } from "@/lib/game/npc-trigger-engine";
-import { runNpcAutonomousAction, evaluateBystanderReactions } from "@/lib/gemini/npc-agent";
-import type { WorldDictionaryEntry } from "@/lib/game/lore-engine";
-import type { HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory, ActionChoice, ScenarioObjectives, ScenarioEndings, ScenePhase } from "@/lib/types/game";
-import type { NpcDynamicState } from "@/lib/types/character";
-import type { NpcEmotionDelta } from "@/lib/gemini/gm-agent";
-import type { ActionCategory } from "@/lib/game/dc-calculator";
-import { defaultDynamicState, clamp, determineReactingNpcs } from "@/lib/game/action-utils";
+import { runGmAction, checkDiceNeed } from "@/lib/trpg/gemini/gm-agent";
+import { runNpcDialogue } from "@/lib/trpg/gemini/npc-agent";
+import { getNextTurn } from "@/lib/trpg/game/turn-manager";
+import { computeDynamicDC, defaultResistanceStats } from "@/lib/trpg/game/dc-calculator";
+import { applyTasteModifiers, buildBaseDeltas } from "@/lib/trpg/game/taste-modifier-engine";
+import { runMemorySummarize } from "@/lib/trpg/game/memory-pipeline";
+import { scanAndExtractLore } from "@/lib/trpg/game/lore-engine";
+import { applyObjectiveUpdate, tickDoomClock, evaluateEndings, applyEnding, deriveScenePhase, advancePhase } from "@/lib/trpg/game/objective-engine";
+import { evaluateTriggers, markTriggerFired } from "@/lib/trpg/game/npc-trigger-engine";
+import { runNpcAutonomousAction, evaluateBystanderReactions } from "@/lib/trpg/gemini/npc-agent";
+import type { WorldDictionaryEntry } from "@/lib/trpg/game/lore-engine";
+import type { HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory, ActionChoice, ScenarioObjectives, ScenarioEndings, ScenePhase } from "@/lib/trpg/types/game";
+import type { NpcDynamicState } from "@/lib/trpg/types/character";
+import type { NpcEmotionDelta } from "@/lib/trpg/gemini/gm-agent";
+import type { ActionCategory } from "@/lib/trpg/game/dc-calculator";
+import { defaultDynamicState, clamp, determineReactingNpcs } from "@/lib/trpg/game/action-utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -133,9 +133,9 @@ export async function POST(req: NextRequest) {
       const diceNeed = await checkDiceNeed(content, recentLogs);
       if (diceNeed.needs_check && diceNeed.action_category) {
         // DC 계산: 동적 DC (NPC 저항 + 심리 상태 + 환경)
-        const resistance = (primaryNpc?.resistance_stats ?? defaultResistanceStats()) as import("@/lib/types/character").ResistanceStats;
+        const resistance = (primaryNpc?.resistance_stats ?? defaultResistanceStats()) as import("@/lib/trpg/types/character").ResistanceStats;
         const primaryDynamicState = primaryNpc && session.npc_dynamic_states
-          ? (session.npc_dynamic_states as Record<string, import("@/lib/types/character").NpcDynamicState>)[primaryNpc.id] ?? null
+          ? (session.npc_dynamic_states as Record<string, import("@/lib/trpg/types/character").NpcDynamicState>)[primaryNpc.id] ?? null
           : null;
         const dc = computeDynamicDC({
           category: diceNeed.action_category,
@@ -239,11 +239,11 @@ export async function POST(req: NextRequest) {
     let gmNarration = "GM이 잠시 자리를 비웠습니다. 다음 플레이어로 턴을 넘깁니다.";
     let gmStateChanges: Array<{ target_id: string; hp_delta: number }> = [];
     let gmNextChoices: ActionChoice[] = [];
-    let gmQuestUpdate: import("@/lib/game/objective-engine").GmObjectiveUpdate | undefined;
+    let gmQuestUpdate: import("@/lib/trpg/game/objective-engine").GmObjectiveUpdate | undefined;
     let gmItemObtained: string | null = null;
     let gmStatGrowth: { stat: string; delta: number; reason?: string } | null = null;
     let gmPhaseTransition: ScenePhase | null = null;
-    let gmFailurePenalty: import("@/lib/gemini/gm-agent").FailurePenalty | null = null;
+    let gmFailurePenalty: import("@/lib/trpg/gemini/gm-agent").FailurePenalty | null = null;
     let gmFailureTwist: string | null = null;
     let geminiSucceeded = false;
 
@@ -286,9 +286,9 @@ export async function POST(req: NextRequest) {
         gmPhaseTransition = advancePhase(activeScenePhase, gmResponse.scene_phase_transition);
       }
       // DC 오버라이드: 동적 DC로 교체
-      const resistance = (primaryNpc?.resistance_stats ?? defaultResistanceStats()) as import("@/lib/types/character").ResistanceStats;
+      const resistance = (primaryNpc?.resistance_stats ?? defaultResistanceStats()) as import("@/lib/trpg/types/character").ResistanceStats;
       const primaryDynamicState = primaryNpc && session.npc_dynamic_states
-        ? (session.npc_dynamic_states as Record<string, import("@/lib/types/character").NpcDynamicState>)[primaryNpc.id] ?? null
+        ? (session.npc_dynamic_states as Record<string, import("@/lib/trpg/types/character").NpcDynamicState>)[primaryNpc.id] ?? null
         : null;
       gmNextChoices = (gmResponse.next_choices ?? []).map((choice) => {
         if (!choice.dice_check) return choice;

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import type { ScenarioObjectives, ScenarioEndings, CharacterConfig } from "@/lib/types/game";
+import type { ScenarioObjectives, ScenarioEndings, CharacterConfig } from "@/lib/trpg/types/game";
 import type { LoreItemInput } from "../generate-lore/route";
 
 interface RouteParams {

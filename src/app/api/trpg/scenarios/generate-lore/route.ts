@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGeminiModel } from "@/lib/gemini/client";
+import { getGeminiModel } from "@/lib/ai/gemini";
 
 export interface LoreItemInput {
   domain: "WORLD_LORE" | "PERSONAL_LORE";

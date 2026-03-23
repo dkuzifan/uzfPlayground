@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { generateChoices } from "@/lib/game/choice-generator";
-import { computeDynamicDC, defaultResistanceStats } from "@/lib/game/dc-calculator";
-import type { ActionChoice, RawPlayer, NpcPersona, GameSession } from "@/lib/types/game";
-import type { PersonalityProfile, ResistanceStats, NpcDynamicState } from "@/lib/types/character";
-import type { ActionCategory } from "@/lib/game/dc-calculator";
+import { generateChoices } from "@/lib/trpg/game/choice-generator";
+import { computeDynamicDC, defaultResistanceStats } from "@/lib/trpg/game/dc-calculator";
+import type { ActionChoice, RawPlayer, NpcPersona, GameSession } from "@/lib/trpg/types/game";
+import type { PersonalityProfile, ResistanceStats, NpcDynamicState } from "@/lib/trpg/types/character";
+import type { ActionCategory } from "@/lib/trpg/game/dc-calculator";
 
 type PlayerWithPersonality = RawPlayer & { personality: PersonalityProfile | null };
 

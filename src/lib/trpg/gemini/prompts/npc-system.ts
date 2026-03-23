@@ -6,10 +6,10 @@
 // 전체 v2 컨텍스트가 있는 경우를 모두 지원합니다.
 // ============================================================
 
-import type { NpcPersona, NpcMemory } from "@/lib/types/game";
-import type { NpcDynamicState, SpeciesInfo } from "@/lib/types/character";
-import { buildNpcPrompt, type NpcPromptInput, type LoreContext } from "@/lib/game/npc-prompt-builder";
-import { computeAgeMatrix } from "@/lib/game/age-matrix";
+import type { NpcPersona, NpcMemory } from "@/lib/trpg/types/game";
+import type { NpcDynamicState, SpeciesInfo } from "@/lib/trpg/types/character";
+import { buildNpcPrompt, type NpcPromptInput, type LoreContext } from "@/lib/trpg/game/npc-prompt-builder";
+import { computeAgeMatrix } from "@/lib/trpg/game/age-matrix";
 
 // 기본 NpcDynamicState (v2 데이터 없을 때 사용)
 function defaultDynamicState(): NpcDynamicState {

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/components/ui/Modal";
 import PersonalityTest from "@/components/trpg/onboarding/PersonalityTest";
-import type { PersonalityProfile, CharacterJob, CharacterCreationConfig } from "@/lib/types/character";
+import type { PersonalityProfile, CharacterJob, CharacterCreationConfig } from "@/lib/trpg/types/character";
 import { AVATAR_COLORS } from "@/lib/types/lobby";
 
 interface Props {

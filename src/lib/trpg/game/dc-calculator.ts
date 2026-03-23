@@ -5,7 +5,7 @@
 // modifier = 캐릭터 스탯에서 관련 값 추출 (직업 하드코딩 제거)
 // ============================================================
 
-import type { ResistanceStats, NpcDynamicState } from "@/lib/types/character";
+import type { ResistanceStats, NpcDynamicState } from "@/lib/trpg/types/character";
 
 export type ActionCategory =
   | "attack"    // 물리적 공격

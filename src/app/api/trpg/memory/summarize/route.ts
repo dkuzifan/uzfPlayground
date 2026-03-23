@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runMemorySummarize } from "@/lib/game/memory-pipeline";
+import { runMemorySummarize } from "@/lib/trpg/game/memory-pipeline";
 
 export async function POST(req: NextRequest) {
   try {

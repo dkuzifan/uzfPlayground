@@ -1,4 +1,4 @@
-import type { GameSession, TurnParticipant } from "@/lib/types/game";
+import type { GameSession, TurnParticipant } from "@/lib/trpg/types/game";
 
 export function getNextTurn(session: GameSession): TurnParticipant | null {
   const { turn_order, current_turn_player_id, turn_number } = session;

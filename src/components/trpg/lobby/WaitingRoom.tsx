@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import PlayerCard from "./PlayerCard";
 import Button from "@/components/ui/Button";
-import { useWaitingRoom } from "@/hooks/useWaitingRoom";
+import { useWaitingRoom } from "@/hooks/trpg/useWaitingRoom";
 import type { GuestProfile } from "@/lib/types/lobby";
 
 interface WaitingRoomProps {

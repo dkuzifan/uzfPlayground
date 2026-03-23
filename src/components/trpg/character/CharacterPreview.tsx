@@ -1,4 +1,4 @@
-import type { CharacterCreateInput } from "@/lib/types/character";
+import type { CharacterCreateInput } from "@/lib/trpg/types/character";
 
 interface CharacterPreviewProps {
   character: CharacterCreateInput;

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { initQuestTracker } from "@/lib/game/objective-engine";
-import { normalizeStatSchema } from "@/lib/types/character";
-import type { ScenarioObjectives, CharacterConfig } from "@/lib/types/game";
+import { initQuestTracker } from "@/lib/trpg/game/objective-engine";
+import { normalizeStatSchema } from "@/lib/trpg/types/character";
+import type { ScenarioObjectives, CharacterConfig } from "@/lib/trpg/types/game";
 
 // ── GET /api/trpg/sessions — 대기 중인 방 목록 ──────────────────────
 export async function GET() {

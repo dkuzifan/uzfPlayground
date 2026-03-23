@@ -1,9 +1,9 @@
-import { getGeminiModel } from "./client";
-import { buildNpcSystemPrompt } from "./prompts/npc-system";
-import type { NpcPersona, NpcMemory, ActionLog } from "@/lib/types/game";
-import type { NpcDynamicState, SpeciesInfo } from "@/lib/types/character";
-import type { LoreContext } from "@/lib/game/npc-prompt-builder";
-import type { NpcTriggerType } from "@/lib/game/npc-trigger-engine";
+import { getGeminiModel } from "@/lib/ai/gemini";
+import { buildNpcSystemPrompt } from "@/lib/trpg/gemini/prompts/npc-system";
+import type { NpcPersona, NpcMemory, ActionLog } from "@/lib/trpg/types/game";
+import type { NpcDynamicState, SpeciesInfo } from "@/lib/trpg/types/character";
+import type { LoreContext } from "@/lib/trpg/game/npc-prompt-builder";
+import type { NpcTriggerType } from "@/lib/trpg/game/npc-trigger-engine";
 
 /**
  * 직접 언급되지 않은 NPC들이 해당 행동에 반응할지 판단합니다.

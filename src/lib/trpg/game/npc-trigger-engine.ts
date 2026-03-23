@@ -1,5 +1,5 @@
-import type { NpcDynamicState } from "@/lib/types/character";
-import type { NpcPersona } from "@/lib/types/game";
+import type { NpcDynamicState } from "@/lib/trpg/types/character";
+import type { NpcPersona } from "@/lib/trpg/types/game";
 
 // ── 트리거 타입 ───────────────────────────────────────────────
 

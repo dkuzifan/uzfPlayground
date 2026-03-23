@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LobbySession } from "@/lib/types/lobby";
-import type { CharacterCreationConfig } from "@/lib/types/character";
+import type { CharacterCreationConfig } from "@/lib/trpg/types/character";
 import { useGuestProfile } from "@/hooks/useGuestProfile";
 
 import JoinRoomModal from "./JoinRoomModal";

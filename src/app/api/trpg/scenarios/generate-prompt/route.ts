@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getGeminiModel } from "@/lib/gemini/client";
+import { getGeminiModel } from "@/lib/ai/gemini";
 
 // ── POST /api/trpg/scenarios/generate-prompt ─────────────────────────
 // 제목/테마/설명/직업 목록을 기반으로 GM 시스템 프롬프트 초안 생성

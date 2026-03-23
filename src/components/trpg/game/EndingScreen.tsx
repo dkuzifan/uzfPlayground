@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ScenarioEndings, EndingTone } from "@/lib/types/game";
+import type { ScenarioEndings, EndingTone } from "@/lib/trpg/types/game";
 
 interface Props {
   endingId: string;

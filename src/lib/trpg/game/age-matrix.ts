@@ -8,7 +8,7 @@
 // 단순 나이 수치가 아닌 '삶에서 얼마나 왔는가'를 비교합니다.
 // ============================================================
 
-import type { SpeciesInfo, SizeCategory } from "@/lib/types/character";
+import type { SpeciesInfo, SizeCategory } from "@/lib/trpg/types/character";
 
 // 생애주기 단계 (비율 기준)
 type LifeStage = "유아기" | "청소년기" | "청년기" | "중년기" | "노년기" | "초고령기";

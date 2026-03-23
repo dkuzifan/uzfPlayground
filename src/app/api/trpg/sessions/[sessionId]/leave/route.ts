@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import type { GameSession, TurnParticipant } from "@/lib/types/game";
+import type { GameSession, TurnParticipant } from "@/lib/trpg/types/game";
 
 interface RouteParams {
   params: Promise<{ sessionId: string }>;

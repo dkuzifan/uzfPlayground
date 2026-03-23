@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { buildTurnOrder } from "@/lib/game/turn-manager";
-import { generateOpeningNarration, generateStoryBlueprint } from "@/lib/gemini/gm-agent";
-import { generateNpcsForScenario } from "@/lib/gemini/npc-agent";
+import { buildTurnOrder } from "@/lib/trpg/game/turn-manager";
+import { generateOpeningNarration, generateStoryBlueprint } from "@/lib/trpg/gemini/gm-agent";
+import { generateNpcsForScenario } from "@/lib/trpg/gemini/npc-agent";
 
 interface RouteParams {
   params: Promise<{ sessionId: string }>;

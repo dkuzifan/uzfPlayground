@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { GameSessionWithDetails, ActionLog } from "@/lib/types/game";
+import type { GameSessionWithDetails, ActionLog } from "@/lib/trpg/types/game";
 import { createClient } from "@/lib/supabase/client";
 
 export function useGameSession(sessionId: string) {

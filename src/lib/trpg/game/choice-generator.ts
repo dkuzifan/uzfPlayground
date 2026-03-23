@@ -1,6 +1,6 @@
-import { getGeminiModel } from "@/lib/gemini/client";
-import type { ActionChoice } from "@/lib/types/game";
-import type { PersonalityProfile } from "@/lib/types/character";
+import { getGeminiModel } from "@/lib/ai/gemini";
+import type { ActionChoice } from "@/lib/trpg/types/game";
+import type { PersonalityProfile } from "@/lib/trpg/types/character";
 
 const MBTI_TRAITS: Record<string, string> = {
   INTJ: "전략적이고 독립적, 장기 계획 선호, 감정보다 논리 우선",

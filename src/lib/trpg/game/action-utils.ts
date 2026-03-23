@@ -1,6 +1,6 @@
-import type { NpcDynamicState } from "@/lib/types/character";
-import type { NpcPersona } from "@/lib/types/game";
-import { evaluateBystanderReactions } from "@/lib/gemini/npc-agent";
+import type { NpcDynamicState } from "@/lib/trpg/types/character";
+import type { NpcPersona } from "@/lib/trpg/types/game";
+import { evaluateBystanderReactions } from "@/lib/trpg/gemini/npc-agent";
 
 export const JOB_MODIFIERS: Record<string, number> = {
   warrior: 2,

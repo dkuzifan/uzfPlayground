@@ -16,8 +16,8 @@
 //   [8] 핵심 연기 지침 & 출력 포맷 강제 (항상 포함)
 // ============================================================
 
-import type { NpcPersona, NpcMemory } from "@/lib/types/game";
-import type { SpeciesInfo, TastePreference, NpcDynamicState } from "@/lib/types/character";
+import type { NpcPersona, NpcMemory } from "@/lib/trpg/types/game";
+import type { SpeciesInfo, TastePreference, NpcDynamicState } from "@/lib/trpg/types/character";
 import type { AgeMatrixResult } from "./age-matrix";
 
 export interface LoreContext {

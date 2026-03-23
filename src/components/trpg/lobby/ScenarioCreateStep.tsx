@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import type { ScenarioSummary } from "./ScenarioSelectStep";
-import type { ObjectiveType, EndingTrigger, EndingTone, ScenarioObjectives, ScenarioEndings, JobDefinition, CharacterConfig } from "@/lib/types/game";
-import type { StatSchemaEntry } from "@/lib/types/character";
-import { normalizeStatSchema } from "@/lib/types/character";
+import type { ObjectiveType, EndingTrigger, EndingTone, ScenarioObjectives, ScenarioEndings, JobDefinition, CharacterConfig } from "@/lib/trpg/types/game";
+import type { StatSchemaEntry } from "@/lib/trpg/types/character";
+import { normalizeStatSchema } from "@/lib/trpg/types/character";
 
 export interface ScenarioInitialData {
   title: string;

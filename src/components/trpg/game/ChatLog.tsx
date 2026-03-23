@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { ActionLog, DiceRoll, HpChange } from "@/lib/types/game";
+import type { ActionLog, DiceRoll, HpChange } from "@/lib/trpg/types/game";
 
 interface Props {
   logs: ActionLog[];

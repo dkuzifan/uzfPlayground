@@ -2,7 +2,7 @@
 // Supabase Database Types (mirrors SQL schema)
 // ============================================================
 
-import type { ScenarioObjectives, ScenarioEndings, QuestTracker, ScenePhase, CharacterConfig, StoryBlueprint } from "./game";
+import type { ScenarioObjectives, ScenarioEndings, QuestTracker, ScenePhase, CharacterConfig, StoryBlueprint } from "../trpg/types/game";
 
 export interface Database {
   public: {

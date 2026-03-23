@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { PersonalityTestAnswers } from "@/lib/types/character";
+import type { PersonalityTestAnswers } from "@/lib/trpg/types/character";
 
 interface PersonalityTestProps {
   onComplete: (answers: PersonalityTestAnswers) => void;

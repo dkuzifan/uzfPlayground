@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import type { ActionLog, ActionChoice, RawPlayer, GameSession, Scenario, NpcPersona } from "@/lib/types/game";
-import { JOB_MODIFIERS } from "@/lib/game/action-utils";
+import type { ActionLog, ActionChoice, RawPlayer, GameSession, Scenario, NpcPersona } from "@/lib/trpg/types/game";
+import { JOB_MODIFIERS } from "@/lib/trpg/game/action-utils";
 
 const FALLBACK_CHOICES: ActionChoice[] = [
   {

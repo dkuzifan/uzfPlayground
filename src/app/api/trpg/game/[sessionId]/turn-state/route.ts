@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import type { ActiveTurnState } from "@/lib/types/game";
+import type { ActiveTurnState } from "@/lib/trpg/types/game";
 
 export async function PATCH(
   req: NextRequest,

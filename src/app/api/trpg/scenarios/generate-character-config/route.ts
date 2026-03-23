@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGeminiModel } from "@/lib/gemini/client";
-import type { CharacterConfig } from "@/lib/types/game";
+import { getGeminiModel } from "@/lib/ai/gemini";
+import type { CharacterConfig } from "@/lib/trpg/types/game";
 
 export async function POST(req: NextRequest) {
   try {

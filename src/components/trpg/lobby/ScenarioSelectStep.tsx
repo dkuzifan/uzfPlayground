@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { CharacterCreationConfig } from "@/lib/types/character";
+import type { CharacterCreationConfig } from "@/lib/trpg/types/character";
 
 export interface ScenarioSummary {
   id: string;

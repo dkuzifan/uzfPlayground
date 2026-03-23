@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { ActionOutcome } from "@/lib/types/game";
+import type { ActionOutcome } from "@/lib/trpg/types/game";
 
 interface DiceRollOverlayProps {
   dc: number;

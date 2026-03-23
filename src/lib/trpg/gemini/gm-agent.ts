@@ -1,7 +1,7 @@
-import { getGeminiModel } from "./client";
-import type { ActionLog, ActionOutcome, ActionChoice, DiceRoll, RawPlayer, QuestTracker, ScenarioObjectives, ScenePhase, StoryBlueprint, StoryAct } from "@/lib/types/game";
-import type { ActionCategory } from "@/lib/game/dc-calculator";
-import type { GmObjectiveUpdate } from "@/lib/game/objective-engine";
+import { getGeminiModel } from "@/lib/ai/gemini";
+import type { ActionLog, ActionOutcome, ActionChoice, DiceRoll, RawPlayer, QuestTracker, ScenarioObjectives, ScenePhase, StoryBlueprint, StoryAct } from "@/lib/trpg/types/game";
+import type { ActionCategory } from "@/lib/trpg/game/dc-calculator";
+import type { GmObjectiveUpdate } from "@/lib/trpg/game/objective-engine";
 
 // ── checkDiceNeed ─────────────────────────────────────────────────────────────
 // AI는 판정 필요 여부와 행동 카테고리만 결정합니다.

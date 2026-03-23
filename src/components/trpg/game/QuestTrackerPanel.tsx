@@ -1,4 +1,4 @@
-import type { QuestTracker, ScenarioObjectives } from "@/lib/types/game";
+import type { QuestTracker, ScenarioObjectives } from "@/lib/trpg/types/game";
 
 interface Props {
   questTracker: QuestTracker | null;

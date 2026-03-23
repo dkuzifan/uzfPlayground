@@ -9,7 +9,7 @@
 // (예: 위협 → 기본 affinity -15 * multiplier -1.5 = +22.5)
 // ============================================================
 
-import type { TastePreference, TasteModifiers } from "@/lib/types/character";
+import type { TastePreference, TasteModifiers } from "@/lib/trpg/types/character";
 
 // 감정 변화량 기본값 타입 (System GM이 산출한 1차 결과)
 export interface EmotionDeltas {

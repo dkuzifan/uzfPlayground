@@ -6,10 +6,10 @@
 // ============================================================
 
 import { createServiceClient } from "@/lib/supabase/server";
-import { summarizeNpcMemory, computeDecayedEmotionLevel } from "@/lib/gemini/memory-agent";
+import { summarizeNpcMemory, computeDecayedEmotionLevel } from "@/lib/trpg/gemini/memory-agent";
 import { computeAgeMatrix } from "./age-matrix";
-import type { NpcPersona, GameSession } from "@/lib/types/game";
-import type { NpcDynamicState, SpeciesInfo, TastePreference } from "@/lib/types/character";
+import type { NpcPersona, GameSession } from "@/lib/trpg/types/game";
+import type { NpcDynamicState, SpeciesInfo, TastePreference } from "@/lib/trpg/types/character";
 
 const SUMMARY_WINDOW = 10;     // 요약 대상 최대 로그 수
 const MIN_LOGS_TO_SUMMARIZE = 5; // 최소 미요약 로그 수

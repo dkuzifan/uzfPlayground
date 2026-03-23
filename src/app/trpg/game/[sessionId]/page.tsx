@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useGameScreen } from "@/hooks/useGameScreen";
+import { useGameScreen } from "@/hooks/trpg/useGameScreen";
 import { useGuestProfile } from "@/hooks/useGuestProfile";
 import ChatLog from "@/components/trpg/game/ChatLog";
 import ActionPanel from "@/components/trpg/game/ActionPanel";

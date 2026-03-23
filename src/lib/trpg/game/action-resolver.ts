@@ -1,5 +1,5 @@
-import type { ActionLog, GmResponse, StateChanges } from "@/lib/types/game";
-import type { PlayerCharacter } from "@/lib/types/character";
+import type { ActionLog, GmResponse, StateChanges } from "@/lib/trpg/types/game";
+import type { PlayerCharacter } from "@/lib/trpg/types/character";
 
 export function applyStateChanges(
   players: PlayerCharacter[],

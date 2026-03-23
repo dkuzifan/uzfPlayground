@@ -8,7 +8,7 @@ import ScenarioSelectStep, { type ScenarioSummary } from "./ScenarioSelectStep";
 import ScenarioCreateStep, { type ScenarioInitialData } from "./ScenarioCreateStep";
 import PersonalityTest from "@/components/trpg/onboarding/PersonalityTest";
 import type { GuestProfile } from "@/lib/types/lobby";
-import type { PersonalityProfile, CharacterJob, CharacterCreationConfig } from "@/lib/types/character";
+import type { PersonalityProfile, CharacterJob, CharacterCreationConfig } from "@/lib/trpg/types/character";
 import { AVATAR_COLORS } from "@/lib/types/lobby";
 
 const DRAFT_KEY = "trpg_onboarding_draft";

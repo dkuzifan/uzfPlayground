@@ -1,7 +1,7 @@
 "use client";
 
-import type { NpcPersona } from "@/lib/types/game";
-import type { NpcDynamicState } from "@/lib/types/character";
+import type { NpcPersona } from "@/lib/trpg/types/game";
+import type { NpcDynamicState } from "@/lib/trpg/types/character";
 
 interface Props {
   npcs: NpcPersona[];

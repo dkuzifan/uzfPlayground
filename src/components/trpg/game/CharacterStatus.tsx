@@ -1,6 +1,6 @@
-import type { RawPlayer } from "@/lib/types/game";
-import type { StatSchemaEntry } from "@/lib/types/character";
-import { normalizeStatSchema } from "@/lib/types/character";
+import type { RawPlayer } from "@/lib/trpg/types/game";
+import type { StatSchemaEntry } from "@/lib/trpg/types/character";
+import { normalizeStatSchema } from "@/lib/trpg/types/character";
 
 interface Props {
   player: RawPlayer | null;

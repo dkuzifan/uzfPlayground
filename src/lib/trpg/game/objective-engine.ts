@@ -4,7 +4,7 @@ import type {
   ScenarioEndings,
   EndingCondition,
   ScenePhase,
-} from "@/lib/types/game";
+} from "@/lib/trpg/types/game";
 
 // ── 씬 페이즈 상수 ─────────────────────────────────────────────
 

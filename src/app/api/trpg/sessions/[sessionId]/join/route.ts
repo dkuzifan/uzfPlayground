@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { normalizeStatSchema } from "@/lib/types/character";
-import type { PersonalityProfile, CharacterJob } from "@/lib/types/character";
+import { normalizeStatSchema } from "@/lib/trpg/types/character";
+import type { PersonalityProfile, CharacterJob } from "@/lib/trpg/types/character";
 
 // ── 화이트리스트 검증 ──────────────────────────────────────────────────────────
 const VALID_MBTI = new Set([
@@ -108,7 +108,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     .from("Scenario")
     .select("character_config")
     .eq("id", session.scenario_id)
-    .single() as unknown as { data: { character_config: import("@/lib/types/game").CharacterConfig | null } | null };
+    .single() as unknown as { data: { character_config: import("@/lib/trpg/types/game").CharacterConfig | null } | null };
 
   const characterConfig = scenarioData?.character_config ?? null;
 

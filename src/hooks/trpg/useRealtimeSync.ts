@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import type { ActionLog } from "@/lib/types/game";
+import type { ActionLog } from "@/lib/trpg/types/game";
 
 interface UseRealtimeSyncOptions {
   sessionId: string;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGeminiModel } from "@/lib/gemini/client";
-import type { ScenarioObjectives, ScenarioEndings } from "@/lib/types/game";
+import { getGeminiModel } from "@/lib/ai/gemini";
+import type { ScenarioObjectives, ScenarioEndings } from "@/lib/trpg/types/game";
 
 // ── POST /api/trpg/scenarios/generate-objectives ──────────────────────────
 // 시나리오 설정을 받아 Gemini로 목표(ScenarioObjectives)와

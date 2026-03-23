@@ -5,8 +5,8 @@
 // NPC의 심리 필터를 거쳐 주관적 기억(Session_Memory)으로 압축합니다.
 // ============================================================
 
-import { getGeminiModel } from "./client";
-import type { NpcDynamicState } from "@/lib/types/character";
+import { getGeminiModel } from "@/lib/ai/gemini";
+import type { NpcDynamicState } from "@/lib/trpg/types/character";
 
 export interface MemorySummaryResult {
   fact_summary: string;

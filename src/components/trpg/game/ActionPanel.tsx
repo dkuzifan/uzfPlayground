@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ActionChoice, ActiveTurnState } from "@/lib/types/game";
+import type { ActionChoice, ActiveTurnState } from "@/lib/trpg/types/game";
 
 interface Props {
   isMyTurn: boolean;

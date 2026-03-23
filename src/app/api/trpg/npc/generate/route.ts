@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { generateNpcsForScenario } from "@/lib/gemini/npc-agent";
+import { generateNpcsForScenario } from "@/lib/trpg/gemini/npc-agent";
 
 export async function POST(req: NextRequest) {
   try {

@@ -7,7 +7,7 @@ import type {
   EnneagramType,
   DnDAlignment,
   CharacterJob,
-} from "@/lib/types/character";
+} from "@/lib/trpg/types/character";
 
 interface Props {
   onComplete: (personality: PersonalityProfile, characterName: string, job: CharacterJob) => void;
