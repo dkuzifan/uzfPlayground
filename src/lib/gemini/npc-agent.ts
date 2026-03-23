@@ -74,6 +74,11 @@ JSON으로만 응답하세요:
   }
 }
 
+export interface NpcResponse {
+  stage_direction: string;
+  dialogue: string;
+}
+
 export interface NpcDialogueOptions {
   dynamicState?: NpcDynamicState;
   playerName?: string;
@@ -87,7 +92,7 @@ export async function runNpcDialogue(
   conversationHistory: Array<{ role: "user" | "model"; content: string }>,
   playerMessage: string,
   options?: NpcDialogueOptions
-): Promise<string> {
+): Promise<NpcResponse> {
   const model = getGeminiModel();
   const systemPrompt = buildNpcSystemPrompt(npc, {
     dynamicState: options?.dynamicState,
@@ -108,9 +113,19 @@ export async function runNpcDialogue(
   const result = await model.generateContent({
     systemInstruction: systemPrompt,
     contents,
+    generationConfig: { responseMimeType: "application/json" },
   });
 
-  return result.response.text();
+  try {
+    const parsed = JSON.parse(result.response.text());
+    return {
+      stage_direction: parsed.stage_direction ?? "",
+      dialogue: parsed.dialogue ?? result.response.text(),
+    };
+  } catch {
+    // JSON 파싱 실패 시 전체 텍스트를 dialogue로 사용
+    return { stage_direction: "", dialogue: result.response.text() };
+  }
 }
 
 // ── NPC 자발 행동 생성 ────────────────────────────────────────
@@ -122,7 +137,7 @@ export async function runNpcAutonomousAction(
   contextHint: string,
   recentLogs: ActionLog[],
   dynamicState?: NpcDynamicState
-): Promise<string> {
+): Promise<NpcResponse> {
   const model = getGeminiModel();
 
   const recentHistory = recentLogs
@@ -139,22 +154,27 @@ ${recentHistory}
 ${contextHint}
 
 위 상황에서 ${npc.name}이 플레이어의 행동을 기다리지 않고 스스로 말하거나 행동합니다.
-NPC의 언어 스타일과 성격을 유지하며, 1~3문장으로 자연스럽게 표현하세요.
-순수 텍스트로만 응답하세요.`;
+NPC의 언어 스타일과 성격을 유지하며, 시스템 프롬프트의 JSON 출력 포맷을 따르세요.`;
 
   try {
     const result = await model.generateContent({
       systemInstruction: systemPrompt,
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
     });
-    return result.response.text().trim();
+    const parsed = JSON.parse(result.response.text());
+    return {
+      stage_direction: parsed.stage_direction ?? "",
+      dialogue: parsed.dialogue ?? result.response.text(),
+    };
   } catch (err) {
     console.error(`[NpcAgent] runNpcAutonomousAction failed (npc=${npc.id}, trigger=${trigger}):`, err);
-    return trigger === "fear_flee"
-      ? `${npc.name}이 두려움에 떨며 뒷걸음질 쳤다.`
+    const fallbackDialogue = trigger === "fear_flee"
+      ? `두려움에 떨며 뒷걸음질 쳤다.`
       : trigger === "bystander_reaction"
-        ? `${npc.name}이 그 광경을 잠자코 바라보았다.`
-        : `${npc.name}이 잠시 망설이다 조용히 입을 열었다.`;
+        ? `그 광경을 잠자코 바라보았다.`
+        : `잠시 망설이다 조용히 입을 열었다.`;
+    return { stage_direction: fallbackDialogue, dialogue: "" };
   }
 }
 

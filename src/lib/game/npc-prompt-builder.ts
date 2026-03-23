@@ -168,15 +168,16 @@ function buildActingGuidelinesBlock(npc: NpcPersona): string {
 말투 특성: ${linguistic_profile.speech_style}${sentenceEndingNote}${vocalTicsNote}${forbiddenWordsNote}
 
 [출력 포맷 강제]
-반드시 아래 형식으로만 출력하십시오. 다른 텍스트는 절대 포함하지 마십시오.
+반드시 아래 JSON 형식으로만 출력하십시오. 다른 텍스트는 절대 포함하지 마십시오.
 
-(지문: 당신의 속마음이 은연중에 드러나는 행동이나 표정 묘사)
-"대사: 유저에게 실제로 하는 말"
+{"stage_direction": "지문 텍스트", "dialogue": "대사 텍스트"}
+
+- stage_direction: 속마음이 은연중에 드러나는 행동이나 표정 묘사 (3인칭 현재형, 괄호 없이)
+- dialogue: 유저에게 실제로 하는 말 (1인칭, 따옴표 없이)
 
 [길이 제한 — 반드시 준수]
-- 지문: 1~2문장 이내. 핵심 비언어 신호 하나만 묘사하십시오.
-- 대사: 1~2문장 이내. 짧고 임팩트 있게 말하십시오.
-- 지문과 대사 블록은 각각 딱 하나씩만 출력하십시오. 추가 "대사:" 블록 절대 금지.
+- stage_direction: 1~2문장 이내. 핵심 비언어 신호 하나만 묘사하십시오.
+- dialogue: 1~2문장 이내. 짧고 임팩트 있게 말하십시오.
 
 [반복 금지]
 - 이전에 한 말과 동일한 의미의 발언을 반복하지 마십시오.
@@ -184,8 +185,6 @@ function buildActingGuidelinesBlock(npc: NpcPersona): string {
 - 새로운 정보, 새로운 감정 반응, 또는 태도 변화를 담으십시오.
 
 [기타 제약]
-- 지문은 괄호 안에 3인칭 현재 묘사로 작성하십시오.
-- 대사는 큰따옴표 안에 1인칭으로 작성하십시오.
 - 게임 시스템, 주사위, 규칙에 대해 절대 언급하지 마십시오.
 - 당신은 GM이 아닙니다. 오직 NPC로서만 발화하십시오.`;
 }

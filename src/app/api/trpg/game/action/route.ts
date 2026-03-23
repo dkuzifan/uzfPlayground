@@ -496,9 +496,9 @@ export async function POST(req: NextRequest) {
             speaker_id: npc.id,
             speaker_name: npc.name,
             action_type: "npc_dialogue",
-            content: npcResponse,
+            content: npcResponse.dialogue,
             outcome: null,
-            state_changes: {},
+            state_changes: { stage_direction: npcResponse.stage_direction },
           });
         } catch (err) {
           console.error(`[ActionRoute] runNpcDialogue failed for npc=${npc.id}:`, err);
@@ -556,9 +556,9 @@ export async function POST(req: NextRequest) {
               speaker_id: npc.id,
               speaker_name: npc.name,
               action_type: "npc_dialogue",
-              content: reaction,
+              content: reaction.dialogue,
               outcome: null,
-              state_changes: { bystander: true },
+              state_changes: { bystander: true, stage_direction: reaction.stage_direction },
             });
           } catch (err) {
             console.error(`[ActionRoute] bystander reaction failed (npc=${npcId}):`, err);
@@ -642,9 +642,9 @@ export async function POST(req: NextRequest) {
               speaker_id: event.npc.id,
               speaker_name: event.npc.name,
               action_type: "npc_dialogue",
-              content: dialogue,
+              content: dialogue.dialogue,
               outcome: null,
-              state_changes: { trigger: event.trigger },
+              state_changes: { trigger: event.trigger, stage_direction: dialogue.stage_direction },
             });
             if (npcState) {
               triggeredStates = {
