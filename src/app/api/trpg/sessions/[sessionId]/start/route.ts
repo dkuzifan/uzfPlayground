@@ -129,6 +129,8 @@ export async function POST(request: Request, { params }: RouteParams) {
               stats: { hp: 30, max_hp: 30, attack: 5, defense: 5 },
               linguistic_profile: npc.linguistic_profile,
               knowledge_level: npc.knowledge_level,
+              // ally는 처음부터 동행 → 소개 완료, 나머지는 GM 서사로 등장 전까지 대기
+              is_introduced: npc.role === "ally",
             }))
           )
           .select("name, role, personality");

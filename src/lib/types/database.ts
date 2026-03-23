@@ -96,6 +96,8 @@ export interface Database {
           camaraderie_threshold: number;
           // v3 추가
           knowledge_level: number;
+          // v4 추가
+          is_introduced: boolean;
           created_at: string;
         };
         Insert: {
@@ -137,6 +139,8 @@ export interface Database {
           camaraderie_threshold?: number;
           // v3 추가
           knowledge_level?: number;
+          // v4 추가
+          is_introduced?: boolean;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["NPC_Persona"]["Insert"]>;

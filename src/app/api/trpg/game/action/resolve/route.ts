@@ -118,8 +118,10 @@ export async function POST(req: NextRequest) {
 
     const recentLogs = ((recentLogsData ?? []).reverse()) as unknown as ActionLog[];
     const npcs = (npcsData ?? []) as unknown as NpcPersona[];
+    const introducedNpcs = npcs.filter((n) => n.is_introduced);
+    const unintroducedNpcs = npcs.filter((n) => !n.is_introduced);
     const dynamicStates = (session.npc_dynamic_states ?? {}) as Record<string, NpcDynamicState>;
-    const targetedNpcs = await determineReactingNpcs(action_content, npcs, dynamicStates);
+    const targetedNpcs = await determineReactingNpcs(action_content, introducedNpcs, dynamicStates);
 
     // 전역 세션 요약 포맷
     const globalMemory = globalMemoryData as { summary_text: string; key_facts: string[]; last_summarized_turn: number } | null;
@@ -258,10 +260,22 @@ export async function POST(req: NextRequest) {
         objectives: scenario?.objectives,
         scenePhase: activeScenePhase,
         storyBlueprint: session.story_blueprint,
+        introducedNpcs: introducedNpcs.map((n) => ({ name: n.name, role: n.role })),
+        unintroducedNpcs: unintroducedNpcs.map((n) => ({ name: n.name, role: n.role })),
       });
       gmNarration = gmResponse.narration;
       gmStateChanges = gmResponse.state_changes ?? [];
       gmQuestUpdate = gmResponse.quest_update;
+      // GM이 새로 소개한 NPC를 is_introduced=true로 업데이트
+      if (gmResponse.npc_introduced?.length) {
+        const toIntroduce = npcs.filter((n) => gmResponse.npc_introduced!.includes(n.name) && !n.is_introduced);
+        if (toIntroduce.length > 0) {
+          await supabase
+            .from("NPC_Persona")
+            .update({ is_introduced: true })
+            .in("id", toIntroduce.map((n) => n.id));
+        }
+      }
       gmItemObtained = gmResponse.item_obtained ?? null;
       gmStatGrowth = gmResponse.stat_growth ?? null;
       gmFailurePenalty = gmResponse.failure_penalty ?? null;
@@ -516,18 +530,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── NPC 방관자 반응 ───────────────────────────────────────────────────────
+    // ── NPC 방관자 반응 (소개된 NPC 중 최대 2명) ─────────────────────────────
     const targetedNpcIds = new Set(targetedNpcs.map((n) => n.id));
-    const bystanders = npcs.filter((n) => !targetedNpcIds.has(n.id));
+    const bystanders = introducedNpcs.filter((n) => !targetedNpcIds.has(n.id));
     if (bystanders.length > 0 && geminiSucceeded) {
       try {
-        const reactingIds = await evaluateBystanderReactions(
+        const allReactingIds = await evaluateBystanderReactions(
           action_content,
           bystanders.map((npc) => ({
             npc,
             dynamicState: updatedDynamicStates[npc.id] ?? null,
           }))
         );
+        const reactingIds = allReactingIds.slice(0, 2);
         for (const npcId of reactingIds) {
           const npc = bystanders.find((n) => n.id === npcId);
           if (!npc) continue;

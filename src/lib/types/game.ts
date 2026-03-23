@@ -187,6 +187,8 @@ export interface NpcPersona {
   camaraderie_threshold: number;
   // v3: 세계관 지식 접근 레벨 (1=평민, 5=학자/귀족, 10=극비)
   knowledge_level: number;
+  // v4: 플레이어에게 소개된 여부 (false이면 GM 서사로 소개 전까지 반응 불가)
+  is_introduced: boolean;
   created_at: string;
 }
 

@@ -80,6 +80,7 @@ interface GmRawResponse {
   failure_penalty?: FailurePenalty | null;
   failure_twist?: string | null;
   stat_growth?: { stat: string; delta: number; reason?: string } | null;
+  npc_introduced?: string[] | null;
 }
 
 export interface NpcEmotionDelta {
@@ -105,6 +106,8 @@ export interface GmActionInput {
   objectives?: ScenarioObjectives | null;
   scenePhase?: ScenePhase;
   storyBlueprint?: StoryBlueprint | null;
+  introducedNpcs?: Array<{ name: string; role: string }>;
+  unintroducedNpcs?: Array<{ name: string; role: string }>;
 }
 
 export type { GmRawResponse };
@@ -299,6 +302,12 @@ outcome이 "failure" 또는 "partial"일 때만 적용한다.
 - 매 턴마다 주지 말 것. 세션 전체에서 2~4회 정도만 의미 있게 부여하라.
 - 해당 없으면 반드시 생략하거나 null로 남겨라.
 
+## npc_introduced 규칙
+- 이번 서사에서 "아직 미등장 NPC" 중 처음으로 등장시킨 NPC가 있다면, 그 이름을 npc_introduced 배열에 담아 반환하라.
+- 이번 서사에서 새로 소개한 NPC가 없으면 npc_introduced는 생략하거나 null로 남겨라.
+- 미등장 NPC를 소개할 때는 반드시 GM 서사에서 자연스럽게 첫 등장 묘사를 포함하라.
+- 한 번에 소개하는 NPC는 1명으로 제한하라.
+
 ## 제약
 - JSON 이외의 텍스트를 출력하지 마십시오.
 - outcome 필드는 반환하지 마십시오. 판정 결과는 이미 서버에서 확정되었습니다.
@@ -355,6 +364,23 @@ function buildScenePhaseSection(phase?: string): string {
   return `\n## 현재 씬 페이즈: ${phase}\n나레이션 톤 지시: ${tone}\n`;
 }
 
+function buildNpcStatusSection(
+  introduced?: Array<{ name: string; role: string }>,
+  unintroduced?: Array<{ name: string; role: string }>
+): string {
+  if (!introduced && !unintroduced) return "";
+  const lines = ["\n## 등장인물 현황"];
+  if (introduced && introduced.length > 0) {
+    lines.push(`이미 등장한 NPC (대화/반응 가능): ${introduced.map((n) => n.name).join(", ")}`);
+  } else {
+    lines.push("이미 등장한 NPC: 없음");
+  }
+  if (unintroduced && unintroduced.length > 0) {
+    lines.push(`아직 미등장 NPC (GM 서사로 소개 전까지 절대 등장 불가): ${unintroduced.map((n) => n.name).join(", ")}`);
+  }
+  return lines.join("\n") + "\n";
+}
+
 function buildBlueprintSection(blueprint?: StoryBlueprint | null, scenePhase?: ScenePhase): string {
   if (!blueprint) return "";
   const phaseToAct: Record<ScenePhase, number> = {
@@ -386,7 +412,7 @@ function buildBlueprintSection(blueprint?: StoryBlueprint | null, scenePhase?: S
 }
 
 function buildContext(input: GmActionInput): string {
-  const { fixedTruths, recentLogs, actingPlayer, action, diceRoll, outcome, npcEmotionDeltas, sessionSummary, questTracker, objectives, scenePhase, storyBlueprint } = input;
+  const { fixedTruths, recentLogs, actingPlayer, action, diceRoll, outcome, npcEmotionDeltas, sessionSummary, questTracker, objectives, scenePhase, storyBlueprint, introducedNpcs, unintroducedNpcs } = input;
 
   const fixedTruthsText =
     Object.keys(fixedTruths).length > 0
@@ -416,7 +442,7 @@ function buildContext(input: GmActionInput): string {
     ? `\n## 캐릭터 성향 (next_choices 생성 시 참고)\n${actingPlayer.personality_summary}\n`
     : "";
 
-  return `${fixedTruthsText}${sessionSummarySection}${buildBlueprintSection(storyBlueprint, scenePhase)}${buildQuestSection(questTracker, objectives)}${buildScenePhaseSection(scenePhase)}
+  return `${fixedTruthsText}${sessionSummarySection}${buildBlueprintSection(storyBlueprint, scenePhase)}${buildNpcStatusSection(introducedNpcs, unintroducedNpcs)}${buildQuestSection(questTracker, objectives)}${buildScenePhaseSection(scenePhase)}
 ## 최근 행동 기록 (최신 10개)
 ${recentHistory}
 
