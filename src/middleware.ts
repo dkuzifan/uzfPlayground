@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
 // 인증 없이 접근 가능한 경로
 const PUBLIC_PATHS = ["/login", "/auth/callback", "/pin", "/api/auth/verify-pin"];
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 공개 경로는 그대로 통과
@@ -25,7 +25,6 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          // request.cookies.set은 객체 형태로만 options 지원
           cookiesToSet.forEach(({ name, value, options }) =>
             request.cookies.set({ name, value, ...options })
           );

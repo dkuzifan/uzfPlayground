@@ -52,7 +52,7 @@ function PinForm() {
     });
 
     if (res.ok) {
-      router.replace(next);
+      window.location.replace(next);
     } else {
       const data = await res.json();
       setErrorMsg(data.error ?? "잘못된 PIN입니다.");
