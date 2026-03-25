@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { generateChoices } from "@/lib/trpg/game/choice-generator";
-import { computeDynamicDC, defaultResistanceStats } from "@/lib/trpg/game/dc-calculator";
-import type { ActionChoice, RawPlayer, NpcPersona, GameSession } from "@/lib/trpg/types/game";
+import { computeDynamicDC, defaultResistanceStats, computePosition } from "@/lib/trpg/game/dc-calculator";
+import type { ActionChoice, RawPlayer, NpcPersona, GameSession, Position } from "@/lib/trpg/types/game";
 import type { PersonalityProfile, ResistanceStats, NpcDynamicState } from "@/lib/trpg/types/character";
 import type { ActionCategory } from "@/lib/trpg/game/dc-calculator";
 
@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
       ? ((session.npc_dynamic_states as Record<string, NpcDynamicState>)[primaryNpc.id] ?? null)
       : null;
     const environment = session?.session_environment ?? null;
+    const position: Position = computePosition(dynamicState, null);
 
     try {
       const rawChoices = await generateChoices(
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
           : defaultResistanceStats().mental_willpower;
         return {
           ...choice,
-          dice_check: { ...choice.dice_check, dc: realDc },
+          dice_check: { ...choice.dice_check, dc: realDc, position },
         };
       });
 

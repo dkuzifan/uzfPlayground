@@ -6,6 +6,7 @@
 // ============================================================
 
 import type { ResistanceStats, NpcDynamicState } from "@/lib/trpg/types/character";
+import type { Position } from "@/lib/trpg/types/game";
 
 export type ActionCategory =
   | "attack"    // 물리적 공격
@@ -185,6 +186,25 @@ export function computeStatModifier(
   }
 
   return 0; // 해당 카테고리에 맞는 스탯 없음 → 보정 없음
+}
+
+// ── 포지션 계산 ────────────────────────────────────────────────────────
+
+export function computePosition(
+  dynamicState: NpcDynamicState | null | undefined,
+  scenePhase?: string | null
+): Position {
+  // 클라이맥스 씬은 항상 Desperate
+  if (scenePhase === "climax") return "desperate";
+
+  if (dynamicState) {
+    // Controlled: NPC가 우호적이고 신뢰함
+    if (dynamicState.affinity > 30 && dynamicState.trust > 20) return "controlled";
+    // Desperate: NPC가 불신하거나 전혀 두려워하지 않음
+    if (dynamicState.trust < -30 || dynamicState.fear_survival < 20) return "desperate";
+  }
+
+  return "risky";
 }
 
 // ── 레거시 폴백 ────────────────────────────────────────────────────────

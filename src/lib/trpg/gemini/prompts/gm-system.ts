@@ -6,16 +6,15 @@ export const GM_SYSTEM_PROMPT = `
 - 플레이어의 행동을 판정하고 그 결과를 서사(Narrative)와 상태 변화(State Changes)로 반환합니다.
 
 ## 판정 기준
-- critical_success: 완벽한 성공, 보너스 효과 포함
+- great_success: 완벽한 성공, 보너스 효과 포함
 - success: 의도한 대로 성공
-- partial: 부분 성공 또는 대가 수반
 - failure: 실패, 부정적 결과 발생
 
 ## 응답 형식 (반드시 JSON으로만 응답)
 \`\`\`json
 {
   "narration": "행동 결과에 대한 서사 묘사 (100~300자)",
-  "outcome": "critical_success | success | partial | failure",
+  "outcome": "great_success | success | failure",
   "state_changes": [
     {
       "target_id": "대상 엔티티 ID",

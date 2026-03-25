@@ -3,7 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { runGmAction } from "@/lib/trpg/gemini/gm-agent";
 import { runNpcDialogue } from "@/lib/trpg/gemini/npc-agent";
 import { getNextTurn } from "@/lib/trpg/game/turn-manager";
-import { computeDynamicDC, computeStatModifier, defaultResistanceStats } from "@/lib/trpg/game/dc-calculator";
+import { computeDynamicDC, computeStatModifier, defaultResistanceStats, computePosition } from "@/lib/trpg/game/dc-calculator";
 import { applyTasteModifiers, buildBaseDeltas } from "@/lib/trpg/game/taste-modifier-engine";
 import { runMemorySummarize } from "@/lib/trpg/game/memory-pipeline";
 import { scanAndExtractLore } from "@/lib/trpg/game/lore-engine";
@@ -11,7 +11,7 @@ import { applyObjectiveUpdate, tickDoomClock, evaluateEndings, applyEnding, deri
 import { evaluateTriggers, markTriggerFired } from "@/lib/trpg/game/npc-trigger-engine";
 import { runNpcAutonomousAction, evaluateBystanderReactions } from "@/lib/trpg/gemini/npc-agent";
 import type { WorldDictionaryEntry } from "@/lib/trpg/game/lore-engine";
-import type { ActionOutcome, DiceRoll, HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory, ActionChoice, ScenarioObjectives, ScenarioEndings, ScenePhase } from "@/lib/trpg/types/game";
+import type { ActionOutcome, DiceRoll, HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory, ActionChoice, ScenarioObjectives, ScenarioEndings, ScenePhase, Position } from "@/lib/trpg/types/game";
 import type { NpcDynamicState } from "@/lib/trpg/types/character";
 import type { ActionCategory } from "@/lib/trpg/game/dc-calculator";
 import type { NpcEmotionDelta } from "@/lib/trpg/gemini/gm-agent";
@@ -157,11 +157,16 @@ export async function POST(req: NextRequest) {
       : 0;
     const total = d20 + modifier;
 
+    const statLevel: "low" | "normal" | "high" = modifier <= -1 ? "low" : modifier >= 1 ? "high" : "normal";
+    const succeeded = d20 === 20 || total >= verifiedDc;
     let outcome: ActionOutcome;
-    if (d20 === 20)                outcome = "critical_success";
-    else if (total >= verifiedDc + 5) outcome = "success";
-    else if (total >= verifiedDc)     outcome = "partial";
-    else                              outcome = "failure";
+    if (!succeeded) {
+      outcome = "failure";
+    } else if (statLevel === "high" && (total >= verifiedDc + 5 || d20 === 20)) {
+      outcome = "great_success";
+    } else {
+      outcome = "success";
+    }
 
     const diceRoll: DiceRoll = { rolled: d20, modifier, total, label: "판정" };
 
@@ -182,6 +187,11 @@ export async function POST(req: NextRequest) {
     let updatedDynamicStates = (session.npc_dynamic_states ?? {}) as Record<string, NpcDynamicState>;
     const npcEmotionDeltas: NpcEmotionDelta[] = [];
 
+    const primaryNpcDynState = targetedNpcs.length > 0
+      ? (updatedDynamicStates[targetedNpcs[0].id] ?? null)
+      : null;
+    const position: Position = computePosition(primaryNpcDynState, session.scene_phase);
+
     if (targetedNpcs.length > 0) {
       // action_category → buildBaseDeltas actionType 변환 (NPC 공통)
       const mappedActionType = (action_category === "gift" ? "gift"
@@ -192,7 +202,7 @@ export async function POST(req: NextRequest) {
         : "neutral") as Parameters<typeof buildBaseDeltas>[0];
 
       for (const npc of targetedNpcs) {
-        const baseDeltas = buildBaseDeltas(mappedActionType, outcome);
+        const baseDeltas = buildBaseDeltas(mappedActionType, outcome, position);
         const { modifiedDeltas } = applyTasteModifiers(
           action_content,
           npc.taste_preferences ?? [],
@@ -265,6 +275,7 @@ export async function POST(req: NextRequest) {
         actionType: action_type as "choice" | "free_input",
         diceRoll,
         outcome,
+        position,
         npcEmotionDeltas: npcEmotionDeltas.length > 0 ? npcEmotionDeltas : undefined,
         sessionSummary,
         questTracker: session.quest_tracker,
@@ -327,7 +338,7 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", session_id);
-      return NextResponse.json({ rolled: d20, modifier, total, dc: verifiedDc, outcome, gm_error: true });
+      return NextResponse.json({ rolled: d20, modifier, total, dc: verifiedDc, outcome, position, gm_error: true });
     }
 
     // ── HP 변환 + GM Action_Log INSERT ────────────────────────────────────────
@@ -489,9 +500,8 @@ export async function POST(req: NextRequest) {
         }));
 
       const outcomeLabel: Record<string, string> = {
-        critical_success: "크리티컬 성공",
+        great_success: "대성공",
         success: "성공",
-        partial: "부분 성공",
         failure: "실패",
       };
       const npcContext = `[GM 서술 / 판정 결과: ${outcomeLabel[outcome ?? ""] ?? outcome}] ${gmNarration}\n[플레이어 행동] ${action_content}`;
@@ -684,7 +694,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ rolled: d20, modifier, total, dc: verifiedDc, outcome, next_choices: gmNextChoices, session_ended: sessionEnded });
+    return NextResponse.json({ rolled: d20, modifier, total, dc: verifiedDc, outcome, position, next_choices: gmNextChoices, session_ended: sessionEnded });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

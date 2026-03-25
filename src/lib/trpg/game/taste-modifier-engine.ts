@@ -10,6 +10,7 @@
 // ============================================================
 
 import type { TastePreference, TasteModifiers } from "@/lib/trpg/types/character";
+import type { Position } from "@/lib/trpg/types/game";
 
 // 감정 변화량 기본값 타입 (System GM이 산출한 1차 결과)
 export interface EmotionDeltas {
@@ -137,20 +138,29 @@ export function applyTasteModifiers(
 // System GM의 판정 결과나 행동 유형에 따라 기본 감정 변화량을 산출
 export function buildBaseDeltas(
   actionType: "attack" | "threaten" | "persuade" | "gift" | "deceive" | "neutral",
-  outcome: "critical_success" | "success" | "partial" | "failure" | null
+  outcome: "great_success" | "success" | "failure" | null,
+  position: Position = "risky"
 ): EmotionDeltas {
+  const failureMultiplier = position === "desperate" ? 0.6
+    : position === "controlled" ? 0.1
+    : 0.3;
+
   const outcomeMultiplier: Record<string, number> = {
-    critical_success: 1.5,
+    great_success: 1.5,
     success: 1.0,
-    partial: 0.5,
-    failure: 0.3,
+    failure: failureMultiplier,
   };
   const mult = outcome ? (outcomeMultiplier[outcome] ?? 1.0) : 1.0;
 
   const baseMap: Record<string, EmotionDeltas> = {
     attack:   { affinity_delta: -20 * mult, stress_delta: 10 * mult, fear_delta: 25 * mult },
     threaten: { affinity_delta: -15 * mult, stress_delta: 20 * mult, fear_delta: 30 * mult },
-    persuade: { affinity_delta: 10 * mult,  stress_delta: -5 * mult, fear_delta: -5 * mult, trust_delta: 8 * mult },
+    persuade: {
+      affinity_delta: 10 * mult + (outcome === "success" && position === "desperate" ? -4 : 0),
+      stress_delta: -5 * mult + (outcome === "success" && position === "desperate" ? 4 : 0),
+      fear_delta: -5 * mult,
+      trust_delta: 8 * mult + (outcome === "success" && position === "desperate" ? -3 : 0),
+    },
     gift:     { affinity_delta: 15 * mult,  stress_delta: -10 * mult, fear_delta: 0 },
     deceive:  { affinity_delta: 5 * mult,   stress_delta: 5 * mult,  fear_delta: 0, trust_delta: -10 * mult },
     neutral:  { affinity_delta: 0, stress_delta: 0, fear_delta: 0 },

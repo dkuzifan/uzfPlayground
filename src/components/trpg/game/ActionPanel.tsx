@@ -91,9 +91,21 @@ export default function ActionPanel({
                     {choice.label}
                   </span>
                   {choice.dice_check && (
-                    <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
-                      🎲 {choice.dice_check.check_label ?? "판정 필요"}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {choice.dice_check.position === "desperate" && (
+                        <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-semibold text-red-600 dark:bg-red-400/10 dark:text-red-400">
+                          불리
+                        </span>
+                      )}
+                      {choice.dice_check.position === "controlled" && (
+                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400">
+                          유리
+                        </span>
+                      )}
+                      <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                        🎲 {choice.dice_check.check_label ?? "판정 필요"}
+                      </span>
+                    </div>
                   )}
                 </div>
                 <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">
@@ -132,9 +144,21 @@ export default function ActionPanel({
                   {choice.label}
                 </span>
                 {choice.dice_check && (
-                  <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:bg-amber-400/15 dark:text-amber-400">
-                    🎲 {choice.dice_check.check_label ?? "판정 필요"}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {choice.dice_check.position === "desperate" && (
+                      <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-semibold text-red-600 dark:bg-red-400/10 dark:text-red-400">
+                        불리
+                      </span>
+                    )}
+                    {choice.dice_check.position === "controlled" && (
+                      <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400">
+                        유리
+                      </span>
+                    )}
+                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:bg-amber-400/15 dark:text-amber-400">
+                      🎲 {choice.dice_check.check_label ?? "판정 필요"}
+                    </span>
+                  </div>
                 )}
               </div>
               <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">

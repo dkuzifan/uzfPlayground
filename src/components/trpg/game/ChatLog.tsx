@@ -11,23 +11,17 @@ const OUTCOME_STYLE: Record<
   string,
   { border: string; text: string; shadow: string; label: string }
 > = {
-  critical_success: {
+  great_success: {
     border: "border-yellow-400",
     text: "text-yellow-600 dark:text-yellow-400",
     shadow: "shadow-yellow-400/40",
-    label: "⚡ 크리티컬 성공",
+    label: "⚡ 대성공",
   },
   success: {
     border: "border-green-500",
     text: "text-green-600 dark:text-green-400",
     shadow: "shadow-green-400/30",
     label: "✦ 성공",
-  },
-  partial: {
-    border: "border-orange-400",
-    text: "text-orange-600 dark:text-orange-400",
-    shadow: "shadow-orange-400/30",
-    label: "◈ 부분 성공",
   },
   failure: {
     border: "border-red-500",
@@ -38,7 +32,7 @@ const OUTCOME_STYLE: Record<
 };
 
 function DiceRollCard({ dice, outcome }: { dice: DiceRoll; outcome: string | null }) {
-  const style = OUTCOME_STYLE[outcome ?? "partial"] ?? OUTCOME_STYLE.partial;
+  const style = OUTCOME_STYLE[outcome ?? "failure"] ?? OUTCOME_STYLE.failure;
   return (
     <div
       className={`mt-2 rounded-lg border ${style.border} bg-black/10 p-3 shadow-lg dark:bg-black/30 ${style.shadow}`}

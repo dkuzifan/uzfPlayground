@@ -38,11 +38,12 @@ export type ActionType =
   | "lore_discovery";
 
 export type ActionOutcome =
-  | "critical_success"
+  | "great_success"
   | "success"
-  | "partial"
   | "failure"
   | null;
+
+export type Position = "controlled" | "risky" | "desperate";
 
 export type ScenarioTheme = "fantasy" | "mystery" | "horror" | "sci-fi";
 
@@ -307,6 +308,7 @@ export interface DiceRoll {
 export interface DiceCheckInfo {
   dc: number;
   check_label: string;  // "전투 판정", "설득 판정" 등
+  position?: Position;
 }
 
 export interface DiceResolveResult {
@@ -362,6 +364,7 @@ export interface ActionChoice {
     dc: number;
     check_label: string;
     action_category: string;
+    position?: Position;
   };
 }
 

@@ -1,5 +1,5 @@
 import { getGeminiModel } from "@/lib/ai/gemini";
-import type { ActionLog, ActionOutcome, ActionChoice, DiceRoll, RawPlayer, QuestTracker, ScenarioObjectives, ScenePhase, StoryBlueprint, StoryAct } from "@/lib/trpg/types/game";
+import type { ActionLog, ActionOutcome, ActionChoice, DiceRoll, RawPlayer, QuestTracker, ScenarioObjectives, ScenePhase, StoryBlueprint, StoryAct, Position } from "@/lib/trpg/types/game";
 import type { ActionCategory } from "@/lib/trpg/game/dc-calculator";
 import type { GmObjectiveUpdate } from "@/lib/trpg/game/objective-engine";
 
@@ -100,6 +100,7 @@ export interface GmActionInput {
   actionType: "choice" | "free_input";
   diceRoll?: DiceRoll;
   outcome?: ActionOutcome;
+  position?: Position;
   npcEmotionDeltas?: NpcEmotionDelta[];
   sessionSummary?: string;
   questTracker?: QuestTracker | null;
@@ -274,7 +275,7 @@ ${scenarioSystemPrompt}
 - 예: "낡은 열쇠", "비밀 메모", "마법 포션", "금화 5개"
 
 ## 실패 설계 규칙 (failure_penalty + failure_twist)
-outcome이 "failure" 또는 "partial"일 때만 적용한다.
+outcome이 "failure"일 때만 적용한다.
 
 ### failure_penalty (실질적 손해)
 - doom_delta: Doom Clock 추가 증가량 (1~2 정수). 실패가 위기를 앞당길 때. 사소한 실패면 생략.
@@ -287,7 +288,7 @@ outcome이 "failure" 또는 "partial"일 때만 적용한다.
 - "하지만 ~했다", "그러나 ~가 눈에 들어왔다" 형식으로.
 - 예: "문은 잠겼지만, 안에서 비명 소리가 들렸다."
 - 예: "설득은 실패했지만, 상인이 당신의 배짱에 흥미를 보였다."
-- outcome이 "success" 또는 "critical_success"면 반드시 생략.
+- outcome이 "success" 또는 "great_success"면 반드시 생략.
 
 ## scene_phase_transition 규칙
 - 컨텍스트에 "현재 씬 페이즈"가 있을 때만 적용한다.
@@ -418,7 +419,7 @@ function buildBlueprintSection(blueprint?: StoryBlueprint | null, scenePhase?: S
 }
 
 function buildContext(input: GmActionInput): string {
-  const { fixedTruths, recentLogs, actingPlayer, action, diceRoll, outcome, npcEmotionDeltas, sessionSummary, questTracker, objectives, scenePhase, storyBlueprint, introducedNpcs, unintroducedNpcs } = input;
+  const { fixedTruths, recentLogs, actingPlayer, action, diceRoll, outcome, position, npcEmotionDeltas, sessionSummary, questTracker, objectives, scenePhase, storyBlueprint, introducedNpcs, unintroducedNpcs } = input;
 
   const fixedTruthsText =
     Object.keys(fixedTruths).length > 0
@@ -434,14 +435,19 @@ function buildContext(input: GmActionInput): string {
     "(아직 행동 기록 없음)";
 
   const outcomeLabel: Record<string, string> = {
-    critical_success: "크리티컬 성공",
+    great_success: "대성공",
     success: "성공",
-    partial: "부분 성공",
     failure: "실패",
   };
 
+  const positionLabel: Record<string, string> = {
+    controlled: "유리한 상황 (Controlled)",
+    risky: "보통 상황 (Risky)",
+    desperate: "불리한 상황 (Desperate)",
+  };
+
   const diceSection = diceRoll && outcome
-    ? `## 판정 결과 (서버 확정)\n- 주사위: d20=${diceRoll.rolled} + 보너스=${diceRoll.modifier} = ${diceRoll.total}\n- 결과: ${outcomeLabel[outcome] ?? outcome}\n\n위 판정 결과에 맞는 나레이션과 HP 상태 변화를 반환하라.`
+    ? `## 판정 결과 (서버 확정)\n- 주사위: d20=${diceRoll.rolled} + 보너스=${diceRoll.modifier} = ${diceRoll.total}\n- 결과: ${outcomeLabel[outcome] ?? outcome}\n- 포지션: ${position ? positionLabel[position] : "보통 상황 (Risky)"}\n\n위 판정 결과에 맞는 나레이션을 작성하라. Desperate 포지션 성공 시 대가나 합병증을 포함하라. Desperate 포지션 실패 시 혹독한 결과를 서술하라. Controlled 포지션 실패 시 가볍게 처리하라.`
     : `## 판정 없음\n이 행동은 주사위 판정 없이 자연스럽게 진행되었다. 행동 결과를 자연스럽게 서사로만 묘사하라. HP 변화가 없으면 state_changes는 []로 반환하라.`;
 
   const personalitySection = actingPlayer.personality_summary
