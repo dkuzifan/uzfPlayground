@@ -111,7 +111,7 @@ export default function GamePage() {
               )}
             </div>
           )}
-          <ChatLog logs={logs} />
+          <ChatLog logs={logs} myPlayerId={myPlayer?.id} />
           <ActionPanel
             isMyTurn={isMyTurn}
             currentTurnName={currentTurnPlayer?.player_name ?? ""}

@@ -40,6 +40,7 @@ export async function POST(request: Request) {
     objectives,
     endings,
     character_config,
+    game_rules,
     lore_items,
   } = body as {
     title?: string;
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
     objectives?: ScenarioObjectives;
     endings?: ScenarioEndings;
     character_config?: CharacterConfig;
+    game_rules?: Record<string, unknown>;
     lore_items?: LoreItemInput[];
   };
 
@@ -91,6 +93,7 @@ export async function POST(request: Request) {
       objectives: objectives ?? null,
       endings: endings ?? null,
       character_config: character_config ?? null,
+      game_rules: game_rules ?? null,
       is_active: true,
     })
     .select("id, title, theme, description, max_players, character_creation_config")

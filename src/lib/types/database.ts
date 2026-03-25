@@ -27,6 +27,7 @@ export interface Database {
           objectives: ScenarioObjectives | null;
           endings: ScenarioEndings | null;
           character_config: CharacterConfig | null;
+          game_rules: Record<string, unknown> | null;
           created_at: string;
           updated_at: string;
         };
@@ -49,6 +50,7 @@ export interface Database {
           objectives?: ScenarioObjectives | null;
           endings?: ScenarioEndings | null;
           character_config?: CharacterConfig | null;
+          game_rules?: Record<string, unknown> | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -287,6 +289,7 @@ export interface Database {
           content: string;
           outcome: string | null;
           state_changes: Record<string, unknown>;
+          is_private: boolean;
           created_at: string;
         };
         Insert: {
@@ -300,6 +303,7 @@ export interface Database {
           content: string;
           outcome?: string | null;
           state_changes?: Record<string, unknown>;
+          is_private?: boolean;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["Action_Log"]["Insert"]>;

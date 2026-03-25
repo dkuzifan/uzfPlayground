@@ -5,6 +5,7 @@ import type { ActionLog, DiceRoll, HpChange } from "@/lib/trpg/types/game";
 
 interface Props {
   logs: ActionLog[];
+  myPlayerId?: string;
 }
 
 const OUTCOME_STYLE: Record<
@@ -83,7 +84,7 @@ function HpChangeCard({ changes }: { changes: HpChange[] }) {
   );
 }
 
-export default function ChatLog({ logs }: Props) {
+export default function ChatLog({ logs, myPlayerId }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -100,6 +101,9 @@ export default function ChatLog({ logs }: Props) {
         )}
 
         {logs.map((log) => {
+          // Private log filtering: hide other players' private logs
+          if (log.is_private && log.speaker_id !== myPlayerId) return null;
+
           if (log.speaker_type === "system") {
             const statGrowth = (log.state_changes as { stat_growth?: { stat: string; delta: number } }).stat_growth;
             if (statGrowth) {
@@ -116,6 +120,9 @@ export default function ChatLog({ logs }: Props) {
             return (
               <div key={log.id} className="py-1 text-center text-xs text-neutral-500">
                 — {log.content} —
+                {log.is_private && (
+                  <span className="text-xs text-neutral-400 dark:text-neutral-500 ml-1">🔒</span>
+                )}
               </div>
             );
           }
@@ -196,6 +203,9 @@ export default function ChatLog({ logs }: Props) {
                 <div className="w-full max-w-[90%] rounded-xl border border-violet-300/60 bg-violet-50/80 px-4 py-3 dark:border-violet-500/30 dark:bg-violet-500/10">
                   <p className="mb-1.5 text-xs font-semibold text-violet-600 dark:text-violet-400">
                     📜 세계관 단서 발견
+                    {log.is_private && (
+                      <span className="text-xs text-neutral-400 dark:text-neutral-500 ml-1">🔒</span>
+                    )}
                   </p>
                   <p className="whitespace-pre-line text-sm text-violet-900 dark:text-violet-200">
                     {log.content}

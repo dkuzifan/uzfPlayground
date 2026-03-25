@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { ScenarioSummary } from "./ScenarioSelectStep";
-import type { ObjectiveType, EndingTrigger, EndingTone, ScenarioObjectives, ScenarioEndings, JobDefinition, CharacterConfig } from "@/lib/trpg/types/game";
+import type { ObjectiveType, EndingTrigger, EndingTone, ScenarioObjectives, ScenarioEndings, JobDefinition, CharacterConfig, GameRules } from "@/lib/trpg/types/game";
 import type { StatSchemaEntry } from "@/lib/trpg/types/character";
 import { normalizeStatSchema } from "@/lib/trpg/types/character";
 
@@ -19,6 +19,7 @@ export interface ScenarioInitialData {
   objectives?: ScenarioObjectives | null;
   endings?: ScenarioEndings | null;
   character_config?: CharacterConfig | null;
+  game_rules?: GameRules | null;
   lore_items?: LoreItem[];
 }
 
@@ -28,7 +29,7 @@ interface Props {
   initialData?: ScenarioInitialData;
 }
 
-type SubStep = "basic" | "jobs" | "prompt" | "objectives" | "character" | "lore";
+type SubStep = "basic" | "jobs" | "prompt" | "objectives" | "character" | "lore" | "rules";
 
 interface JobConfig {
   job: string;
@@ -148,8 +149,9 @@ const SUB_STEP_LABELS: Record<SubStep, string> = {
   objectives: "게임 목표",
   character: "캐릭터 설정",
   lore: "세계관 Lore",
+  rules: "게임 룰",
 };
-const SUB_STEPS: SubStep[] = ["basic", "jobs", "prompt", "objectives", "character", "lore"];
+const SUB_STEPS: SubStep[] = ["basic", "jobs", "prompt", "objectives", "character", "lore", "rules"];
 
 function defaultEndings(): EndingForm[] {
   return [
@@ -216,6 +218,8 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
 
   // Step F: Lore
   const [loreItems, setLoreItems] = useState<LoreItem[]>([]);
+  // Step G: Rules
+  const [usePrivateInfo, setUsePrivateInfo] = useState(false);
   const [generatingLore, setGeneratingLore] = useState(false);
   const [loreError, setLoreError] = useState<string | null>(null);
   const [editingLoreIdx, setEditingLoreIdx] = useState<number | null>(null);
@@ -297,6 +301,11 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
     // Lore 복원
     if (initialData.lore_items?.length) {
       setLoreItems(initialData.lore_items);
+    }
+
+    // 게임 룰 복원
+    if (initialData.game_rules?.info_rules) {
+      setUsePrivateInfo(initialData.game_rules.info_rules.use_private_info);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData]);
@@ -582,6 +591,9 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
             ? { stat_schema: statSchema, jobs: jobDefs }
             : null,
           lore_items: loreItems.filter((l) => l.lore_text.trim()),
+          game_rules: {
+            info_rules: { use_private_info: usePrivateInfo },
+          },
         }),
       });
       const data = await res.json();
@@ -1390,12 +1402,6 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
             + Lore 항목 직접 추가
           </button>
 
-          {saveError && (
-            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-500 dark:text-red-400">
-              {saveError}
-            </p>
-          )}
-
           <div className="flex gap-2 pt-1">
             <button
               onClick={() => setSubStep("character")}
@@ -1404,12 +1410,60 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
               ← 이전
             </button>
             <button
-              onClick={handleSave} disabled={saving}
-              className="flex-1 rounded-lg bg-neutral-900 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-40 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+              onClick={() => setSubStep("rules")}
+              className="flex-1 rounded-lg bg-neutral-900 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
             >
-              {saving ? "저장 중…" : "시나리오 저장"}
+              다음 →
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── Step G: 게임 룰 ── */}
+      {subStep === "rules" && (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-1">정보 공개 규칙</h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">
+              플레이어가 발견한 아이템과 단서를 다른 플레이어에게 숨길지 설정합니다.
+              추리 미스터리나 비밀이 중요한 시나리오에 적합합니다.
+            </p>
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <div className="relative mt-0.5">
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={usePrivateInfo}
+                  onChange={(e) => setUsePrivateInfo(e.target.checked)}
+                />
+                <div className={`w-10 h-6 rounded-full transition-colors ${usePrivateInfo ? "bg-indigo-600" : "bg-neutral-300 dark:bg-neutral-600"}`} />
+                <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${usePrivateInfo ? "translate-x-4" : ""}`} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-neutral-800 dark:text-neutral-200">비공개 정보 사용</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  ON: 아이템 획득, Lore 발견이 해당 플레이어에게만 표시됩니다. 본인 화면에는 🔒 표시가 붙습니다.
+                </p>
+              </div>
+            </label>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => setSubStep("lore")}
+              className="flex-1 rounded-lg border border-black/10 py-2 text-sm text-neutral-600 transition hover:bg-neutral-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5"
+            >
+              ← 이전
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
+            >
+              {saving ? "저장 중..." : "시나리오 저장"}
+            </button>
+          </div>
+          {saveError && <p className="text-sm text-red-500">{saveError}</p>}
         </div>
       )}
     </div>

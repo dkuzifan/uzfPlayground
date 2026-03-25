@@ -318,9 +318,9 @@ export function useGameScreen(sessionId: string, localId: string | null) {
             action_category: captured.action_category,
           }),
         });
-        const data = res.ok ? await res.json() : null;
+        const data = await res.json().catch(() => null);
         if (!res.ok) {
-          toast.error("주사위 결과 처리 중 오류가 발생했습니다.");
+          toast.error(data?.error ?? "주사위 결과 처리 중 오류가 발생했습니다.");
         } else if (data?.gm_error) {
           toast.warning("GM이 일시적으로 응답하지 않았습니다. 자동으로 진행됩니다.");
         }

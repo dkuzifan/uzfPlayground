@@ -11,7 +11,7 @@ import { applyObjectiveUpdate, tickDoomClock, evaluateEndings, applyEnding, deri
 import { evaluateTriggers, markTriggerFired } from "@/lib/trpg/game/npc-trigger-engine";
 import { runNpcAutonomousAction, evaluateBystanderReactions } from "@/lib/trpg/gemini/npc-agent";
 import type { WorldDictionaryEntry } from "@/lib/trpg/game/lore-engine";
-import type { ActionOutcome, DiceRoll, HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory, ActionChoice, ScenarioObjectives, ScenarioEndings, ScenePhase, Position } from "@/lib/trpg/types/game";
+import type { ActionOutcome, DiceRoll, HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory, ActionChoice, ScenarioObjectives, ScenarioEndings, ScenePhase, Position, GameRules } from "@/lib/trpg/types/game";
 import type { NpcDynamicState } from "@/lib/trpg/types/character";
 import type { ActionCategory } from "@/lib/trpg/game/dc-calculator";
 import type { NpcEmotionDelta } from "@/lib/trpg/gemini/gm-agent";
@@ -234,7 +234,7 @@ export async function POST(req: NextRequest) {
     // ── Gemini GM 서사 생성 ───────────────────────────────────────────────────
     const { data: scenarioRaw } = await supabase
       .from("Scenario")
-      .select("gm_system_prompt, fixed_truths, objectives, endings")
+      .select("gm_system_prompt, fixed_truths, objectives, endings, game_rules")
       .eq("id", session.scenario_id)
       .single() as unknown as {
         data: {
@@ -242,9 +242,12 @@ export async function POST(req: NextRequest) {
           fixed_truths: Record<string, unknown>;
           objectives: ScenarioObjectives | null;
           endings: ScenarioEndings | null;
+          game_rules: Record<string, unknown> | null;
         } | null;
       };
     const scenario = scenarioRaw;
+    const gameRules = (scenario?.game_rules ?? null) as GameRules | null;
+    const usePrivateInfo = gameRules?.info_rules?.use_private_info ?? false;
 
     // 씬 페이즈 계산
     const currentScenePhase = (session.scene_phase ?? "exploration") as ScenePhase;
@@ -441,8 +444,22 @@ export async function POST(req: NextRequest) {
         action_type: "system_event",
         content: `🎒 [${player.player_name}] 아이템 획득: ${gmItemObtained}`,
         outcome: null,
-        state_changes: { item_obtained: gmItemObtained },
+        state_changes: usePrivateInfo ? {} : { item_obtained: gmItemObtained },
       });
+      if (usePrivateInfo) {
+        await supabase.from("Action_Log").insert({
+          session_id,
+          turn_number: session.turn_number,
+          speaker_type: "system",
+          speaker_id: player_id,
+          speaker_name: "system",
+          action_type: "system_event",
+          content: `[아이템 획득] ${gmItemObtained}`,
+          outcome: null,
+          state_changes: { item_obtained: gmItemObtained },
+          is_private: true,
+        });
+      }
     }
 
     // ── 스탯 성장 처리 ───────────────────────────────────────────────────────
@@ -540,12 +557,13 @@ export async function POST(req: NextRequest) {
           session_id,
           turn_number: session.turn_number,
           speaker_type: "system",
-          speaker_id: null,
+          speaker_id: usePrivateInfo ? player_id : null,
           speaker_name: "세계관 단서",
           action_type: "lore_discovery",
           content: loreContext.currentLoreTexts.join("\n\n"),
           outcome: null,
           state_changes: {},
+          is_private: usePrivateInfo,
         });
       }
     }

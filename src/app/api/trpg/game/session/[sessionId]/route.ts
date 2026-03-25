@@ -29,6 +29,7 @@ type SessionWithScenario = {
     description: string | null;
     max_players: number;
     is_active: boolean;
+    game_rules: Record<string, unknown> | null;
     created_at: string;
     updated_at: string;
   } | null;

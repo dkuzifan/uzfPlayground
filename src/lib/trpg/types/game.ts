@@ -45,6 +45,14 @@ export type ActionOutcome =
 
 export type Position = "controlled" | "risky" | "desperate";
 
+export interface InfoRules {
+  use_private_info: boolean;
+}
+
+export interface GameRules {
+  info_rules?: InfoRules;
+}
+
 export type ScenarioTheme = "fantasy" | "mystery" | "horror" | "sci-fi";
 
 export type NpcRole = "enemy" | "ally" | "neutral" | "boss";
@@ -145,6 +153,7 @@ export interface Scenario {
   objectives?: ScenarioObjectives | null;
   endings?: ScenarioEndings | null;
   character_config?: CharacterConfig | null;
+  game_rules?: GameRules | null;
   created_at: string;
   updated_at: string;
 }
@@ -277,6 +286,7 @@ export interface ActionLog {
   content: string;
   outcome: ActionOutcome;
   state_changes: StateChanges;
+  is_private?: boolean;
   created_at: string;
 }
 
