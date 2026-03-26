@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import RoomCard from "@/components/trpg/lobby/RoomCard";
-import CreateRoomModal from "@/components/trpg/lobby/CreateRoomModal";
+import RoomCard from "@/components/tales/trpg/lobby/RoomCard";
+import CreateRoomModal from "@/components/tales/trpg/lobby/CreateRoomModal";
 import { useAuthProfile } from "@/hooks/useAuthProfile";
 import type { LobbySession } from "@/lib/types/lobby";
 
@@ -24,7 +24,7 @@ export default function LobbyPage() {
   const fetchSessions = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/trpg/sessions");
+      const res = await fetch("/api/tales/trpg/sessions");
       if (res.ok) setSessions(await res.json());
     } finally { setLoading(false); }
   }, []);

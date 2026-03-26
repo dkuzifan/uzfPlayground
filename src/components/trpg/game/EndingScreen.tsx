@@ -84,7 +84,7 @@ export default function EndingScreen({ endingId, endings, finalNarration, sessio
         <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
           {sessionId && (
             <Link
-              href={`/trpg/recap/${sessionId}`}
+              href={`/tales/trpg/recap/${sessionId}`}
               className="rounded-lg bg-white/20 px-8 py-3 text-sm font-medium text-white transition hover:bg-white/30 active:scale-95"
             >
               세션 리캡 보기

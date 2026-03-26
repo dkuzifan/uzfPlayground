@@ -43,7 +43,7 @@ export default function RoomCard({ session }: RoomCardProps) {
       if (res.status === 409) { alert(data.error ?? "이미 시작된 방입니다."); return; }
       if (!res.ok) { alert(data.error ?? "입장 확인에 실패했습니다."); return; }
       if (data.exists) {
-        router.push(`/trpg/lobby/${session.id}`);
+        router.push(`/tales/trpg/lobby/${session.id}`);
       } else {
         setJoinModal({ scenarioTitle: data.scenario?.title ?? session.scenario_title, config: data.scenario?.character_creation_config });
       }

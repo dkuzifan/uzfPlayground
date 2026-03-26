@@ -16,13 +16,23 @@ export default function HomePage() {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Link
-            href="/trpg"
+            href="/tales"
             className="group rounded-xl border border-black/10 bg-black/[0.04] p-6 text-left transition-colors hover:border-black/20 hover:bg-black/8 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20 dark:hover:bg-white/10"
           >
-            <div className="mb-3 text-2xl">⚔️</div>
-            <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-white">TRPG</h2>
+            <div className="mb-3 text-2xl">📖</div>
+            <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-white">Tales</h2>
             <p className="text-sm text-neutral-500 dark:text-neutral-400">
-              AI GM과 함께하는 멀티플레이어 텍스트 TRPG
+              텍스트와 AI로 펼쳐지는 이야기 공간
+            </p>
+          </Link>
+          <Link
+            href="/arena"
+            className="group rounded-xl border border-black/10 bg-black/[0.04] p-6 text-left transition-colors hover:border-black/20 hover:bg-black/8 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20 dark:hover:bg-white/10"
+          >
+            <div className="mb-3 text-2xl">🏟️</div>
+            <h2 className="mb-1 text-lg font-semibold text-neutral-900 dark:text-white">Arena</h2>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              데이터와 시뮬레이션으로 펼쳐지는 스포츠 공간
             </p>
           </Link>
         </div>

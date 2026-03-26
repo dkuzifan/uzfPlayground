@@ -115,7 +115,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
       try {
         const res = await fetch(`/api/trpg/game/session/${sessionId}`);
         if (res.status === 404 || res.status === 403) {
-          router.replace("/trpg/lobby");
+          router.replace("/tales/trpg/lobby");
           return;
         }
         const data = await res.json();
@@ -128,7 +128,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
 
         const me = (data.players as RawPlayer[]).find((p) => p.user_id === localId);
         if (!me) {
-          router.replace("/trpg/lobby");
+          router.replace("/tales/trpg/lobby");
           return;
         }
         setMyPlayer(me);
@@ -386,7 +386,7 @@ export function useGameScreen(sessionId: string, localId: string | null) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ localId }),
     });
-    router.replace("/trpg/lobby");
+    router.replace("/tales/trpg/lobby");
   }, [sessionId, localId, router]);
 
   // ── 저장 ──────────────────────────────────────────────────────────────

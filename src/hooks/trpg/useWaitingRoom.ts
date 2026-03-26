@@ -47,7 +47,7 @@ export function useWaitingRoom(sessionId: string, userId: string) {
 
       // 이미 in_progress면 바로 게임 화면으로
       if (session.status === "in_progress") {
-        router.push(`/trpg/game/${sessionId}`);
+        router.push(`/tales/trpg/game/${sessionId}`);
         return;
       }
 
@@ -122,7 +122,7 @@ export function useWaitingRoom(sessionId: string, userId: string) {
           (payload) => {
             const updated = payload.new as { status: string };
             if (updated.status === "in_progress") {
-              router.push(`/trpg/game/${sessionId}`);
+              router.push(`/tales/trpg/game/${sessionId}`);
             }
           }
         )

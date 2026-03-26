@@ -12,7 +12,7 @@ export default function TrpgHubPage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Link
-          href="/trpg/lobby"
+          href="/tales/trpg/lobby"
           className="rounded-xl border border-black/10 bg-black/[0.04] p-6 transition-colors hover:border-black/20 hover:bg-black/8 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20 dark:hover:bg-white/10"
         >
           <h2 className="mb-2 text-xl font-semibold text-neutral-900 dark:text-white">로비 입장</h2>
@@ -22,7 +22,7 @@ export default function TrpgHubPage() {
         </Link>
 
         <Link
-          href="/trpg/character/create"
+          href="/tales/trpg/character/create"
           className="rounded-xl border border-black/10 bg-black/[0.04] p-6 transition-colors hover:border-black/20 hover:bg-black/8 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20 dark:hover:bg-white/10"
         >
           <h2 className="mb-2 text-xl font-semibold text-neutral-900 dark:text-white">캐릭터 생성</h2>

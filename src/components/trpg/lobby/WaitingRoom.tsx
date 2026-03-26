@@ -36,7 +36,7 @@ export default function WaitingRoom({ sessionId, profile }: WaitingRoomProps) {
       });
       const data = await res.json();
       if (!res.ok) { setStartError(data.detail ?? data.error ?? "게임 시작에 실패했습니다."); return; }
-      router.push(`/trpg/game/${sessionId}`);
+      router.push(`/tales/trpg/game/${sessionId}`);
     } catch { setStartError("네트워크 오류가 발생했습니다."); }
     finally { setStarting(false); }
   }
@@ -54,7 +54,7 @@ export default function WaitingRoom({ sessionId, profile }: WaitingRoomProps) {
       {/* 헤더 */}
       <div className="mb-8">
         <button
-          onClick={() => router.push("/trpg/lobby")}
+          onClick={() => router.push("/tales/trpg/lobby")}
           className="mb-3 flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition"
         >
           ← 로비로
@@ -156,7 +156,7 @@ export default function WaitingRoom({ sessionId, profile }: WaitingRoomProps) {
           )}
 
           <button
-            onClick={() => router.push("/trpg/lobby")}
+            onClick={() => router.push("/tales/trpg/lobby")}
             className="w-full rounded-xl border border-black/10 py-2.5 text-sm text-neutral-600 transition hover:bg-neutral-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5"
           >
             방 나가기

@@ -2,7 +2,7 @@
 
 import { use, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import WaitingRoom from "@/components/trpg/lobby/WaitingRoom";
+import WaitingRoom from "@/components/tales/trpg/lobby/WaitingRoom";
 import { useAuthProfile } from "@/hooks/useAuthProfile";
 
 interface WaitingRoomPageProps {
@@ -48,19 +48,19 @@ function JoinAndShow({
 
   useEffect(() => {
     // auth 쿠키가 자동으로 전송되므로 별도 localId 불필요
-    fetch(`/api/trpg/sessions/${sessionId}/my-character`)
+    fetch(`/api/tales/trpg/sessions/${sessionId}/my-character`)
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
 
         if (res.status === 409) {
           // 이미 시작된 방
           alert(data.error ?? "이미 시작된 방입니다.");
-          router.replace("/trpg/lobby");
+          router.replace("/tales/trpg/lobby");
           return;
         }
         if (res.status === 404) {
           alert(data.error ?? "방을 찾을 수 없습니다.");
-          router.replace("/trpg/lobby");
+          router.replace("/tales/trpg/lobby");
           return;
         }
 
@@ -68,7 +68,7 @@ function JoinAndShow({
 
         // PC 없음 (직접 URL 접근 등) → 로비로 리다이렉트
         // 정상 흐름(RoomCard → JoinRoomModal)에선 여기 도달하지 않음
-        router.replace("/trpg/lobby");
+        router.replace("/tales/trpg/lobby");
       })
       .catch(() => {
         // 네트워크 오류는 무시하고 대기실 렌더 유지

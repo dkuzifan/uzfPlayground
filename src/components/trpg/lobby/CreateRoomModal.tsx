@@ -202,7 +202,7 @@ export default function CreateRoomModal({ open, onClose, profile, onSaveProfile,
       }
       sessionStorage.removeItem(DRAFT_KEY);
       onSaveProfile(characterData.characterName, avatarIndex);
-      router.push(`/trpg/lobby/${data.sessionId}`);
+      router.push(`/tales/trpg/lobby/${data.sessionId}`);
     } catch {
       setError("네트워크 오류가 발생했습니다.");
     } finally {

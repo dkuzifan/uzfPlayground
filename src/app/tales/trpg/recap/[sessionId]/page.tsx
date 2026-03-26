@@ -1,7 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import type { QuestTracker, ScenarioObjectives, ScenarioEndings, EndingCondition } from "@/lib/trpg/types/game";
-import type { NpcDynamicState, CharacterStats, PersonalityProfile } from "@/lib/trpg/types/character";
+import type { QuestTracker, ScenarioObjectives, ScenarioEndings, EndingCondition } from "@/lib/tales/trpg/types/game";
+import type { NpcDynamicState, CharacterStats, PersonalityProfile } from "@/lib/tales/trpg/types/character";
 
 interface PageProps {
   params: Promise<{ sessionId: string }>;
@@ -161,7 +161,7 @@ export default async function RecapPage({ params }: PageProps) {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <p className="mb-4 text-neutral-500">세션을 찾을 수 없습니다.</p>
-          <Link href="/trpg/lobby" className="text-sm text-teal-500 underline">로비로 돌아가기</Link>
+          <Link href="/tales/trpg/lobby" className="text-sm text-teal-500 underline">로비로 돌아가기</Link>
         </div>
       </div>
     );
@@ -184,7 +184,7 @@ export default async function RecapPage({ params }: PageProps) {
         {/* 헤더 */}
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <Link href="/trpg/lobby" className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200">← 로비</Link>
+            <Link href="/tales/trpg/lobby" className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200">← 로비</Link>
             <span className="text-xs text-neutral-300 dark:text-neutral-600">/</span>
             <span className="text-xs text-neutral-400">세션 리캡</span>
           </div>
@@ -441,7 +441,7 @@ export default async function RecapPage({ params }: PageProps) {
 
         {/* 하단 링크 */}
         <div className="pb-8 text-center">
-          <Link href="/trpg/lobby" className="text-sm text-teal-500 hover:underline">로비로 돌아가기</Link>
+          <Link href="/tales/trpg/lobby" className="text-sm text-teal-500 hover:underline">로비로 돌아가기</Link>
         </div>
 
       </div>

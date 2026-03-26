@@ -145,7 +145,7 @@ export default function JoinRoomModal({
       }
 
       onSaveProfile(characterData.characterName, avatarIndex);
-      router.push(`/trpg/lobby/${sessionId}`);
+      router.push(`/tales/trpg/lobby/${sessionId}`);
     } catch {
       setError("네트워크 오류가 발생했습니다.");
     } finally {
