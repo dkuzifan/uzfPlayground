@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { initQuestTracker } from "@/lib/trpg/game/objective-engine";
 import { normalizeStatSchema } from "@/lib/trpg/types/character";
 import type { ScenarioObjectives, CharacterConfig } from "@/lib/trpg/types/game";
@@ -55,11 +55,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { room_name, max_players, scenario_id, localId, nickname, avatarIndex, characterName, job, personality } = body as {
+  // 서버사이드 인증
+  const authClient = await createClient();
+  const { data: { user } } = await authClient.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { room_name, max_players, scenario_id, nickname, avatarIndex, characterName, job, personality } = body as {
     room_name?: string;
     max_players?: number;
     scenario_id?: string;
-    localId?: string;
     nickname?: string;
     avatarIndex?: number;
     characterName?: string;
@@ -74,9 +78,9 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  if (!localId || !nickname?.trim()) {
+  if (!nickname?.trim()) {
     return NextResponse.json(
-      { error: "localId와 nickname은 필수입니다." },
+      { error: "nickname은 필수입니다." },
       { status: 400 }
     );
   }
@@ -169,7 +173,7 @@ export async function POST(request: Request) {
     .from("Player_Character")
     .insert({
       session_id: session.id,
-      user_id: localId,
+      user_id: user.id,
       player_name: nickname.trim(),
       character_name: safeCharName,
       job: safeJob,

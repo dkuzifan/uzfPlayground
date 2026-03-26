@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { ActionChoice, ActiveTurnState } from "@/lib/trpg/types/game";
+
+const REACTION_EMOJIS = ["😨", "😮", "🎉", "⚠️", "🔥"];
 
 interface Props {
   isMyTurn: boolean;
@@ -10,12 +13,44 @@ interface Props {
   choicesLoading: boolean;
   isSubmitting: boolean;
   activeTurnState?: ActiveTurnState | null;
+  myPlayerId?: string;
   onSubmit: (
     content: string,
     type: "choice" | "free_input",
     diceCheck?: { dc: number; check_label: string; action_category?: string },
     actionCategory?: string
   ) => Promise<void>;
+  onReact?: (emoji: string) => void;
+  onAssist?: () => Promise<void>;
+}
+
+// DC → 난이도 레이블/색상
+function DcBadge({ check }: { check: ActionChoice["dice_check"] }) {
+  if (!check) return null;
+  const posStyle =
+    check.position === "desperate"
+      ? { color: "#f87171", background: "rgba(239,68,68,0.12)", label: "불리" }
+      : check.position === "controlled"
+        ? { color: "#4ade80", background: "rgba(74,222,128,0.12)", label: "유리" }
+        : null;
+  return (
+    <div className="flex items-center gap-1.5">
+      {posStyle && (
+        <span
+          className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+          style={{ color: posStyle.color, background: posStyle.background }}
+        >
+          {posStyle.label}
+        </span>
+      )}
+      <span
+        className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+        style={{ color: "#fbbf24", background: "rgba(251,191,36,0.12)" }}
+      >
+        🎲 {check.check_label ?? "판정 필요"}
+      </span>
+    </div>
+  );
 }
 
 export default function ActionPanel({
@@ -25,93 +60,123 @@ export default function ActionPanel({
   choicesLoading,
   isSubmitting,
   activeTurnState,
+  myPlayerId,
   onSubmit,
+  onReact,
+  onAssist,
 }: Props) {
   const [freeInput, setFreeInput] = useState("");
+  const [assistDone, setAssistDone] = useState(false);
 
+  // ── GM 판정 중 ──────────────────────────────────────
   if (isSubmitting) {
     return (
-      <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 text-center">
-        <div className="flex items-center justify-center gap-2 text-yellow-600 dark:text-yellow-400">
+      <div
+        className="rounded-xl px-4 py-3 text-center"
+        style={{ border: "1px solid var(--skin-accent)", background: "var(--skin-accent-glow)" }}
+      >
+        <div className="flex items-center justify-center gap-2">
           <span className="animate-spin text-lg">⚙</span>
-          <span className="text-sm">GM이 판정 중...</span>
+          <span className="text-sm" style={{ color: "var(--skin-accent)" }}>GM이 판정 중...</span>
         </div>
       </div>
     );
   }
 
+  // ── 내 턴 아님 ──────────────────────────────────────
   if (!isMyTurn) {
     return (
-      <div className="rounded-xl border border-black/10 bg-black/[0.04] p-4 dark:border-white/10 dark:bg-white/5 space-y-3">
+      <div
+        className="space-y-3 rounded-xl p-4"
+        style={{ border: "1px solid var(--skin-border)", background: "var(--skin-bg-card)" }}
+      >
         {/* 상태 헤더 */}
-        <div className="flex items-center gap-2 text-neutral-500">
+        <div className="flex items-center gap-2" style={{ color: "var(--skin-text-muted)" }}>
           {activeTurnState?.status === "rolling" ? (
             <>
               <span className="animate-bounce text-lg">🎲</span>
-              <span className="text-sm">
-                {activeTurnState.player_name}이(가) 주사위를 굴리고 있습니다...
-              </span>
+              <span className="text-sm">{activeTurnState.player_name}이(가) 주사위를 굴리고 있습니다...</span>
             </>
           ) : activeTurnState?.status === "choosing" ? (
             <>
-              <span className="animate-pulse text-lg">◌</span>
-              <span className="text-sm">
-                {activeTurnState.player_name}이(가) 행동을 선택하고 있습니다...
-              </span>
+              <span className="animate-pulse text-lg" style={{ color: "var(--skin-accent)" }}>◌</span>
+              <span className="text-sm">{activeTurnState.player_name}이(가) 행동을 선택하고 있습니다...</span>
             </>
           ) : (
             <>
               <span className="animate-pulse text-lg">◌</span>
-              <span className="text-sm">
-                {currentTurnName ? `${currentTurnName}의 턴입니다...` : "대기 중..."}
-              </span>
+              <span className="text-sm">{currentTurnName ? `${currentTurnName}의 턴입니다...` : "대기 중..."}</span>
             </>
           )}
         </div>
 
-        {/* rolling 상태: 선택한 행동 표시 */}
+        {/* rolling: 선택한 행동 */}
         {activeTurnState?.status === "rolling" && activeTurnState.selected_label && (
-          <div className="rounded-lg border border-amber-300/40 bg-amber-50/50 px-4 py-2.5 dark:border-amber-500/20 dark:bg-amber-500/5">
-            <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-0.5">선택한 행동</p>
-            <p className="text-sm text-neutral-800 dark:text-neutral-200">{activeTurnState.selected_label}</p>
+          <div
+            className="rounded-lg px-4 py-2.5"
+            style={{ border: "1px solid rgba(251,191,36,0.3)", background: "rgba(251,191,36,0.06)" }}
+          >
+            <p className="mb-0.5 text-xs font-medium text-yellow-400">선택한 행동</p>
+            <p className="text-sm" style={{ color: "var(--skin-text)" }}>{activeTurnState.selected_label}</p>
           </div>
         )}
 
-        {/* choosing 상태: 선택지 목록 표시 (read-only) */}
+        {/* choosing: 선택지 목록 read-only */}
         {activeTurnState?.status === "choosing" && activeTurnState.choices.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs text-neutral-400">제시된 선택지</p>
+            <p className="text-xs" style={{ color: "var(--skin-text-muted)" }}>제시된 선택지</p>
             {activeTurnState.choices.map((choice, i) => (
               <div
                 key={choice.id ?? i}
-                className="w-full rounded-lg border border-black/8 bg-white/40 px-4 py-2.5 dark:border-white/8 dark:bg-white/[0.03]"
+                className="rounded-lg px-4 py-2.5"
+                style={{ border: "1px solid var(--skin-border)", background: "var(--skin-bg-secondary)" }}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                    {choice.label}
-                  </span>
-                  {choice.dice_check && (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {choice.dice_check.position === "desperate" && (
-                        <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-semibold text-red-600 dark:bg-red-400/10 dark:text-red-400">
-                          불리
-                        </span>
-                      )}
-                      {choice.dice_check.position === "controlled" && (
-                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400">
-                          유리
-                        </span>
-                      )}
-                      <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
-                        🎲 {choice.dice_check.check_label ?? "판정 필요"}
-                      </span>
-                    </div>
-                  )}
+                  <span className="text-sm font-medium" style={{ color: "var(--skin-text)" }}>{choice.label}</span>
+                  <DcBadge check={choice.dice_check} />
                 </div>
-                <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">
-                  {choice.description}
-                </p>
+                <p className="mt-0.5 text-xs" style={{ color: "var(--skin-text-muted)" }}>{choice.description}</p>
               </div>
+            ))}
+          </div>
+        )}
+
+        {/* 지원 선언 */}
+        {onAssist && activeTurnState?.status === "choosing" && (() => {
+          const alreadyAssisted =
+            assistDone ||
+            (myPlayerId ? (activeTurnState.assist_player_ids ?? []).includes(myPlayerId) : false);
+          const assistCount = activeTurnState.assist_count ?? 0;
+          return (
+            <button
+              onClick={async () => { if (!alreadyAssisted) { await onAssist(); setAssistDone(true); } }}
+              disabled={alreadyAssisted}
+              className="w-full rounded-lg py-2 text-xs font-medium transition"
+              style={{
+                border: `1px solid ${alreadyAssisted ? "var(--skin-accent)" : "var(--skin-border)"}`,
+                background: alreadyAssisted ? "var(--skin-accent-glow)" : "transparent",
+                color: alreadyAssisted ? "var(--skin-accent)" : "var(--skin-text-muted)",
+              }}
+            >
+              {alreadyAssisted
+                ? `✓ 지원 선언됨${assistCount > 0 ? ` (${assistCount}명, 보너스 +${assistCount * 2})` : ""}`
+                : `🤝 지원 선언 (+2 보너스)${assistCount > 0 ? ` · ${assistCount}명 지원 중` : ""}`}
+            </button>
+          );
+        })()}
+
+        {/* 감정 반응 */}
+        {onReact && (
+          <div className="flex justify-center gap-2 pt-1">
+            {REACTION_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => onReact(emoji)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-base transition hover:scale-110 active:scale-95"
+                style={{ border: "1px solid var(--skin-border)", background: "var(--skin-bg-secondary)" }}
+              >
+                {emoji}
+              </button>
             ))}
           </div>
         )}
@@ -119,56 +184,70 @@ export default function ActionPanel({
     );
   }
 
+  // ── 내 턴 — 선택지 카드 ─────────────────────────────
   return (
-    <div className="space-y-3 rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-4">
-      <p className="text-xs font-medium text-indigo-600 dark:text-indigo-300">
-        당신의 턴 — 행동을 선택하세요
+    <div
+      className="space-y-3 rounded-xl p-4"
+      style={{ border: "1px solid var(--skin-accent)", background: "var(--skin-accent-glow)" }}
+    >
+      <p
+        className="text-xs font-semibold tracking-wider"
+        style={{ color: "var(--skin-accent)", fontFamily: "var(--skin-font-display)" }}
+      >
+        ⚔ 당신의 턴 — 행동을 선택하세요
       </p>
 
+      {/* 선택지 카드 */}
       {choicesLoading ? (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-14 animate-pulse rounded-lg bg-black/10 dark:bg-white/10" />
+            <div
+              key={i}
+              className="h-20 animate-pulse rounded-xl"
+              style={{ background: "var(--skin-bg-secondary)" }}
+            />
           ))}
         </div>
       ) : (
-        <div className="space-y-2">
-          {choices.map((choice) => (
-            <button
-              key={choice.id}
-              onClick={() => onSubmit(choice.label, "choice", choice.dice_check, choice.action_category)}
-              className="w-full rounded-lg border border-black/10 bg-white/60 px-4 py-2.5 text-left text-sm transition-colors hover:border-indigo-400/50 hover:bg-indigo-50 dark:border-white/10 dark:bg-white/5 dark:hover:border-indigo-400/40 dark:hover:bg-white/10"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-medium text-neutral-900 dark:text-white">
+        <AnimatePresence>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {choices.map((choice, i) => (
+              <motion.button
+                key={choice.id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0, transition: { delay: i * 0.07, duration: 0.25 } }}
+                whileHover={{ y: -5, boxShadow: "0 10px 30px var(--skin-accent-glow)" }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => onSubmit(choice.label, "choice", choice.dice_check, choice.action_category)}
+                className="flex flex-col gap-2 rounded-xl p-3 text-left transition-colors"
+                style={{
+                  border: "1px solid var(--skin-border)",
+                  background: "var(--skin-bg-card)",
+                  cursor: "pointer",
+                }}
+              >
+                <p
+                  className="text-[10px] font-semibold tracking-widest"
+                  style={{ color: "var(--skin-accent)", fontFamily: "var(--skin-font-display)" }}
+                >
+                  선택지 {i + 1}
+                </p>
+                <p className="flex-1 text-sm font-medium leading-snug" style={{ color: "var(--skin-text)" }}>
                   {choice.label}
-                </span>
-                {choice.dice_check && (
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {choice.dice_check.position === "desperate" && (
-                      <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-semibold text-red-600 dark:bg-red-400/10 dark:text-red-400">
-                        불리
-                      </span>
-                    )}
-                    {choice.dice_check.position === "controlled" && (
-                      <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400">
-                        유리
-                      </span>
-                    )}
-                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:bg-amber-400/15 dark:text-amber-400">
-                      🎲 {choice.dice_check.check_label ?? "판정 필요"}
-                    </span>
-                  </div>
+                </p>
+                {choice.description && (
+                  <p className="text-xs leading-relaxed" style={{ color: "var(--skin-text-muted)" }}>
+                    {choice.description}
+                  </p>
                 )}
-              </div>
-              <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                {choice.description}
-              </p>
-            </button>
-          ))}
-        </div>
+                <DcBadge check={choice.dice_check} />
+              </motion.button>
+            ))}
+          </div>
+        </AnimatePresence>
       )}
 
+      {/* 직접 입력 */}
       <div className="flex gap-2">
         <input
           type="text"
@@ -181,17 +260,20 @@ export default function ActionPanel({
             }
           }}
           placeholder="직접 입력..."
-          className="flex-1 rounded-lg border border-black/10 bg-white/70 px-3 py-2 text-sm text-neutral-900 placeholder-neutral-400 outline-none focus:border-indigo-500/50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder-neutral-500"
+          className="flex-1 rounded-lg px-3 py-2 text-sm outline-none transition"
+          style={{
+            border: "1px solid var(--skin-border)",
+            background: "var(--skin-bg-secondary)",
+            color: "var(--skin-text)",
+          }}
         />
         <button
           onClick={() => {
-            if (freeInput.trim()) {
-              onSubmit(freeInput.trim(), "free_input");
-              setFreeInput("");
-            }
+            if (freeInput.trim()) { onSubmit(freeInput.trim(), "free_input"); setFreeInput(""); }
           }}
           disabled={!freeInput.trim()}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-40"
+          className="rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-40"
+          style={{ background: "var(--skin-accent)", color: "var(--skin-bg)" }}
         >
           제출
         </button>

@@ -1,5 +1,5 @@
 import { getGeminiModel } from "@/lib/ai/gemini";
-import type { ActionLog, ActionOutcome, ActionChoice, DiceRoll, RawPlayer, QuestTracker, ScenarioObjectives, ScenePhase, StoryBlueprint, StoryAct, Position } from "@/lib/trpg/types/game";
+import type { ActionLog, ActionOutcome, ActionChoice, DiceRoll, RawPlayer, QuestTracker, ScenarioObjectives, ScenePhase, StoryBlueprint, StoryAct, Position, ResourceRule } from "@/lib/trpg/types/game";
 import type { ActionCategory } from "@/lib/trpg/game/dc-calculator";
 import type { GmObjectiveUpdate } from "@/lib/trpg/game/objective-engine";
 
@@ -81,6 +81,7 @@ interface GmRawResponse {
   failure_twist?: string | null;
   stat_growth?: { stat: string; delta: number; reason?: string } | null;
   npc_introduced?: string[] | null;
+  resource_changes?: Array<{ stat_key: string; delta: number; reason?: string }> | null;
 }
 
 export interface NpcEmotionDelta {
@@ -109,6 +110,7 @@ export interface GmActionInput {
   storyBlueprint?: StoryBlueprint | null;
   introducedNpcs?: Array<{ name: string; role: string }>;
   unintroducedNpcs?: Array<{ name: string; role: string }>;
+  resourceRules?: ResourceRule[] | null;
 }
 
 export type { GmRawResponse };
@@ -303,6 +305,13 @@ outcome이 "failure"일 때만 적용한다.
 - 매 턴마다 주지 말 것. 세션 전체에서 2~4회 정도만 의미 있게 부여하라.
 - 해당 없으면 반드시 생략하거나 null로 남겨라.
 
+## resource_changes 규칙 (시나리오에 특수 자원 규칙이 있을 때만 적용)
+- 컨텍스트에 "특수 자원 규칙"이 있으면 해당 조건이 충족될 때 resource_changes를 반환하라.
+- stat_key: 자원 키 이름 (그대로 사용), delta: 변화량 (음수 가능), reason: 변화 이유 (선택).
+- 예: [{"stat_key": "sanity", "delta": -15, "reason": "끔찍한 시체 목격"}]
+- 조건이 충족되지 않으면 반드시 생략하거나 null로 남겨라.
+- stat_growth와 resource_changes는 독립적으로 동시에 반환할 수 있다.
+
 ## npc_introduced 규칙
 - 이번 서사에서 "아직 미등장 NPC" 중 처음으로 등장시킨 NPC가 있다면, 그 이름을 npc_introduced 배열에 담아 반환하라.
 - 이번 서사에서 새로 소개한 NPC가 없으면 npc_introduced는 생략하거나 null로 남겨라.
@@ -418,8 +427,21 @@ function buildBlueprintSection(blueprint?: StoryBlueprint | null, scenePhase?: S
   return lines.join("\n") + "\n";
 }
 
+function buildResourceRulesSection(rules?: ResourceRule[] | null): string {
+  if (!rules || rules.length === 0) return "";
+  const lines = ["\n## 특수 자원 규칙 (resource_changes 판단 시 참고)"];
+  for (const r of rules) {
+    const conditions = r.change_conditions
+      .map((c) => `${c.delta > 0 ? "+" : ""}${c.delta} (${c.trigger})`)
+      .join(" / ");
+    lines.push(`- ${r.stat_key}: ${conditions}${r.depletion_effect ? ` | 고갈 효과: ${r.depletion_effect}` : ""}`);
+  }
+  lines.push("조건이 충족될 때 resource_changes를 반환하라. 충족되지 않으면 생략하라.");
+  return lines.join("\n") + "\n";
+}
+
 function buildContext(input: GmActionInput): string {
-  const { fixedTruths, recentLogs, actingPlayer, action, diceRoll, outcome, position, npcEmotionDeltas, sessionSummary, questTracker, objectives, scenePhase, storyBlueprint, introducedNpcs, unintroducedNpcs } = input;
+  const { fixedTruths, recentLogs, actingPlayer, action, diceRoll, outcome, position, npcEmotionDeltas, sessionSummary, questTracker, objectives, scenePhase, storyBlueprint, introducedNpcs, unintroducedNpcs, resourceRules } = input;
 
   const fixedTruthsText =
     Object.keys(fixedTruths).length > 0
@@ -454,7 +476,7 @@ function buildContext(input: GmActionInput): string {
     ? `\n## 캐릭터 성향 (next_choices 생성 시 참고)\n${actingPlayer.personality_summary}\n`
     : "";
 
-  return `${fixedTruthsText}${sessionSummarySection}${buildBlueprintSection(storyBlueprint, scenePhase)}${buildNpcStatusSection(introducedNpcs, unintroducedNpcs)}${buildQuestSection(questTracker, objectives)}${buildScenePhaseSection(scenePhase)}
+  return `${fixedTruthsText}${sessionSummarySection}${buildBlueprintSection(storyBlueprint, scenePhase)}${buildNpcStatusSection(introducedNpcs, unintroducedNpcs)}${buildQuestSection(questTracker, objectives)}${buildScenePhaseSection(scenePhase)}${buildResourceRulesSection(resourceRules)}
 ## 최근 행동 기록 (최신 10개)
 ${recentHistory}
 

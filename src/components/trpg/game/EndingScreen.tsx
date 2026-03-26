@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { ScenarioEndings, EndingTone } from "@/lib/trpg/types/game";
 
 interface Props {
-  endingId: string;
+  endingId?: string | null;
   endings?: ScenarioEndings | null;
   finalNarration?: string;
+  sessionId?: string;
   onLeave: () => void;
 }
 
@@ -33,7 +35,7 @@ const TONE_STYLES: Record<EndingTone, { bg: string; text: string; badge: string 
   },
 };
 
-export default function EndingScreen({ endingId, endings, finalNarration, onLeave }: Props) {
+export default function EndingScreen({ endingId, endings, finalNarration, sessionId, onLeave }: Props) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -41,7 +43,7 @@ export default function EndingScreen({ endingId, endings, finalNarration, onLeav
     return () => clearTimeout(t);
   }, []);
 
-  const ending = endings?.endings.find((e) => e.id === endingId);
+  const ending = endingId ? endings?.endings.find((e) => e.id === endingId) : undefined;
   const tone: EndingTone = ending?.tone ?? "bittersweet";
   const styles = TONE_STYLES[tone];
 
@@ -78,13 +80,23 @@ export default function EndingScreen({ endingId, endings, finalNarration, onLeav
           </div>
         )}
 
-        {/* 로비 버튼 */}
-        <button
-          onClick={onLeave}
-          className="rounded-lg bg-white/10 px-8 py-3 text-sm font-medium text-white transition hover:bg-white/20 active:scale-95"
-        >
-          로비로 돌아가기
-        </button>
+        {/* 버튼 그룹 */}
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          {sessionId && (
+            <Link
+              href={`/trpg/recap/${sessionId}`}
+              className="rounded-lg bg-white/20 px-8 py-3 text-sm font-medium text-white transition hover:bg-white/30 active:scale-95"
+            >
+              세션 리캡 보기
+            </Link>
+          )}
+          <button
+            onClick={onLeave}
+            className="rounded-lg bg-white/10 px-8 py-3 text-sm font-medium text-white transition hover:bg-white/20 active:scale-95"
+          >
+            로비로 돌아가기
+          </button>
+        </div>
       </div>
     </div>
   );

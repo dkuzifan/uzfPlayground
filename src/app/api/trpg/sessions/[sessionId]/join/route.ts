@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { normalizeStatSchema } from "@/lib/trpg/types/character";
 import type { PersonalityProfile, CharacterJob } from "@/lib/trpg/types/character";
 
@@ -56,8 +56,12 @@ export async function POST(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { localId, nickname, avatarIndex, characterName, job, personality } = body as {
-    localId?: string;
+  // 서버사이드 인증 — 클라이언트가 보낸 localId 대신 auth.uid() 사용
+  const authClient = await createClient();
+  const { data: { user } } = await authClient.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { nickname, avatarIndex, characterName, job, personality } = body as {
     nickname?: string;
     avatarIndex?: number;
     characterName?: string;
@@ -65,9 +69,9 @@ export async function POST(request: Request, { params }: RouteParams) {
     personality?: unknown;
   };
 
-  if (!localId || !nickname?.trim()) {
+  if (!nickname?.trim()) {
     return NextResponse.json(
-      { error: "localId와 nickname은 필수입니다." },
+      { error: "nickname은 필수입니다." },
       { status: 400 }
     );
   }
@@ -95,7 +99,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       .from("Player_Character")
       .select("id")
       .eq("session_id", sessionId)
-      .eq("user_id", localId)
+      .eq("user_id", user.id)
       .single();
     if (existing) {
       return NextResponse.json({ ok: true });
@@ -152,7 +156,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     .from("Player_Character")
     .insert({
       session_id: sessionId,
-      user_id: localId,
+      user_id: user.id,
       player_name: nickname.trim(),
       character_name: (characterName?.trim() || nickname.trim()).slice(0, 16),
       job: safeJob,

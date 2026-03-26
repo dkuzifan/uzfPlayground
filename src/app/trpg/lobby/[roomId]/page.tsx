@@ -3,7 +3,7 @@
 import { use, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import WaitingRoom from "@/components/trpg/lobby/WaitingRoom";
-import { useGuestProfile } from "@/hooks/useGuestProfile";
+import { useAuthProfile } from "@/hooks/useAuthProfile";
 
 interface WaitingRoomPageProps {
   params: Promise<{ roomId: string }>;
@@ -12,7 +12,7 @@ interface WaitingRoomPageProps {
 export default function WaitingRoomPage({ params }: WaitingRoomPageProps) {
   const { roomId } = use(params);
   const router = useRouter();
-  const { profile, mounted } = useGuestProfile();
+  const { profile, mounted } = useAuthProfile();
 
   // 프로필 없이 직접 접근 시 홈으로 리다이렉트
   useEffect(() => {
@@ -33,26 +33,22 @@ export default function WaitingRoomPage({ params }: WaitingRoomPageProps) {
   // 입장 처리는 WaitingRoom 내부(useWaitingRoom)가 아닌
   // 여기서 한 번만 호출 (컴포넌트 마운트 시 1회)
   return (
-    <JoinAndShow sessionId={roomId} localId={profile.localId} profile={profile} />
+    <JoinAndShow sessionId={roomId} profile={profile} />
   );
 }
 
-// PC 존재 확인 후 WaitingRoom을 렌더링하는 내부 컴포넌트.
-// RoomCard를 통해 정상 입장한 경우 PC는 이미 생성되어 있음.
-// 직접 URL 접근 등 예외 케이스에만 fallback join 시도.
 function JoinAndShow({
   sessionId,
-  localId,
   profile,
 }: {
   sessionId: string;
-  localId: string;
-  profile: NonNullable<ReturnType<typeof useGuestProfile>["profile"]>;
+  profile: NonNullable<ReturnType<typeof useAuthProfile>["profile"]>;
 }) {
   const router = useRouter();
 
   useEffect(() => {
-    fetch(`/api/trpg/sessions/${sessionId}/my-character?localId=${localId}`)
+    // auth 쿠키가 자동으로 전송되므로 별도 localId 불필요
+    fetch(`/api/trpg/sessions/${sessionId}/my-character`)
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
 

@@ -3,11 +3,11 @@
 // ============================================================
 
 
-/** localStorage에 저장되는 게스트 프로필 */
+/** @deprecated useAuthProfile 사용 권장. 하위호환용으로 유지. */
 export interface GuestProfile {
-  localId: string;     // crypto.randomUUID() — DB Player_Character.user_id로 사용
-  nickname: string;    // 최근 사용한 캐릭터 이름 (방 입장 시 자동 갱신)
-  avatarIndex: number; // 0~7 (색상 원 인덱스, 방 입장 시 자동 갱신)
+  localId: string;
+  nickname: string;
+  avatarIndex: number;
 }
 
 /** 로비 방 목록 카드 1개 */

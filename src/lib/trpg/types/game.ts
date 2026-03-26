@@ -46,11 +46,24 @@ export type ActionOutcome =
 export type Position = "controlled" | "risky" | "desperate";
 
 export interface InfoRules {
-  use_private_info: boolean;
+  private_items: boolean;  // 아이템 획득 비공개 여부
+  private_lore: boolean;   // Lore 발견 비공개 여부
+}
+
+export interface ResourceChangeCondition {
+  trigger: string;   // 예: "공포스러운 장면 목격", "전투 승리"
+  delta: number;     // 변화량 (음수 가능)
+}
+
+export interface ResourceRule {
+  stat_key: string;                       // stat_schema의 key와 동일 (예: "sanity", "fatigue")
+  change_conditions: ResourceChangeCondition[];
+  depletion_effect?: string;              // 자원이 최솟값에 도달했을 때 효과 설명
 }
 
 export interface GameRules {
   info_rules?: InfoRules;
+  resource_rules?: ResourceRule[];
 }
 
 export type ScenarioTheme = "fantasy" | "mystery" | "horror" | "sci-fi";
@@ -200,7 +213,19 @@ export interface NpcPersona {
   knowledge_level: number;
   // v4: 플레이어에게 소개된 여부 (false이면 GM 서사로 소개 전까지 반응 불가)
   is_introduced: boolean;
+  // v5: 제작자 정의 커스텀 트리거
+  custom_triggers?: NpcCustomTrigger[] | null;
   created_at: string;
+}
+
+// 제작자가 시나리오 제작 시 NPC별로 정의하는 트리거 조건
+export interface NpcCustomTrigger {
+  id: string;                   // 중복 방지용 고유 ID
+  condition_field: string;      // 체크할 NpcDynamicState 필드 (예: "trust", "affinity")
+  condition_op: ">=" | "<=" | ">" | "<";
+  condition_value: number;
+  action_hint: string;          // NPC 자발 행동 프롬프트 힌트
+  once: boolean;                // true이면 1회만 발동
 }
 
 // NPC 주관적 기억 (망각 연산 적용 후 형태)
@@ -223,6 +248,8 @@ export interface ActiveTurnState {
   status: "choosing" | "rolling";
   selected_label?: string;  // rolling 상태일 때 선택한 행동 텍스트
   player_name: string;
+  assist_count?: number;        // 지원 선언 횟수 (각 +2 보너스)
+  assist_player_ids?: string[]; // 지원 선언한 플레이어 ID 목록
 }
 
 // ── Game Session ──────────────────────────────────────────

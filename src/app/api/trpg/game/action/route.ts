@@ -8,7 +8,7 @@ import { applyTasteModifiers, buildBaseDeltas } from "@/lib/trpg/game/taste-modi
 import { runMemorySummarize } from "@/lib/trpg/game/memory-pipeline";
 import { scanAndExtractLore } from "@/lib/trpg/game/lore-engine";
 import { applyObjectiveUpdate, tickDoomClock, evaluateEndings, applyEnding, deriveScenePhase, advancePhase } from "@/lib/trpg/game/objective-engine";
-import { evaluateTriggers, markTriggerFired } from "@/lib/trpg/game/npc-trigger-engine";
+import { evaluateTriggers, markTriggerFired, recordNpcInteraction } from "@/lib/trpg/game/npc-trigger-engine";
 import { runNpcAutonomousAction, evaluateBystanderReactions } from "@/lib/trpg/gemini/npc-agent";
 import type { WorldDictionaryEntry } from "@/lib/trpg/game/lore-engine";
 import type { HpChange, RawPlayer, GameSession, ActionLog, NpcPersona, NpcMemory, ActionChoice, ScenarioObjectives, ScenarioEndings, ScenePhase } from "@/lib/trpg/types/game";
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     const player = playerData;
 
     // ── Step 2: NPC 조회 + 최근 로그 조회 ─────────────────────────────────────
-    const [{ data: recentLogsData }, { data: npcsData }, { data: memoriesData }, { data: loreData }, { data: globalMemoryData }] =
+    const [{ data: recentLogsData }, { data: npcsData }, { data: memoriesData }, { data: loreData }, { data: globalMemoryData, error: globalMemoryError }] =
       await Promise.all([
         supabase
           .from("Action_Log")
@@ -121,6 +121,9 @@ export async function POST(req: NextRequest) {
     const loreEntries = (loreData ?? []) as unknown as WorldDictionaryEntry[];
 
     // 전역 세션 요약 포맷 (없으면 undefined → GM 컨텍스트에서 생략)
+    if (globalMemoryError && (globalMemoryError as { code?: string }).code !== "PGRST116") {
+      console.error("[ActionRoute] Session_Memory 조회 실패:", globalMemoryError);
+    }
     const globalMemory = globalMemoryData as { summary_text: string; key_facts: string[]; last_summarized_turn: number } | null;
     const sessionSummary = globalMemory
       ? `${globalMemory.summary_text}${globalMemory.key_facts?.length > 0 ? `\n주요 사실: ${globalMemory.key_facts.join(" / ")}` : ""} (${globalMemory.last_summarized_turn}턴까지 요약)`
@@ -192,9 +195,10 @@ export async function POST(req: NextRequest) {
           baseDeltas
         );
         const currentState = updatedDynamicStates[npc.id] ?? defaultDynamicState();
+        const stateWithInteraction = recordNpcInteraction(currentState, session.turn_number);
         const updatedState: NpcDynamicState = {
-          ...currentState,
-          affinity: clamp(currentState.affinity + modifiedDeltas.affinity_delta, -100, 100),
+          ...stateWithInteraction,
+          affinity: clamp(stateWithInteraction.affinity + modifiedDeltas.affinity_delta, -100, 100),
           mental_stress: clamp(currentState.mental_stress + modifiedDeltas.stress_delta, 0, 100),
           fear_survival: clamp(currentState.fear_survival + modifiedDeltas.fear_delta, 0, 100),
           trust: clamp(currentState.trust + (modifiedDeltas.trust_delta ?? 0), -100, 100),
@@ -217,7 +221,7 @@ export async function POST(req: NextRequest) {
     // ── Step 6: Gemini GM 서사 생성 ───────────────────────────────────────────
     const { data: scenarioRaw } = await supabase
       .from("Scenario")
-      .select("gm_system_prompt, fixed_truths, objectives, endings")
+      .select("gm_system_prompt, fixed_truths, objectives, endings, game_rules")
       .eq("id", session.scenario_id)
       .single() as unknown as {
         data: {
@@ -225,9 +229,14 @@ export async function POST(req: NextRequest) {
           fixed_truths: Record<string, unknown>;
           objectives: ScenarioObjectives | null;
           endings: ScenarioEndings | null;
+          game_rules: Record<string, unknown> | null;
         } | null;
       };
     const scenario = scenarioRaw;
+    const gameRules = (scenario?.game_rules ?? null) as import("@/lib/trpg/types/game").GameRules | null;
+    const privateItems = gameRules?.info_rules?.private_items ?? false;
+    const privateLore  = gameRules?.info_rules?.private_lore  ?? false;
+    const resourceRules = (gameRules?.resource_rules ?? null) as import("@/lib/trpg/types/game").ResourceRule[] | null;
 
     // 씬 페이즈: QuestTracker 기반 계산 (objectives 없으면 세션 저장값 유지)
     const currentScenePhase = (session.scene_phase ?? "exploration") as ScenePhase;
@@ -242,6 +251,7 @@ export async function POST(req: NextRequest) {
     let gmQuestUpdate: import("@/lib/trpg/game/objective-engine").GmObjectiveUpdate | undefined;
     let gmItemObtained: string | null = null;
     let gmStatGrowth: { stat: string; delta: number; reason?: string } | null = null;
+    let gmResourceChanges: Array<{ stat_key: string; delta: number; reason?: string }> | null = null;
     let gmPhaseTransition: ScenePhase | null = null;
     let gmFailurePenalty: import("@/lib/trpg/gemini/gm-agent").FailurePenalty | null = null;
     let gmFailureTwist: string | null = null;
@@ -264,6 +274,7 @@ export async function POST(req: NextRequest) {
         storyBlueprint: session.story_blueprint,
         introducedNpcs: introducedNpcs.map((n) => ({ name: n.name, role: n.role })),
         unintroducedNpcs: unintroducedNpcs.map((n) => ({ name: n.name, role: n.role })),
+        resourceRules,
       });
       gmNarration = gmResponse.narration;
       gmStateChanges = gmResponse.state_changes ?? [];
@@ -280,6 +291,7 @@ export async function POST(req: NextRequest) {
       gmQuestUpdate = gmResponse.quest_update;
       gmItemObtained = gmResponse.item_obtained ?? null;
       gmStatGrowth = gmResponse.stat_growth ?? null;
+      gmResourceChanges = gmResponse.resource_changes ?? null;
       gmFailurePenalty = gmResponse.failure_penalty ?? null;
       gmFailureTwist = gmResponse.failure_twist ?? null;
       if (gmResponse.scene_phase_transition) {
@@ -428,8 +440,22 @@ export async function POST(req: NextRequest) {
         action_type: "system_event",
         content: `🎒 [${player.player_name}] 아이템 획득: ${gmItemObtained}`,
         outcome: null,
-        state_changes: { item_obtained: gmItemObtained },
+        state_changes: privateItems ? {} : { item_obtained: gmItemObtained },
       });
+      if (privateItems) {
+        await supabase.from("Action_Log").insert({
+          session_id,
+          turn_number: session.turn_number,
+          speaker_type: "system",
+          speaker_id: player_id,
+          speaker_name: "system",
+          action_type: "system_event",
+          content: `[아이템 획득] ${gmItemObtained}`,
+          outcome: null,
+          state_changes: { item_obtained: gmItemObtained },
+          is_private: true,
+        });
+      }
     }
 
     // ── Step 7-D: 스탯 성장 처리 ────────────────────────────────────────────
@@ -455,6 +481,35 @@ export async function POST(req: NextRequest) {
           content: `📈 [${player.player_name}] ${stat} +${delta}${reason ? ` — ${reason}` : ""}`,
           outcome: null,
           state_changes: { stat_growth: { stat, delta, reason } },
+        });
+      }
+    }
+
+    // ── Step 7-E: 특수 자원 변동 처리 ───────────────────────────────────────
+    if (gmResourceChanges && gmResourceChanges.length > 0 && geminiSucceeded) {
+      const currentStats = player.stats as Record<string, number>;
+      const updatedStats = { ...currentStats };
+      const changeLog: string[] = [];
+      for (const { stat_key, delta, reason } of gmResourceChanges) {
+        if (typeof currentStats[stat_key] !== "number") continue;
+        updatedStats[stat_key] = currentStats[stat_key] + delta;
+        changeLog.push(`${stat_key} ${delta > 0 ? "+" : ""}${delta}${reason ? ` (${reason})` : ""}`);
+      }
+      if (changeLog.length > 0) {
+        await supabase
+          .from("Player_Character")
+          .update({ stats: updatedStats })
+          .eq("id", player_id);
+        await supabase.from("Action_Log").insert({
+          session_id,
+          turn_number: session.turn_number,
+          speaker_type: "system",
+          speaker_id: null,
+          speaker_name: "시스템",
+          action_type: "system_event",
+          content: `📊 [${player.player_name}] ${changeLog.join(", ")}`,
+          outcome: null,
+          state_changes: { resource_changes: gmResourceChanges },
         });
       }
     }
@@ -522,12 +577,13 @@ export async function POST(req: NextRequest) {
           session_id,
           turn_number: session.turn_number,
           speaker_type: "system",
-          speaker_id: null,
+          speaker_id: privateLore ? player_id : null,
           speaker_name: "세계관 단서",
           action_type: "lore_discovery",
           content: loreContext.currentLoreTexts.join("\n\n"),
           outcome: null,
           state_changes: {},
+          is_private: privateLore,
         });
       }
     }
@@ -633,7 +689,7 @@ export async function POST(req: NextRequest) {
 
     // ── Step 11: NPC 이벤트 트리거 평가 ──────────────────────────────────────
     if (!sessionEnded) {
-      const triggerEvents = evaluateTriggers(npcs, updatedDynamicStates);
+      const triggerEvents = evaluateTriggers(npcs, updatedDynamicStates, session.turn_number);
       if (triggerEvents.length > 0) {
         let triggeredStates = { ...updatedDynamicStates };
         for (const event of triggerEvents) {

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import type { ScenarioSummary } from "./ScenarioSelectStep";
-import type { ObjectiveType, EndingTrigger, EndingTone, ScenarioObjectives, ScenarioEndings, JobDefinition, CharacterConfig, GameRules } from "@/lib/trpg/types/game";
+import type { ObjectiveType, EndingTrigger, EndingTone, ScenarioObjectives, ScenarioEndings, JobDefinition, CharacterConfig, GameRules, ResourceRule, NpcCustomTrigger } from "@/lib/trpg/types/game";
+import type { NpcDraft } from "@/app/api/trpg/scenarios/generate-npcs/route";
 import type { StatSchemaEntry } from "@/lib/trpg/types/character";
 import { normalizeStatSchema } from "@/lib/trpg/types/character";
 
@@ -21,15 +22,18 @@ export interface ScenarioInitialData {
   character_config?: CharacterConfig | null;
   game_rules?: GameRules | null;
   lore_items?: LoreItem[];
+  npc_items?: NpcDraft[];
 }
 
 interface Props {
   onComplete: (scenario: ScenarioSummary) => void;
   onBack: () => void;
   initialData?: ScenarioInitialData;
+  /** 수정 모드: 기존 시나리오 ID. 제공 시 PUT으로 저장 */
+  scenarioId?: string;
 }
 
-type SubStep = "basic" | "jobs" | "prompt" | "objectives" | "character" | "lore" | "rules";
+type SubStep = "basic" | "jobs" | "prompt" | "objectives" | "character" | "lore" | "npcs" | "rules";
 
 interface JobConfig {
   job: string;
@@ -149,9 +153,10 @@ const SUB_STEP_LABELS: Record<SubStep, string> = {
   objectives: "게임 목표",
   character: "캐릭터 설정",
   lore: "세계관 Lore",
+  npcs: "NPC 설계",
   rules: "게임 룰",
 };
-const SUB_STEPS: SubStep[] = ["basic", "jobs", "prompt", "objectives", "character", "lore", "rules"];
+const SUB_STEPS: SubStep[] = ["basic", "jobs", "prompt", "objectives", "character", "lore", "npcs", "rules"];
 
 function defaultEndings(): EndingForm[] {
   return [
@@ -161,7 +166,7 @@ function defaultEndings(): EndingForm[] {
   ];
 }
 
-export default function ScenarioCreateStep({ onComplete, onBack, initialData }: Props) {
+export default function ScenarioCreateStep({ onComplete, onBack, initialData, scenarioId }: Props) {
   const [subStep, setSubStep] = useState<SubStep>("basic");
 
   // Step A
@@ -215,14 +220,46 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
   const [newStatMaxKey, setNewStatMaxKey]   = useState("");
   const [generatingChar, setGeneratingChar] = useState(false);
   const [charError, setCharError]       = useState<string | null>(null);
+  const [generatingJobStats, setGeneratingJobStats] = useState(false);
+  const [jobStatsError, setJobStatsError] = useState<string | null>(null);
 
   // Step F: Lore
   const [loreItems, setLoreItems] = useState<LoreItem[]>([]);
+  // Step H: NPCs
+  const [npcDrafts, setNpcDrafts] = useState<NpcDraft[]>([]);
+  const [generatingNpcs, setGeneratingNpcs] = useState(false);
+  const [npcError, setNpcError] = useState<string | null>(null);
+  const [expandedNpcIdx, setExpandedNpcIdx] = useState<number | null>(null);
+
   // Step G: Rules
-  const [usePrivateInfo, setUsePrivateInfo] = useState(false);
+  const [privateItems, setPrivateItems] = useState(false);
+  const [privateLore, setPrivateLore]   = useState(false);
+  const [resourceRules, setResourceRules] = useState<ResourceRule[]>([]);
+  const [generatingRules, setGeneratingRules] = useState(false);
+  const [rulesError, setRulesError] = useState<string | null>(null);
+  type RulesSuggestion = {
+    info_rules: { private_items: boolean; private_lore: boolean; reason: string };
+    resource_rules: Array<ResourceRule & { reason: string }>;
+  };
+  const [rulesSuggestion, setRulesSuggestion] = useState<RulesSuggestion | null>(null);
+  const [infoSuggestionDismissed, setInfoSuggestionDismissed] = useState(false);
   const [generatingLore, setGeneratingLore] = useState(false);
   const [loreError, setLoreError] = useState<string | null>(null);
   const [editingLoreIdx, setEditingLoreIdx] = useState<number | null>(null);
+  type LoreGapSuggestion = {
+    domain: "WORLD_LORE" | "PERSONAL_LORE";
+    category: string;
+    lore_text: string;
+    trigger_keywords: string[];
+    cluster_tags: string[];
+    importance_weight: number;
+    required_access_level: number;
+    reason: string;
+  };
+  const [analyzingLore, setAnalyzingLore] = useState(false);
+  const [loreAnalysisError, setLoreAnalysisError] = useState<string | null>(null);
+  const [loreGapSuggestions, setLoreGapSuggestions] = useState<LoreGapSuggestion[]>([]);
+  const [acceptedGapIndices, setAcceptedGapIndices] = useState<Set<number>>(new Set());
 
   // 저장
   const [saving, setSaving]     = useState(false);
@@ -232,7 +269,7 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
   useEffect(() => {
     if (!initialData) return;
 
-    setTitle(initialData.title ? `${initialData.title} (복사본)` : "");
+    setTitle(initialData.title ? (scenarioId ? initialData.title : `${initialData.title} (복사본)`) : "");
     setTheme(initialData.theme ?? "fantasy");
     setDescription(initialData.description ?? "");
     setMaxPlayers(initialData.max_players ?? 4);
@@ -305,7 +342,16 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
 
     // 게임 룰 복원
     if (initialData.game_rules?.info_rules) {
-      setUsePrivateInfo(initialData.game_rules.info_rules.use_private_info);
+      setPrivateItems(initialData.game_rules.info_rules.private_items ?? false);
+      setPrivateLore(initialData.game_rules.info_rules.private_lore ?? false);
+    }
+    if (initialData.game_rules?.resource_rules?.length) {
+      setResourceRules(initialData.game_rules.resource_rules);
+    }
+
+    // NPC 복원 (수정 모드)
+    if (initialData.npc_items?.length) {
+      setNpcDrafts(initialData.npc_items);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData]);
@@ -460,6 +506,39 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
     );
   }
 
+  // ── Step E: AI 직업별 스탯 생성 ─────────────────────────────────────
+  async function handleGenerateJobStats() {
+    setGeneratingJobStats(true);
+    setJobStatsError(null);
+    try {
+      const res = await fetch("/api/trpg/scenarios/generate-job-stats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stat_schema: statSchema,
+          jobs: jobDefs.map((j) => ({ id: j.id, name: j.name, description: j.description })),
+          theme,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setJobStatsError(data.error ?? "생성에 실패했습니다.");
+        return;
+      }
+      const result = data as { jobs: Array<{ id: string; base_stats: Record<string, number> }> };
+      setJobDefs((prev) =>
+        prev.map((j) => {
+          const found = result.jobs.find((r) => r.id === j.id);
+          return found ? { ...j, base_stats: found.base_stats } : j;
+        })
+      );
+    } catch {
+      setJobStatsError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setGeneratingJobStats(false);
+    }
+  }
+
   // ── Step D→E 전환 시 jobDefs 초기화 ─────────────────────────────────
   function handleObjectivesNext() {
     if (jobDefs.length === 0) {
@@ -515,6 +594,69 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
     }
   }
 
+  // ── Step F: Lore 보완 분석 ───────────────────────────────────────────
+  async function handleAnalyzeLoreGaps() {
+    setAnalyzingLore(true);
+    setLoreAnalysisError(null);
+    setLoreGapSuggestions([]);
+    setAcceptedGapIndices(new Set());
+    try {
+      const res = await fetch("/api/trpg/scenarios/analyze-lore-gaps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          theme,
+          description,
+          gm_system_prompt: gmPrompt,
+          primary_objective: primaryObj.target_description,
+          secret_objective: secretObj.target_description,
+          endings: endings.filter((e) => e.label.trim()).map((e) => `${e.label}: ${e.description || "(설명 없음)"}`),
+          npc_names: npcDrafts.filter((n) => n.name.trim()).map((n) => n.name),
+          existing_lore: loreItems.map((l) => ({
+            category: l.category,
+            lore_text: l.lore_text,
+            trigger_keywords: l.trigger_keywords,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLoreAnalysisError(data.error ?? "분석에 실패했습니다.");
+        return;
+      }
+      setLoreGapSuggestions(data.suggestions ?? []);
+    } catch {
+      setLoreAnalysisError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setAnalyzingLore(false);
+    }
+  }
+
+  function acceptLoreGapSuggestion(idx: number) {
+    const s = loreGapSuggestions[idx];
+    if (!s) return;
+    setLoreItems((prev) => [...prev, {
+      domain: s.domain,
+      category: s.category,
+      lore_text: s.lore_text,
+      trigger_keywords: s.trigger_keywords,
+      cluster_tags: s.cluster_tags,
+      importance_weight: s.importance_weight,
+      required_access_level: s.required_access_level,
+    }]);
+    setAcceptedGapIndices((prev) => new Set([...prev, idx]));
+  }
+
+  function dismissLoreGapSuggestion(idx: number) {
+    setLoreGapSuggestions((prev) => prev.filter((_, i) => i !== idx));
+    setAcceptedGapIndices((prev) => {
+      const next = new Set(prev);
+      next.delete(idx);
+      return next;
+    });
+  }
+
   function updateLoreItem(idx: number, patch: Partial<LoreItem>) {
     setLoreItems((prev) => prev.map((item, i) => (i === idx ? { ...item, ...patch } : item)));
   }
@@ -538,6 +680,157 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
       },
     ]);
     setEditingLoreIdx(loreItems.length);
+  }
+
+  // ── Step H: NPC 생성 ────────────────────────────────────────────────
+  async function handleGenerateNpcs() {
+    setGeneratingNpcs(true);
+    setNpcError(null);
+    try {
+      const res = await fetch("/api/trpg/scenarios/generate-npcs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          theme,
+          description,
+          gm_system_prompt: gmPrompt,
+          primary_objective: primaryObj.target_description,
+          secret_objective: secretObj.target_description,
+          endings: endings.filter((e) => e.label.trim()).map((e) => `${e.label}: ${e.description || "(설명 없음)"}`),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setNpcError(data.error ?? "생성에 실패했습니다.");
+        return;
+      }
+      setNpcDrafts(data.npcs as NpcDraft[]);
+      setExpandedNpcIdx(null);
+    } catch {
+      setNpcError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setGeneratingNpcs(false);
+    }
+  }
+
+  function updateNpcDraft(idx: number, patch: Partial<NpcDraft>) {
+    setNpcDrafts((prev) => prev.map((n, i) => i === idx ? { ...n, ...patch } : n));
+  }
+
+  function removeNpcDraft(idx: number) {
+    setNpcDrafts((prev) => prev.filter((_, i) => i !== idx));
+    if (expandedNpcIdx === idx) setExpandedNpcIdx(null);
+  }
+
+  function addCustomTrigger(npcIdx: number) {
+    const npc = npcDrafts[npcIdx];
+    const existing = npc.custom_triggers ?? [];
+    const newTrigger: NpcCustomTrigger = {
+      id: `ct_${Date.now()}`,
+      condition_field: "affinity",
+      condition_op: ">=",
+      condition_value: 70,
+      action_hint: "",
+      once: true,
+    };
+    updateNpcDraft(npcIdx, { custom_triggers: [...existing, newTrigger] });
+  }
+
+  function updateCustomTrigger(npcIdx: number, ctIdx: number, patch: Partial<NpcCustomTrigger>) {
+    const npc = npcDrafts[npcIdx];
+    const existing = npc.custom_triggers ?? [];
+    const updated = existing.map((ct, i) => i === ctIdx ? { ...ct, ...patch } : ct);
+    updateNpcDraft(npcIdx, { custom_triggers: updated });
+  }
+
+  function removeCustomTrigger(npcIdx: number, ctIdx: number) {
+    const npc = npcDrafts[npcIdx];
+    const updated = (npc.custom_triggers ?? []).filter((_, i) => i !== ctIdx);
+    updateNpcDraft(npcIdx, { custom_triggers: updated });
+  }
+
+  function addEmptyNpc() {
+    setNpcDrafts((prev) => [...prev, {
+      name: "",
+      role: "neutral",
+      appearance: "",
+      personality: "",
+      mbti: "ENFJ",
+      enneagram: 2,
+      dnd_alignment: "true-neutral",
+      hidden_motivation: { goal: "", secret: "" },
+      system_prompt: "",
+      linguistic_profile: {
+        speech_style: "평범한 구어체",
+        sentence_ending: "",
+        honorific_rules: "상황에 따라",
+        vocal_tics: "",
+        evasion_style: "바빠 보이는 척하며 화제를 돌림",
+        forbidden_words: [],
+      },
+      resistance_stats: { physical_defense: 10, mental_willpower: 10, perception: 10 },
+      knowledge_level: 3,
+    }]);
+    setExpandedNpcIdx(npcDrafts.length);
+  }
+
+  // ── Step G: AI 룰 제안 ──────────────────────────────────────────────
+  async function handleGenerateRules() {
+    setGeneratingRules(true);
+    setRulesError(null);
+    setRulesSuggestion(null);
+    setInfoSuggestionDismissed(false);
+    try {
+      const res = await fetch("/api/trpg/scenarios/generate-rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          theme,
+          description,
+          gm_system_prompt: gmPrompt,
+          primary_objective: primaryObj.target_description,
+          stat_schema: statSchema.map((s) => ({ key: s.key, label: s.label, icon: s.icon })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRulesError(data.error ?? "생성에 실패했습니다.");
+        return;
+      }
+      setRulesSuggestion(data.rules);
+    } catch {
+      setRulesError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setGeneratingRules(false);
+    }
+  }
+
+  function acceptInfoRuleSuggestion() {
+    if (!rulesSuggestion) return;
+    setPrivateItems(rulesSuggestion.info_rules.private_items);
+    setPrivateLore(rulesSuggestion.info_rules.private_lore);
+    setInfoSuggestionDismissed(true);
+  }
+
+  function acceptResourceRuleSuggestion(idx: number) {
+    if (!rulesSuggestion) return;
+    const suggested = rulesSuggestion.resource_rules[idx];
+    // 이미 같은 stat_key가 있으면 교체, 없으면 추가
+    setResourceRules((prev) => {
+      const exists = prev.findIndex((r) => r.stat_key === suggested.stat_key);
+      const { reason: _r, ...rule } = suggested;
+      if (exists >= 0) return prev.map((r, i) => i === exists ? rule : r);
+      return [...prev, rule];
+    });
+    setRulesSuggestion((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        resource_rules: prev.resource_rules.filter((_, i) => i !== idx),
+      };
+    });
   }
 
   // ── 최종 저장 ────────────────────────────────────────────────────────
@@ -569,36 +862,62 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
       ? { endings: endings.filter((e) => e.label.trim()).map((e) => ({ ...e, label: e.label.trim(), description: e.description.trim(), custom_condition: undefined })) }
       : null;
 
+    const payload = {
+      title,
+      theme,
+      description,
+      max_players: maxPlayers,
+      gm_system_prompt: gmPrompt,
+      character_creation_config: {
+        available_jobs: enabledJobs.map((j) => j.job),
+        job_labels: jobLabels,
+        personality_test_theme: PERSONALITY_THEME_MAP[theme] ?? "fantasy",
+        character_name_hint: theme === "fantasy" ? "모험가의 이름을 입력하세요" : "캐릭터 이름을 입력하세요",
+      },
+      objectives,
+      endings: endingsData,
+      character_config: jobDefs.length > 0
+        ? { stat_schema: statSchema, jobs: jobDefs }
+        : null,
+      lore_items: loreItems.filter((l) => l.lore_text.trim()),
+      game_rules: {
+        info_rules: { private_items: privateItems, private_lore: privateLore },
+        resource_rules: resourceRules.length > 0 ? resourceRules : undefined,
+      },
+    };
+
+    const validNpcs = npcDrafts.filter((n) => n.name.trim() && n.system_prompt.trim());
+
     try {
-      const res = await fetch("/api/trpg/scenarios", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          theme,
-          description,
-          max_players: maxPlayers,
-          gm_system_prompt: gmPrompt,
-          character_creation_config: {
-            available_jobs: enabledJobs.map((j) => j.job),
-            job_labels: jobLabels,
-            personality_test_theme: PERSONALITY_THEME_MAP[theme] ?? "fantasy",
-            character_name_hint: theme === "fantasy" ? "모험가의 이름을 입력하세요" : "캐릭터 이름을 입력하세요",
-          },
-          objectives,
-          endings: endingsData,
-          character_config: jobDefs.length > 0
-            ? { stat_schema: statSchema, jobs: jobDefs }
-            : null,
-          lore_items: loreItems.filter((l) => l.lore_text.trim()),
-          game_rules: {
-            info_rules: { use_private_info: usePrivateInfo },
-          },
-        }),
-      });
+      const isEdit = !!scenarioId;
+      const res = await fetch(
+        isEdit ? `/api/trpg/scenarios/${scenarioId}` : "/api/trpg/scenarios",
+        {
+          method: isEdit ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(isEdit ? { ...payload, npcs: validNpcs } : payload),
+        }
+      );
       const data = await res.json();
-      if (!res.ok) setSaveError(data.error ?? "저장에 실패했습니다.");
-      else onComplete(data);
+      if (!res.ok) {
+        setSaveError(data.error ?? "저장에 실패했습니다.");
+        return;
+      }
+
+      // 신규 생성 시에만 별도 NPC bulk-create 호출
+      if (!isEdit && validNpcs.length > 0) {
+        try {
+          await fetch("/api/trpg/npc/bulk-create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ scenario_id: data.id, npcs: validNpcs }),
+          });
+        } catch {
+          console.error("[handleSave] NPC 저장 실패 (시나리오는 저장됨)");
+        }
+      }
+
+      onComplete(data);
     } catch {
       setSaveError("네트워크 오류가 발생했습니다.");
     } finally {
@@ -1170,7 +1489,38 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
           {/* 직업별 기본 스탯 */}
           {jobDefs.length > 0 && (
             <section className="space-y-2">
-              <h4 className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">직업별 기본 스탯</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">직업별 기본 스탯</h4>
+                <button
+                  onClick={handleGenerateJobStats} disabled={generatingJobStats}
+                  className="flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-100 disabled:opacity-50 dark:border-violet-600/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30 whitespace-nowrap"
+                >
+                  {generatingJobStats ? (
+                    <><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300/30 border-t-violet-500 dark:border-violet-400/30 dark:border-t-violet-300" />스탯 생성 중…</>
+                  ) : <>✨ AI 스탯 채우기</>}
+                </button>
+              </div>
+              {jobStatsError && <p className="text-xs text-red-400">{jobStatsError}</p>}
+
+              {/* 직업 설명 입력 */}
+              <div className="space-y-1.5">
+                {jobDefs.map((job, ji) => (
+                  <div key={job.id} className="flex items-center gap-2 rounded-lg border border-black/5 bg-white/60 px-2.5 py-1.5 dark:border-white/5 dark:bg-white/5">
+                    <span className="w-20 flex-shrink-0 text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                      {JOB_EMOJI[job.id] ?? "👤"} {job.name}
+                    </span>
+                    <input
+                      type="text"
+                      value={job.description}
+                      onChange={(e) => setJobDefs((prev) => prev.map((j, i) => i === ji ? { ...j, description: e.target.value } : j))}
+                      placeholder="직업 특성 설명 (AI 스탯 생성에 활용됩니다)"
+                      maxLength={100}
+                      className="flex-1 rounded border border-black/10 bg-white/80 px-2 py-1 text-xs outline-none focus:border-violet-400 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                    />
+                  </div>
+                ))}
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
@@ -1275,8 +1625,8 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
             </p>
           </div>
 
-          {/* AI 자동 생성 */}
-          <div className="flex items-center gap-2">
+          {/* AI 버튼 행 */}
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleGenerateLore}
               disabled={generatingLore}
@@ -1285,7 +1635,16 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
               {generatingLore ? (
                 <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
               ) : "✨"}
-              AI 자동 제안
+              AI 자동 생성
+            </button>
+            <button
+              onClick={handleAnalyzeLoreGaps}
+              disabled={analyzingLore}
+              className="flex items-center gap-1.5 rounded-lg border border-teal-400 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-100 disabled:opacity-50 dark:border-teal-600/50 dark:bg-teal-900/20 dark:text-teal-300 dark:hover:bg-teal-900/30"
+            >
+              {analyzingLore ? (
+                <><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-teal-400/30 border-t-teal-500 dark:border-teal-400/30 dark:border-t-teal-300" />분석 중…</>
+              ) : <>🔍 AI 보완 분석</>}
             </button>
             <span className="text-xs text-neutral-400">
               {loreItems.length > 0 ? `${loreItems.length}개 항목` : "시나리오 설정을 바탕으로 Lore를 자동 생성합니다"}
@@ -1294,6 +1653,68 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
 
           {loreError && (
             <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-500">{loreError}</p>
+          )}
+          {loreAnalysisError && (
+            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-500">{loreAnalysisError}</p>
+          )}
+
+          {/* 보완 제안 카드 */}
+          {loreGapSuggestions.length > 0 && (
+            <div className="space-y-2 rounded-xl border border-teal-200 bg-teal-50/50 p-3 dark:border-teal-700/40 dark:bg-teal-900/10">
+              <p className="text-xs font-semibold text-teal-700 dark:text-teal-300">
+                🔍 AI 보완 제안 ({loreGapSuggestions.length}개)
+              </p>
+              <p className="text-xs text-teal-600/80 dark:text-teal-400/80">
+                이 시나리오 플레이에 필요할 것으로 예측되는 누락 Lore입니다. 각 항목을 채용하거나 건너뛸 수 있습니다.
+              </p>
+              {loreGapSuggestions.map((s, idx) => (
+                <div
+                  key={idx}
+                  className={`rounded-lg border p-3 text-xs transition ${
+                    acceptedGapIndices.has(idx)
+                      ? "border-teal-400 bg-teal-100/60 dark:border-teal-600 dark:bg-teal-900/30"
+                      : "border-black/10 bg-white dark:border-white/10 dark:bg-white/5"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                        s.domain === "WORLD_LORE"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                          : "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300"
+                      }`}>
+                        {s.domain === "WORLD_LORE" ? "세계" : "개인"}
+                      </span>
+                      <span className="text-neutral-500">[{s.category}]</span>
+                      <span className="text-neutral-400">⚡{s.importance_weight}</span>
+                    </div>
+                    {acceptedGapIndices.has(idx) ? (
+                      <span className="rounded-full bg-teal-500 px-2 py-0.5 text-[10px] font-semibold text-white">채용됨</span>
+                    ) : (
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => acceptLoreGapSuggestion(idx)}
+                          className="rounded-lg bg-teal-500 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-teal-600"
+                        >채용</button>
+                        <button
+                          onClick={() => dismissLoreGapSuggestion(idx)}
+                          className="rounded-lg border border-black/10 px-2.5 py-1 text-[10px] text-neutral-500 hover:bg-neutral-100 dark:border-white/10 dark:hover:bg-white/10"
+                        >건너뜀</button>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed mb-1.5">
+                    {s.lore_text}
+                  </p>
+                  <p className="text-[10px] text-neutral-400">
+                    키워드: {s.trigger_keywords.join(", ")}
+                  </p>
+                  <div className="mt-1.5 rounded bg-teal-50 px-2 py-1 text-[10px] text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">
+                    💡 {s.reason}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
 
           {/* Lore 목록 */}
@@ -1410,6 +1831,243 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
               ← 이전
             </button>
             <button
+              onClick={() => setSubStep("npcs")}
+              className="flex-1 rounded-lg bg-neutral-900 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+            >
+              다음 →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step H: NPC 설계 ── */}
+      {subStep === "npcs" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              게임에 등장할 NPC를 설계합니다. 생략하면 세션 시작 시 자동 생성됩니다.
+            </p>
+            <button
+              onClick={handleGenerateNpcs}
+              disabled={generatingNpcs}
+              className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700 disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 whitespace-nowrap"
+            >
+              {generatingNpcs ? (
+                <><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white dark:border-neutral-900/30 dark:border-t-neutral-900" />생성 중…</>
+              ) : <>✨ AI NPC 생성</>}
+            </button>
+          </div>
+          {npcError && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-500">{npcError}</p>}
+
+          {/* NPC 목록 */}
+          {npcDrafts.length > 0 && (
+            <div className="space-y-2">
+              {npcDrafts.map((npc, idx) => (
+                <div key={idx} className="rounded-xl border border-black/10 bg-white/60 dark:border-white/10 dark:bg-white/5">
+                  {/* 요약 행 */}
+                  <div
+                    className="flex cursor-pointer items-center gap-2 px-3 py-2.5"
+                    onClick={() => setExpandedNpcIdx(expandedNpcIdx === idx ? null : idx)}
+                  >
+                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded whitespace-nowrap ${
+                      npc.role === "boss"    ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" :
+                      npc.role === "enemy"   ? "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300" :
+                      npc.role === "ally"    ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" :
+                                              "bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300"
+                    }`}>
+                      {{ boss: "보스", enemy: "적대", ally: "우호", neutral: "중립" }[npc.role]}
+                    </span>
+                    <span className="flex-1 font-medium text-sm text-neutral-700 dark:text-neutral-300 truncate">
+                      {npc.name || "(이름 없음)"}
+                    </span>
+                    <span className="text-xs text-neutral-400 truncate hidden sm:block">{npc.personality.slice(0, 30)}{npc.personality.length > 30 ? "…" : ""}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeNpcDraft(idx); }}
+                      className="text-neutral-400 hover:text-red-500 flex-shrink-0"
+                    >✕</button>
+                  </div>
+
+                  {/* 편집 패널 */}
+                  {expandedNpcIdx === idx && (
+                    <div className="border-t border-black/5 px-3 py-3 space-y-3 dark:border-white/5">
+                      {/* 이름 + 역할 */}
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={npc.name}
+                          onChange={(e) => updateNpcDraft(idx, { name: e.target.value })}
+                          placeholder="NPC 이름"
+                          maxLength={20}
+                          className="flex-1 rounded border border-black/10 bg-white px-2 py-1.5 text-sm outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                        />
+                        <select
+                          value={npc.role}
+                          onChange={(e) => updateNpcDraft(idx, { role: e.target.value as NpcDraft["role"] })}
+                          className="rounded border border-black/10 bg-white px-2 py-1.5 text-xs dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                        >
+                          <option value="ally">우호 (ally)</option>
+                          <option value="neutral">중립 (neutral)</option>
+                          <option value="enemy">적대 (enemy)</option>
+                          <option value="boss">보스 (boss)</option>
+                        </select>
+                      </div>
+
+                      {/* 성격 */}
+                      <textarea
+                        value={npc.personality}
+                        onChange={(e) => updateNpcDraft(idx, { personality: e.target.value })}
+                        placeholder="성격 묘사"
+                        rows={2}
+                        className="w-full rounded border border-black/10 bg-white px-2 py-1.5 text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-neutral-800 dark:text-white resize-none"
+                      />
+
+                      {/* 숨겨진 동기 */}
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">숨겨진 동기 (GM only)</p>
+                        <input
+                          type="text"
+                          value={npc.hidden_motivation.goal}
+                          onChange={(e) => updateNpcDraft(idx, { hidden_motivation: { ...npc.hidden_motivation, goal: e.target.value } })}
+                          placeholder="목표 (예: 마을을 지배하려 한다)"
+                          className="w-full rounded border border-black/10 bg-white px-2 py-1.5 text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                        />
+                        <input
+                          type="text"
+                          value={npc.hidden_motivation.secret}
+                          onChange={(e) => updateNpcDraft(idx, { hidden_motivation: { ...npc.hidden_motivation, secret: e.target.value } })}
+                          placeholder="비밀 (예: 사실 왕족 후손이다)"
+                          className="w-full rounded border border-black/10 bg-white px-2 py-1.5 text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                        />
+                      </div>
+
+                      {/* 저항 스탯 */}
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">저항 스탯 (DC 기준값)</p>
+                        <div className="flex gap-2">
+                          {(["physical_defense", "mental_willpower", "perception"] as const).map((key) => (
+                            <label key={key} className="flex-1 flex flex-col items-center gap-0.5 text-[10px] text-neutral-400">
+                              {{ physical_defense: "물리방어", mental_willpower: "정신의지", perception: "지각" }[key]}
+                              <input
+                                type="number"
+                                min={1} max={20}
+                                value={npc.resistance_stats[key]}
+                                onChange={(e) => updateNpcDraft(idx, { resistance_stats: { ...npc.resistance_stats, [key]: Number(e.target.value) } })}
+                                className="w-full rounded border border-black/10 bg-white px-1.5 py-1 text-center text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-neutral-800 dark:text-white"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 역할 지시어 */}
+                      <div>
+                        <p className="mb-1 text-xs font-medium text-neutral-500 dark:text-neutral-400">역할 지시어 (AI 대화 시 사용)</p>
+                        <textarea
+                          value={npc.system_prompt}
+                          onChange={(e) => updateNpcDraft(idx, { system_prompt: e.target.value })}
+                          placeholder="이 NPC로 대화할 때 AI가 따를 지침"
+                          rows={3}
+                          className="w-full rounded border border-black/10 bg-white px-2 py-1.5 text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-neutral-800 dark:text-white resize-none"
+                        />
+                      </div>
+
+                      {/* 커스텀 트리거 */}
+                      <div>
+                        <div className="mb-1 flex items-center justify-between">
+                          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">자발적 행동 트리거</p>
+                          <button
+                            onClick={() => addCustomTrigger(idx)}
+                            className="rounded px-2 py-0.5 text-xs bg-neutral-100 hover:bg-neutral-200 dark:bg-white/10 dark:hover:bg-white/20"
+                          >
+                            + 추가
+                          </button>
+                        </div>
+                        {(npc.custom_triggers ?? []).length === 0 && (
+                          <p className="text-xs text-neutral-400 dark:text-neutral-500">트리거 없음 (내장 트리거만 적용)</p>
+                        )}
+                        {(npc.custom_triggers ?? []).map((ct, ctIdx) => (
+                          <div key={ct.id} className="mb-2 rounded border border-black/10 bg-neutral-50 p-2 dark:border-white/10 dark:bg-neutral-800/50">
+                            <div className="mb-1.5 flex items-center gap-1">
+                              {/* 조건 필드 */}
+                              <select
+                                value={ct.condition_field}
+                                onChange={(e) => updateCustomTrigger(idx, ctIdx, { condition_field: e.target.value })}
+                                className="rounded border border-black/10 bg-white px-1.5 py-1 text-xs dark:border-white/10 dark:bg-neutral-700 dark:text-white"
+                              >
+                                <option value="affinity">호감도</option>
+                                <option value="fear_survival">공포</option>
+                                <option value="mental_stress">스트레스</option>
+                                <option value="trust">신뢰</option>
+                                <option value="suspicion">의심</option>
+                                <option value="curiosity">호기심</option>
+                              </select>
+                              {/* 연산자 */}
+                              <select
+                                value={ct.condition_op}
+                                onChange={(e) => updateCustomTrigger(idx, ctIdx, { condition_op: e.target.value as NpcCustomTrigger["condition_op"] })}
+                                className="rounded border border-black/10 bg-white px-1.5 py-1 text-xs dark:border-white/10 dark:bg-neutral-700 dark:text-white"
+                              >
+                                <option value=">=">≥</option>
+                                <option value="<=">≤</option>
+                                <option value=">">{">"}</option>
+                                <option value="<">{"<"}</option>
+                              </select>
+                              {/* 값 */}
+                              <input
+                                type="number"
+                                value={ct.condition_value}
+                                min={-100} max={100}
+                                onChange={(e) => updateCustomTrigger(idx, ctIdx, { condition_value: Number(e.target.value) })}
+                                className="w-16 rounded border border-black/10 bg-white px-1.5 py-1 text-center text-xs dark:border-white/10 dark:bg-neutral-700 dark:text-white"
+                              />
+                              {/* 1회성 */}
+                              <label className="ml-auto flex items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={ct.once}
+                                  onChange={(e) => updateCustomTrigger(idx, ctIdx, { once: e.target.checked })}
+                                />
+                                1회
+                              </label>
+                              {/* 삭제 */}
+                              <button
+                                onClick={() => removeCustomTrigger(idx, ctIdx)}
+                                className="ml-1 text-neutral-400 hover:text-red-500 text-xs"
+                              >✕</button>
+                            </div>
+                            {/* 행동 힌트 */}
+                            <input
+                              type="text"
+                              value={ct.action_hint}
+                              onChange={(e) => updateCustomTrigger(idx, ctIdx, { action_hint: e.target.value })}
+                              placeholder="조건 충족 시 AI에게 전달할 행동 지침"
+                              className="w-full rounded border border-black/10 bg-white px-2 py-1 text-xs outline-none focus:border-yellow-500/60 dark:border-white/10 dark:bg-neutral-700 dark:text-white"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={addEmptyNpc}
+            className="w-full rounded-lg border border-dashed border-black/20 px-3 py-2 text-xs text-neutral-500 hover:bg-neutral-50 dark:border-white/20 dark:hover:bg-white/5"
+          >
+            + NPC 직접 추가
+          </button>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={() => setSubStep("lore")}
+              className="flex-1 rounded-lg border border-black/10 py-2 text-sm text-neutral-600 transition hover:bg-neutral-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5"
+            >
+              ← 이전
+            </button>
+            <button
               onClick={() => setSubStep("rules")}
               className="flex-1 rounded-lg bg-neutral-900 py-2 text-sm font-semibold text-white transition hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
             >
@@ -1422,30 +2080,217 @@ export default function ScenarioCreateStep({ onComplete, onBack, initialData }: 
       {/* ── Step G: 게임 룰 ── */}
       {subStep === "rules" && (
         <div className="space-y-6">
+          {/* AI 룰 제안 */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">AI 룰 제안</h3>
+              <button
+                onClick={handleGenerateRules}
+                disabled={generatingRules}
+                className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-500 disabled:opacity-50"
+              >
+                {generatingRules ? "분석 중..." : "✨ AI 제안 받기"}
+              </button>
+            </div>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-3">
+              시나리오 테마와 목표를 분석해서 어울리는 게임 룰을 추천합니다. 각 제안을 수락하거나 무시할 수 있습니다.
+            </p>
+            {rulesError && <p className="text-xs text-red-500 mb-2">{rulesError}</p>}
+
+            {rulesSuggestion && (
+              <div className="space-y-2">
+                {/* 정보 공개 규칙 제안 카드 */}
+                {!infoSuggestionDismissed && (
+                  <div className="rounded-lg border border-violet-300 dark:border-violet-700 bg-violet-50 dark:bg-violet-950/30 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-violet-700 dark:text-violet-400 mb-0.5">
+                          정보 공개 규칙 — 아이템 비공개 {rulesSuggestion.info_rules.private_items ? "ON" : "OFF"} / Lore 비공개 {rulesSuggestion.info_rules.private_lore ? "ON" : "OFF"}
+                        </p>
+                        <p className="text-xs text-neutral-600 dark:text-neutral-400">{rulesSuggestion.info_rules.reason}</p>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <button
+                          onClick={acceptInfoRuleSuggestion}
+                          className="rounded px-2 py-1 text-xs bg-violet-600 text-white hover:bg-violet-500"
+                        >
+                          수락
+                        </button>
+                        <button
+                          onClick={() => setInfoSuggestionDismissed(true)}
+                          className="rounded px-2 py-1 text-xs text-neutral-500 hover:text-neutral-300"
+                        >
+                          무시
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 특수 자원 제안 카드 */}
+                {rulesSuggestion.resource_rules.map((suggested, idx) => (
+                  <div key={idx} className="rounded-lg border border-violet-300 dark:border-violet-700 bg-violet-50 dark:bg-violet-950/30 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-violet-700 dark:text-violet-400 mb-0.5">
+                          특수 자원 — {suggested.stat_key}
+                        </p>
+                        <p className="text-xs text-neutral-600 dark:text-neutral-400 mb-1">{suggested.reason}</p>
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400 space-y-0.5">
+                          {suggested.change_conditions.map((c, ci) => (
+                            <p key={ci}>{c.delta > 0 ? "+" : ""}{c.delta} — {c.trigger}</p>
+                          ))}
+                          {suggested.depletion_effect && (
+                            <p className="text-red-500 dark:text-red-400">고갈: {suggested.depletion_effect}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <button
+                          onClick={() => acceptResourceRuleSuggestion(idx)}
+                          className="rounded px-2 py-1 text-xs bg-violet-600 text-white hover:bg-violet-500"
+                        >
+                          수락
+                        </button>
+                        <button
+                          onClick={() => setRulesSuggestion((prev) => prev ? { ...prev, resource_rules: prev.resource_rules.filter((_, i) => i !== idx) } : prev)}
+                          className="rounded px-2 py-1 text-xs text-neutral-500 hover:text-neutral-300"
+                        >
+                          무시
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {infoSuggestionDismissed && rulesSuggestion.resource_rules.length === 0 && (
+                  <p className="text-xs text-neutral-400 italic">모든 제안을 처리했습니다.</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 정보 공개 규칙 */}
           <div>
             <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-1">정보 공개 규칙</h3>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">
-              플레이어가 발견한 아이템과 단서를 다른 플레이어에게 숨길지 설정합니다.
-              추리 미스터리나 비밀이 중요한 시나리오에 적합합니다.
+              어떤 정보를 발견한 플레이어에게만 보일지 설정합니다. 다른 플레이어 화면에는 숨겨지며, 본인 화면에는 🔒 표시가 붙습니다.
             </p>
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <div className="relative mt-0.5">
-                <input
-                  type="checkbox"
-                  className="sr-only"
-                  checked={usePrivateInfo}
-                  onChange={(e) => setUsePrivateInfo(e.target.checked)}
-                />
-                <div className={`w-10 h-6 rounded-full transition-colors ${usePrivateInfo ? "bg-indigo-600" : "bg-neutral-300 dark:bg-neutral-600"}`} />
-                <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${usePrivateInfo ? "translate-x-4" : ""}`} />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-neutral-800 dark:text-neutral-200">비공개 정보 사용</p>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-                  ON: 아이템 획득, Lore 발견이 해당 플레이어에게만 표시됩니다. 본인 화면에는 🔒 표시가 붙습니다.
-                </p>
-              </div>
-            </label>
+            <div className="space-y-3">
+              {([
+                { key: "items", label: "아이템 획득 비공개", desc: "플레이어가 아이템을 줍거나 받았을 때 다른 플레이어에게 숨깁니다.", value: privateItems, set: setPrivateItems },
+                { key: "lore",  label: "Lore 발견 비공개",  desc: "플레이어가 세계관 단서를 발견했을 때 다른 플레이어에게 숨깁니다.", value: privateLore,  set: setPrivateLore  },
+              ] as const).map(({ key, label, desc, value, set }) => (
+                <label key={key} className="flex items-start gap-3 cursor-pointer">
+                  <div className="relative mt-0.5 shrink-0">
+                    <input type="checkbox" className="sr-only" checked={value} onChange={(e) => set(e.target.checked)} />
+                    <div className={`w-10 h-6 rounded-full transition-colors ${value ? "bg-indigo-600" : "bg-neutral-300 dark:bg-neutral-600"}`} />
+                    <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${value ? "translate-x-4" : ""}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-neutral-800 dark:text-neutral-200">{label}</p>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* 특수 자원 규칙 */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">특수 자원 규칙</h3>
+              <button
+                onClick={() => {
+                  const firstStat = statSchema[0]?.key ?? "hp";
+                  setResourceRules((prev) => [...prev, { stat_key: firstStat, change_conditions: [], depletion_effect: "" }]);
+                }}
+                className="text-xs text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+              >
+                + 자원 추가
+              </button>
+            </div>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-3">
+              시나리오에서 자동으로 변동되는 특수 자원을 설정합니다. GM AI가 상황에 맞게 자동 조정합니다.
+              (예: 호러 — 정신력 🧠이 공포 장면에서 감소)
+            </p>
+            <div className="space-y-3">
+              {resourceRules.map((rule, rIdx) => (
+                <div key={rIdx} className="rounded-lg border border-black/10 dark:border-white/10 p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={rule.stat_key}
+                      onChange={(e) => setResourceRules((prev) => prev.map((r, i) => i === rIdx ? { ...r, stat_key: e.target.value } : r))}
+                      className="flex-1 rounded border border-black/10 dark:border-white/10 bg-white dark:bg-neutral-800 px-2 py-1 text-xs"
+                    >
+                      {statSchema.map((s) => (
+                        <option key={s.key} value={s.key}>{s.icon ? `${s.icon} ` : ""}{s.label} ({s.key})</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setResourceRules((prev) => prev.filter((_, i) => i !== rIdx))}
+                      className="text-xs text-red-500 hover:text-red-400 px-1"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    {rule.change_conditions.map((cond, cIdx) => (
+                      <div key={cIdx} className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          placeholder="조건 설명 (예: 공포 장면 목격)"
+                          value={cond.trigger}
+                          onChange={(e) => setResourceRules((prev) => prev.map((r, i) => i === rIdx ? {
+                            ...r,
+                            change_conditions: r.change_conditions.map((c, j) => j === cIdx ? { ...c, trigger: e.target.value } : c)
+                          } : r))}
+                          className="flex-1 rounded border border-black/10 dark:border-white/10 bg-white dark:bg-neutral-800 px-2 py-1 text-xs"
+                        />
+                        <input
+                          type="number"
+                          placeholder="±"
+                          value={cond.delta}
+                          onChange={(e) => setResourceRules((prev) => prev.map((r, i) => i === rIdx ? {
+                            ...r,
+                            change_conditions: r.change_conditions.map((c, j) => j === cIdx ? { ...c, delta: Number(e.target.value) } : c)
+                          } : r))}
+                          className="w-16 rounded border border-black/10 dark:border-white/10 bg-white dark:bg-neutral-800 px-2 py-1 text-xs text-center"
+                        />
+                        <button
+                          onClick={() => setResourceRules((prev) => prev.map((r, i) => i === rIdx ? {
+                            ...r,
+                            change_conditions: r.change_conditions.filter((_, j) => j !== cIdx)
+                          } : r))}
+                          className="text-xs text-neutral-400 hover:text-red-400"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => setResourceRules((prev) => prev.map((r, i) => i === rIdx ? {
+                        ...r,
+                        change_conditions: [...r.change_conditions, { trigger: "", delta: -10 }]
+                      } : r))}
+                      className="text-xs text-neutral-500 hover:text-neutral-300"
+                    >
+                      + 조건 추가
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="고갈 효과 (선택, 예: 패닉 상태 — 행동 제한)"
+                    value={rule.depletion_effect ?? ""}
+                    onChange={(e) => setResourceRules((prev) => prev.map((r, i) => i === rIdx ? { ...r, depletion_effect: e.target.value } : r))}
+                    className="w-full rounded border border-black/10 dark:border-white/10 bg-white dark:bg-neutral-800 px-2 py-1 text-xs"
+                  />
+                </div>
+              ))}
+              {resourceRules.length === 0 && (
+                <p className="text-xs text-neutral-400 italic">자원 규칙 없음 — 기본 HP 변동만 적용됩니다.</p>
+              )}
+            </div>
           </div>
 
           <div className="flex gap-2 pt-1">

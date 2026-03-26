@@ -10,14 +10,30 @@ interface Props {
 
 export default function GameControls({ amIHost, onLeave, onSave, onDelete, saveStatus }: Props) {
   return (
-    <div className="rounded-xl border border-black/10 bg-black/[0.04] p-4 dark:border-white/10 dark:bg-white/5">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-neutral-500">
+    <div className="rounded-xl p-3" style={{ border: "1px solid var(--skin-border)", background: "var(--skin-bg-card)" }}>
+      <p
+        className="mb-2 text-[9px] font-semibold uppercase tracking-widest"
+        style={{ color: "var(--skin-text-muted)", fontFamily: "var(--skin-font-display)" }}
+      >
         방 관리
       </p>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         <button
           onClick={onLeave}
-          className="w-full rounded-lg border border-black/10 bg-white/60 px-3 py-2 text-left text-sm text-neutral-700 transition-colors hover:border-neutral-400/50 hover:bg-neutral-100 dark:border-white/10 dark:bg-white/5 dark:text-neutral-300 dark:hover:border-white/20 dark:hover:bg-white/10"
+          className="w-full rounded-lg px-3 py-2 text-left text-xs transition"
+          style={{
+            border: "1px solid var(--skin-border)",
+            background: "var(--skin-bg-secondary)",
+            color: "var(--skin-text-muted)",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.color = "var(--skin-text)";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--skin-accent)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.color = "var(--skin-text-muted)";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--skin-border)";
+          }}
         >
           나가기
         </button>
@@ -27,17 +43,23 @@ export default function GameControls({ amIHost, onLeave, onSave, onDelete, saveS
             <button
               onClick={onSave}
               disabled={saveStatus === "saving"}
-              className="w-full rounded-lg border border-blue-500/30 bg-blue-500/5 px-3 py-2 text-left text-sm text-blue-700 transition-colors hover:bg-blue-500/10 disabled:opacity-50 dark:text-blue-400"
+              className="w-full rounded-lg px-3 py-2 text-left text-xs transition disabled:opacity-50"
+              style={{
+                border: "1px solid rgba(96,165,250,0.3)",
+                background: "rgba(96,165,250,0.06)",
+                color: "#60a5fa",
+              }}
             >
-              {saveStatus === "saving"
-                ? "저장 중..."
-                : saveStatus === "saved"
-                  ? "저장됨 ✓"
-                  : "저장"}
+              {saveStatus === "saving" ? "저장 중..." : saveStatus === "saved" ? "저장됨 ✓" : "저장"}
             </button>
             <button
               onClick={onDelete}
-              className="w-full rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-left text-sm text-red-700 transition-colors hover:bg-red-500/10 dark:text-red-400"
+              className="w-full rounded-lg px-3 py-2 text-left text-xs transition"
+              style={{
+                border: "1px solid rgba(248,113,113,0.3)",
+                background: "rgba(248,113,113,0.06)",
+                color: "#f87171",
+              }}
             >
               방 제거
             </button>

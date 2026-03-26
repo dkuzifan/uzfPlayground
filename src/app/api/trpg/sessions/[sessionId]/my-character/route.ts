@@ -1,21 +1,30 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 interface RouteParams {
   params: Promise<{ sessionId: string }>;
 }
 
-// ── GET /api/trpg/sessions/[sessionId]/my-character?localId=xxx ──────
+// ── GET /api/trpg/sessions/[sessionId]/my-character ──────────────────────────
 // 해당 세션에 이미 내 Player_Character가 있는지 확인.
 // - exists: true  → 이미 참여 중, 바로 대기실로 이동
 // - exists: false → 캐릭터 생성 필요, scenario 정보 반환
 export async function GET(request: Request, { params }: RouteParams) {
   const { sessionId } = await params;
-  const { searchParams } = new URL(request.url);
-  const localId = searchParams.get("localId");
 
-  if (!localId) {
-    return NextResponse.json({ error: "localId는 필수입니다." }, { status: 400 });
+  // 서버사이드 인증
+  const authClient = await createClient();
+  const { data: { user } } = await authClient.auth.getUser();
+
+  // 하위호환: auth 없으면 query param localId 사용
+  let userId = user?.id ?? null;
+  if (!userId) {
+    const { searchParams } = new URL(request.url);
+    userId = searchParams.get("localId");
+  }
+
+  if (!userId) {
+    return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
 
   const supabase = createServiceClient();
@@ -25,7 +34,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     .from("Player_Character")
     .select("id")
     .eq("session_id", sessionId)
-    .eq("user_id", localId)
+    .eq("user_id", userId)
     .single();
 
   if (pc) {

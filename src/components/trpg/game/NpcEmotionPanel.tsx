@@ -1,186 +1,181 @@
 "use client";
 
+import { useState } from "react";
+import Portrait from "./Portrait";
 import type { NpcPersona } from "@/lib/trpg/types/game";
 import type { NpcDynamicState } from "@/lib/trpg/types/character";
 
 interface Props {
   npcs: NpcPersona[];
   dynamicStates: Record<string, NpcDynamicState> | null;
+  sessionTheme?: string;
 }
 
-function StatBar({
-  label,
-  value,
-  min = 0,
-  max = 100,
-  colorClass,
-}: {
-  label: string;
-  value: number;
-  min?: number;
-  max?: number;
-  colorClass: string;
-}) {
-  const ratio = (value - min) / (max - min);
-  const pct = Math.round(Math.max(0, Math.min(1, ratio)) * 100);
+function AffinityRow({ label, value }: { label: string; value: number }) {
+  const pct = Math.min(100, Math.abs(value));
+  const isPos = value >= 0;
   return (
-    <div>
-      <div className="mb-0.5 flex justify-between text-xs">
-        <span className="text-neutral-500 dark:text-neutral-400">{label}</span>
-        <span className="font-medium tabular-nums text-neutral-700 dark:text-neutral-300">
-          {value}
-        </span>
-      </div>
-      <div className="h-1.5 w-full rounded-full bg-black/10 dark:bg-white/10">
+    <div className="flex items-center gap-1.5">
+      <span className="w-6 text-[9px]" style={{ color: "var(--skin-text-muted)" }}>{label}</span>
+      <div className="relative h-1.5 flex-1 rounded-full" style={{ background: "var(--skin-bg-card)" }}>
+        <div className="absolute inset-y-0 left-1/2 w-px" style={{ background: "var(--skin-border)" }} />
         <div
-          className={`h-1.5 rounded-full transition-all ${colorClass}`}
-          style={{ width: `${pct}%` }}
+          className="absolute inset-y-0 rounded-full transition-all duration-500"
+          style={{
+            background: isPos ? "#4ade80" : "#f87171",
+            ...(isPos
+              ? { left: "50%", width: `${pct / 2}%` }
+              : { right: "50%", width: `${pct / 2}%` }),
+          }}
         />
       </div>
+      <span className="w-6 text-right text-[9px]" style={{ color: isPos ? "#4ade80" : "#f87171" }}>
+        {value > 0 ? "+" : ""}{value}
+      </span>
     </div>
   );
 }
 
-function AffinityBar({ value }: { value: number }) {
-  // -100~100 → 가운데 기준 좌우로 뻗는 바
-  const isPositive = value >= 0;
-  const pct = Math.round(Math.abs(value));
-  const colorClass = isPositive
-    ? "bg-rose-400 dark:bg-rose-500"
-    : "bg-slate-400 dark:bg-slate-500";
+function MoodBadge({ mood, fearHigh }: { mood?: string; fearHigh: boolean }) {
+  if (!mood && !fearHigh) return null;
   return (
-    <div>
-      <div className="mb-0.5 flex justify-between text-xs">
-        <span className="text-neutral-500 dark:text-neutral-400">호감도</span>
-        <span
-          className={`font-medium tabular-nums ${
-            isPositive
-              ? "text-rose-600 dark:text-rose-400"
-              : "text-slate-500 dark:text-slate-400"
-          }`}
-        >
-          {value > 0 ? "+" : ""}
-          {value}
+    <div className="mt-1.5 flex flex-wrap gap-1">
+      {fearHigh && (
+        <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold"
+          style={{ background: "rgba(239,68,68,0.15)", color: "#f87171" }}>
+          공포
         </span>
-      </div>
-      <div className="relative h-1.5 w-full rounded-full bg-black/10 dark:bg-white/10">
-        {/* 중앙선 */}
-        <div className="absolute inset-y-0 left-1/2 w-px bg-black/20 dark:bg-white/20" />
-        {isPositive ? (
-          <div
-            className={`absolute inset-y-0 left-1/2 rounded-full ${colorClass}`}
-            style={{ width: `${pct / 2}%` }}
-          />
-        ) : (
-          <div
-            className={`absolute inset-y-0 rounded-full ${colorClass}`}
-            style={{ right: "50%", width: `${pct / 2}%` }}
-          />
-        )}
-      </div>
+      )}
+      {mood && (
+        <span className="text-[10px] italic" style={{ color: "var(--skin-text-muted)" }}>{mood}</span>
+      )}
     </div>
   );
 }
 
-function TrustBar({ value }: { value: number }) {
-  const isPositive = value >= 0;
-  const pct = Math.round(Math.abs(value));
-  const colorClass = isPositive
-    ? "bg-sky-400 dark:bg-sky-500"
-    : "bg-orange-400 dark:bg-orange-500";
-  return (
-    <div>
-      <div className="mb-0.5 flex justify-between text-xs">
-        <span className="text-neutral-500 dark:text-neutral-400">신뢰도</span>
-        <span
-          className={`font-medium tabular-nums ${
-            isPositive
-              ? "text-sky-600 dark:text-sky-400"
-              : "text-orange-600 dark:text-orange-400"
-          }`}
-        >
-          {value > 0 ? "+" : ""}
-          {value}
-        </span>
-      </div>
-      <div className="relative h-1.5 w-full rounded-full bg-black/10 dark:bg-white/10">
-        <div className="absolute inset-y-0 left-1/2 w-px bg-black/20 dark:bg-white/20" />
-        {isPositive ? (
-          <div
-            className={`absolute inset-y-0 left-1/2 rounded-full ${colorClass}`}
-            style={{ width: `${pct / 2}%` }}
-          />
-        ) : (
-          <div
-            className={`absolute inset-y-0 rounded-full ${colorClass}`}
-            style={{ right: "50%", width: `${pct / 2}%` }}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
+export default function NpcEmotionPanel({ npcs, dynamicStates, sessionTheme }: Props) {
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [portraitUrls, setPortraitUrls] = useState<Record<string, string>>({});
 
-export default function NpcEmotionPanel({ npcs, dynamicStates }: Props) {
-  if (npcs.length === 0 || !dynamicStates) return null;
+  const visibleNpcs = npcs.filter((npc) => dynamicStates?.[npc.id]);
+  if (visibleNpcs.length === 0) return null;
+
+  async function handleGenerate(npc: NpcPersona) {
+    setGeneratingId(npc.id);
+    try {
+      const res = await fetch("/api/trpg/portraits/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          characterName: npc.name,
+          job: npc.role,
+          theme: sessionTheme,
+          npcId: npc.id,
+        }),
+      });
+      const data = await res.json();
+      if (data.url) setPortraitUrls((prev) => ({ ...prev, [npc.id]: data.url }));
+    } catch { /* ignore */ }
+    finally { setGeneratingId(null); }
+  }
 
   return (
-    <div className="space-y-3 rounded-xl border border-black/10 bg-black/[0.04] p-4 dark:border-white/10 dark:bg-white/5">
-      <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-        NPC 심리 상태
+    <div
+      className="rounded-xl p-3"
+      style={{ border: "1px solid var(--skin-border)", background: "var(--skin-bg-card)" }}
+    >
+      <p
+        className="mb-3 text-[9px] font-semibold uppercase tracking-widest"
+        style={{ color: "var(--skin-text-muted)", fontFamily: "var(--skin-font-display)" }}
+      >
+        NPC 관계
       </p>
 
-      {npcs.map((npc) => {
-        const state = dynamicStates[npc.id];
-        if (!state) return null;
+      <div className="flex flex-col gap-3">
+        {visibleNpcs.map((npc) => {
+          const state = dynamicStates![npc.id];
+          const fearHigh = state.fear_survival >= 80;
+          const existingUrl = (npc as unknown as { portrait_url?: string }).portrait_url
+            ?? portraitUrls[npc.id];
 
-        const fearHigh = state.fear_survival >= 80;
-
-        return (
-          <div key={npc.id} className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-                {npc.name}
-              </span>
-              {fearHigh && (
-                <span className="rounded bg-red-100 px-1 py-0.5 text-[10px] font-bold text-red-600 dark:bg-red-500/20 dark:text-red-400">
-                  공포
-                </span>
-              )}
-              {state.current_mood && (
-                <span className="ml-auto text-[11px] text-neutral-400 dark:text-neutral-500">
-                  {state.current_mood}
-                </span>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <AffinityBar value={state.affinity} />
-              <TrustBar value={state.trust} />
-              <StatBar
-                label="스트레스"
-                value={state.mental_stress}
-                colorClass="bg-violet-400 dark:bg-violet-500"
+          return (
+            <div
+              key={npc.id}
+              className="flex items-start gap-2.5 rounded-lg p-2"
+              style={{ background: "var(--skin-bg-secondary)", border: "1px solid var(--skin-border)" }}
+            >
+              {/* 초상화 */}
+              <Portrait
+                portraitUrl={existingUrl}
+                seed={npc.name}
+                size={40}
+                onGenerate={() => handleGenerate(npc)}
+                generating={generatingId === npc.id}
+                className="flex-shrink-0"
               />
-              <StatBar
-                label="공포"
-                value={state.fear_survival}
-                colorClass={
-                  fearHigh
-                    ? "bg-red-500 dark:bg-red-500"
-                    : "bg-red-300 dark:bg-red-400"
-                }
-              />
-            </div>
 
-            {state.power_dynamics && (
-              <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
-                ⚖ {state.power_dynamics}
-              </p>
-            )}
-          </div>
-        );
-      })}
+              <div className="min-w-0 flex-1">
+                {/* 이름 + 역할 */}
+                <div className="flex items-baseline justify-between gap-1">
+                  <span
+                    className="truncate text-xs font-semibold"
+                    style={{ color: "var(--skin-text)", fontFamily: "var(--skin-font-display)" }}
+                  >
+                    {npc.name}
+                  </span>
+                  {npc.is_introduced && (
+                    <span className="shrink-0 text-[9px]" style={{ color: "var(--skin-accent)" }}>
+                      등장
+                    </span>
+                  )}
+                </div>
+                <p className="mb-1.5 text-[10px]" style={{ color: "var(--skin-text-muted)" }}>
+                  {npc.role}
+                </p>
+
+                {/* 관계 바 */}
+                <AffinityRow label="호감" value={state.affinity} />
+                <AffinityRow label="신뢰" value={state.trust} />
+
+                {/* 기타 심리 */}
+                <div className="mt-1.5 flex gap-2">
+                  <div className="flex-1">
+                    <div className="mb-0.5 flex justify-between text-[9px]">
+                      <span style={{ color: "var(--skin-text-muted)" }}>스트레스</span>
+                      <span style={{ color: "var(--skin-text-muted)" }}>{state.mental_stress}</span>
+                    </div>
+                    <div className="h-1 rounded-full" style={{ background: "var(--skin-bg-card)" }}>
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${state.mental_stress}%`, background: "#a78bfa" }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="mb-0.5 flex justify-between text-[9px]">
+                      <span style={{ color: "var(--skin-text-muted)" }}>공포</span>
+                      <span style={{ color: fearHigh ? "#f87171" : "var(--skin-text-muted)" }}>
+                        {state.fear_survival}
+                      </span>
+                    </div>
+                    <div className="h-1 rounded-full" style={{ background: "var(--skin-bg-card)" }}>
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${state.fear_survival}%`,
+                          background: fearHigh ? "#ef4444" : "#fca5a5",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <MoodBadge mood={state.current_mood} fearHigh={fearHigh} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

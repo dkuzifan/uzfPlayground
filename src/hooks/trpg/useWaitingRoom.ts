@@ -16,7 +16,7 @@ interface WaitingRoomState {
   loading: boolean;
 }
 
-export function useWaitingRoom(sessionId: string, localId: string) {
+export function useWaitingRoom(sessionId: string, userId: string) {
   const router = useRouter();
   const [state, setState] = useState<WaitingRoomState>({
     players: [],
@@ -63,7 +63,7 @@ export function useWaitingRoom(sessionId: string, localId: string) {
         toWaitingPlayer(pc, hostPcId)
       );
 
-      const myPcId = (pcs ?? []).find((pc) => pc.user_id === localId)?.id ?? null;
+      const myPcId = (pcs ?? []).find((pc) => pc.user_id === userId)?.id ?? null;
 
       setState({
         players: initialPlayers,
@@ -142,7 +142,7 @@ export function useWaitingRoom(sessionId: string, localId: string) {
 
   return {
     ...state,
-    localId,
+    userId,
   };
 }
 

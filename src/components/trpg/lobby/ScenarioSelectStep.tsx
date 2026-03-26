@@ -16,6 +16,7 @@ interface Props {
   onSelect: (scenario: ScenarioSummary) => void;
   onCreateNew: () => void;
   onCopyScenario?: (scenarioId: string) => void;
+  onEditScenario?: (scenarioId: string) => void;
 }
 
 const THEME_LABEL: Record<string, string> = {
@@ -43,7 +44,7 @@ const THEME_ICON: Record<string, string> = {
   "sci-fi": "🚀",
 };
 
-export default function ScenarioSelectStep({ onSelect, onCreateNew, onCopyScenario }: Props) {
+export default function ScenarioSelectStep({ onSelect, onCreateNew, onCopyScenario, onEditScenario }: Props) {
   const [scenarios, setScenarios] = useState<ScenarioSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -118,14 +119,24 @@ export default function ScenarioSelectStep({ onSelect, onCreateNew, onCopyScenar
                 </div>
               </button>
 
-              {onCopyScenario && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onCopyScenario(scenario.id); }}
-                  className="absolute right-3 top-3 rounded-lg border border-black/10 bg-white px-2 py-1 text-[10px] font-medium text-neutral-500 opacity-0 transition hover:border-indigo-400/60 hover:bg-indigo-50 hover:text-indigo-600 group-hover:opacity-100 dark:border-white/10 dark:bg-neutral-800 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-400"
-                >
-                  복사해서 편집
-                </button>
-              )}
+              <div className="absolute right-3 top-3 flex gap-1.5 opacity-0 transition group-hover:opacity-100">
+                {onEditScenario && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onEditScenario(scenario.id); }}
+                    className="rounded-lg border border-black/10 bg-white px-2 py-1 text-[10px] font-medium text-neutral-500 hover:border-emerald-400/60 hover:bg-emerald-50 hover:text-emerald-600 dark:border-white/10 dark:bg-neutral-800 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-400"
+                  >
+                    수정
+                  </button>
+                )}
+                {onCopyScenario && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onCopyScenario(scenario.id); }}
+                    className="rounded-lg border border-black/10 bg-white px-2 py-1 text-[10px] font-medium text-neutral-500 hover:border-indigo-400/60 hover:bg-indigo-50 hover:text-indigo-600 dark:border-white/10 dark:bg-neutral-800 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-400"
+                  >
+                    복사해서 편집
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}

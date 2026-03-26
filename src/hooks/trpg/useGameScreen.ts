@@ -6,6 +6,14 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import type { ActionLog, ActionChoice, RawPlayer, GameSession, Scenario, NpcPersona } from "@/lib/trpg/types/game";
 import { JOB_MODIFIERS } from "@/lib/trpg/game/action-utils";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+
+export interface ReactionEvent {
+  id: string;
+  playerId: string;
+  playerName: string;
+  emoji: string;
+}
 
 const FALLBACK_CHOICES: ActionChoice[] = [
   {
@@ -55,6 +63,9 @@ export function useGameScreen(sessionId: string, localId: string | null) {
   const [saveStatus, setSaveStatus]     = useState<"idle" | "saving" | "saved">("idle");
   const [sessionDeleted, setSessionDeleted] = useState(false);
   const [gameEnded, setGameEnded]       = useState(false);
+
+  const [recentReactions, setRecentReactions] = useState<ReactionEvent[]>([]);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   const isMyTurn =
     !!session && !!myPlayer && session.current_turn_player_id === myPlayer.id;
@@ -134,7 +145,11 @@ export function useGameScreen(sessionId: string, localId: string | null) {
   // ── 내 턴 시작 감지 → 선택지 자동 생성 ─────────────────────────────
   useEffect(() => {
     if (isMyTurn && !prevIsMyTurnRef.current && myPlayer && localId) {
-      fetchChoices(sessionId, myPlayer.id, localId);
+      fetchChoices(sessionId, myPlayer.id, localId).then((result) => {
+        if (result?.is_fallback) {
+          toast.info("선택지 생성에 오류가 발생했습니다. 기본 선택지로 진행합니다.");
+        }
+      });
     }
     prevIsMyTurnRef.current = isMyTurn;
   }, [isMyTurn, myPlayer, localId, sessionId, fetchChoices]);
@@ -179,9 +194,22 @@ export function useGameScreen(sessionId: string, localId: string | null) {
           prev && prev.id === updated.id ? { ...prev, stats: updated.stats, inventory: updated.inventory } : prev
         );
       })
+      .on("broadcast", { event: "reaction" }, (payload) => {
+        const reaction = payload.payload as Omit<ReactionEvent, "id">;
+        const id = crypto.randomUUID();
+        setRecentReactions((prev) => [...prev, { ...reaction, id }]);
+        setTimeout(() => {
+          setRecentReactions((prev) => prev.filter((r) => r.id !== id));
+        }, 3500);
+      })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    channelRef.current = channel;
+
+    return () => {
+      channelRef.current = null;
+      supabase.removeChannel(channel);
+    };
   }, [sessionId]);
 
   // ── 행동 제출 ────────────────────────────────────────────────────────
@@ -378,6 +406,26 @@ export function useGameScreen(sessionId: string, localId: string | null) {
     }
   }, [sessionId, localId]);
 
+  // ── 감정 반응 전송 (Realtime broadcast) ──────────────────────────────
+  const sendReaction = useCallback((emoji: string) => {
+    if (!channelRef.current || !myPlayer) return;
+    channelRef.current.send({
+      type: "broadcast",
+      event: "reaction",
+      payload: { playerId: myPlayer.id, playerName: myPlayer.player_name, emoji },
+    }).catch(() => {});
+  }, [myPlayer]);
+
+  // ── 지원 선언 ──────────────────────────────────────────────────────────
+  const declareAssist = useCallback(async () => {
+    if (!myPlayer || !localId) return;
+    await fetch("/api/trpg/game/assist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId, player_id: myPlayer.id, local_id: localId }),
+    });
+  }, [sessionId, myPlayer, localId]);
+
   // ── 방 제거 ───────────────────────────────────────────────────────────
   const deleteRoom = useCallback(async () => {
     if (!localId) return;
@@ -412,5 +460,8 @@ export function useGameScreen(sessionId: string, localId: string | null) {
     leaveRoom,
     saveGame,
     deleteRoom,
+    recentReactions,
+    sendReaction,
+    declareAssist,
   };
 }

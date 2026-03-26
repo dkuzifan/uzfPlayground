@@ -100,6 +100,8 @@ export interface Database {
           knowledge_level: number;
           // v4 추가
           is_introduced: boolean;
+          // v5 추가
+          portrait_url: string | null;
           created_at: string;
         };
         Insert: {
@@ -143,6 +145,8 @@ export interface Database {
           knowledge_level?: number;
           // v4 추가
           is_introduced?: boolean;
+          // v5 추가
+          portrait_url?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["NPC_Persona"]["Insert"]>;
@@ -237,6 +241,8 @@ export interface Database {
           };
           equipped_items: unknown[];
           status_effects: unknown[];
+          // v5 추가
+          portrait_url: string | null;
           joined_at: string;
           updated_at: string;
         };
@@ -270,6 +276,8 @@ export interface Database {
           };
           equipped_items?: unknown[];
           status_effects?: unknown[];
+          // v5 추가
+          portrait_url?: string | null;
           joined_at?: string;
           updated_at?: string;
         };

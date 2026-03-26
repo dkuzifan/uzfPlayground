@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import type { ActionLog, DiceRoll, HpChange } from "@/lib/trpg/types/game";
 
 interface Props {
@@ -8,51 +9,37 @@ interface Props {
   myPlayerId?: string;
 }
 
-const OUTCOME_STYLE: Record<
-  string,
-  { border: string; text: string; shadow: string; label: string }
-> = {
-  great_success: {
-    border: "border-yellow-400",
-    text: "text-yellow-600 dark:text-yellow-400",
-    shadow: "shadow-yellow-400/40",
-    label: "⚡ 대성공",
-  },
-  success: {
-    border: "border-green-500",
-    text: "text-green-600 dark:text-green-400",
-    shadow: "shadow-green-400/30",
-    label: "✦ 성공",
-  },
-  failure: {
-    border: "border-red-500",
-    text: "text-red-600 dark:text-red-500",
-    shadow: "shadow-red-500/30",
-    label: "✕ 실패",
-  },
-};
-
+// ── 주사위 결과 카드 ────────────────────────────────────
 function DiceRollCard({ dice, outcome }: { dice: DiceRoll; outcome: string | null }) {
-  const style = OUTCOME_STYLE[outcome ?? "failure"] ?? OUTCOME_STYLE.failure;
+  const cfg = {
+    great_success: { num: "text-yellow-400", label: "⚡ 대성공", glow: "0 0 20px rgba(250,204,21,0.4)" },
+    success:       { num: "text-green-400",  label: "✦ 성공",    glow: "0 0 12px rgba(74,222,128,0.3)" },
+    failure:       { num: "text-red-400",    label: "✕ 실패",    glow: "none" },
+  }[outcome ?? "failure"] ?? { num: "text-red-400", label: "✕ 실패", glow: "none" };
+
   return (
     <div
-      className={`mt-2 rounded-lg border ${style.border} bg-black/10 p-3 shadow-lg dark:bg-black/30 ${style.shadow}`}
+      className="mt-2 flex items-center gap-3 rounded-lg px-3 py-2.5"
+      style={{
+        background: "var(--skin-bg-secondary)",
+        border: "1px solid var(--skin-border)",
+        boxShadow: cfg.glow,
+      }}
     >
-      <div className="flex items-center gap-3">
-        <div className={`text-3xl font-black tabular-nums ${style.text}`}>
-          {dice.rolled}
-        </div>
-        <div className="flex-1">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            d20({dice.rolled}) + {dice.modifier} = {dice.total}
-          </p>
-          <p className={`text-sm font-bold ${style.text}`}>{style.label}</p>
-        </div>
+      <span className={`text-3xl font-black tabular-nums ${cfg.num}`} style={{ fontFamily: "var(--skin-font-display)" }}>
+        {dice.rolled}
+      </span>
+      <div>
+        <p className="text-xs" style={{ color: "var(--skin-text-muted)" }}>
+          d20({dice.rolled}) + {dice.modifier} = {dice.total}
+        </p>
+        <p className={`text-sm font-bold ${cfg.num}`}>{cfg.label}</p>
       </div>
     </div>
   );
 }
 
+// ── HP 변화 카드 ────────────────────────────────────────
 function HpChangeCard({ changes }: { changes: HpChange[] }) {
   if (changes.length === 0) return null;
   return (
@@ -60,29 +47,26 @@ function HpChangeCard({ changes }: { changes: HpChange[] }) {
       {changes.map((c) => (
         <div
           key={c.target_id}
-          className="flex items-center gap-2 rounded-md bg-black/5 px-3 py-1.5 text-sm dark:bg-white/5"
+          className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm"
+          style={{ background: "var(--skin-bg-secondary)", color: "var(--skin-text)" }}
         >
-          <span className="text-neutral-700 dark:text-neutral-300">{c.name}</span>
-          <span className="text-neutral-500">
-            {c.old_hp} → {c.new_hp}
-          </span>
-          <span
-            className={`ml-auto font-bold ${
-              c.delta < 0
-                ? "text-red-500 dark:text-red-400"
-                : c.delta > 0
-                  ? "text-green-600 dark:text-green-400"
-                  : "text-neutral-500"
-            }`}
-          >
-            {c.delta > 0 ? "+" : ""}
-            {c.delta} HP
+          <span>{c.name}</span>
+          <span style={{ color: "var(--skin-text-muted)" }}>{c.old_hp} → {c.new_hp}</span>
+          <span className={`ml-auto font-bold ${c.delta < 0 ? "text-red-400" : c.delta > 0 ? "text-green-400" : ""}`}>
+            {c.delta > 0 ? "+" : ""}{c.delta} HP
           </span>
         </div>
       ))}
     </div>
   );
 }
+
+// ── 메시지 등장 애니메이션 ───────────────────────────────
+const msgAnim = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.25 },
+} as const;
 
 export default function ChatLog({ logs, myPlayerId }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -92,126 +76,203 @@ export default function ChatLog({ logs, myPlayerId }: Props) {
   }, [logs]);
 
   return (
-    <div className="flex-1 overflow-y-auto rounded-xl border border-black/10 bg-black/[0.04] p-4 dark:border-white/10 dark:bg-white/5">
-      <div className="flex flex-col gap-3">
+    <div
+      className="flex min-h-0 flex-1 overflow-y-auto rounded-xl p-4 scrollbar-thin"
+      style={{
+        background: "var(--skin-bg-card)",
+        border: "1px solid var(--skin-border)",
+        color: "var(--skin-text)",
+        fontFamily: "var(--skin-font-body)",
+      }}
+    >
+      <div className="flex w-full flex-col gap-4">
         {logs.length === 0 && (
-          <p className="py-8 text-center text-sm text-neutral-500">
+          <p className="py-8 text-center text-sm" style={{ color: "var(--skin-text-muted)" }}>
             게임이 시작되었습니다.
           </p>
         )}
 
         {logs.map((log) => {
-          // Private log filtering: hide other players' private logs
+          // 비공개 로그 필터
           if (log.is_private && log.speaker_id !== myPlayerId) return null;
 
+          // ── 시스템 메시지 ──
           if (log.speaker_type === "system") {
             const statGrowth = (log.state_changes as { stat_growth?: { stat: string; delta: number } }).stat_growth;
             if (statGrowth) {
               return (
-                <div key={log.id} className="flex justify-center">
-                  <div className="rounded-xl border border-emerald-300/60 bg-emerald-50/80 px-4 py-2.5 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                    <p className="text-center text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                <motion.div key={log.id} {...msgAnim} className="flex justify-center">
+                  <div
+                    className="rounded-xl px-4 py-2.5"
+                    style={{ border: "1px solid var(--skin-accent)", background: "var(--skin-accent-glow)" }}
+                  >
+                    <p className="text-center text-xs font-semibold" style={{ color: "var(--skin-accent)" }}>
                       📈 {log.content.replace(/^\[.*?\]\s*/, "")}
                     </p>
                   </div>
-                </div>
+                </motion.div>
               );
             }
             return (
-              <div key={log.id} className="py-1 text-center text-xs text-neutral-500">
+              <motion.div key={log.id} {...msgAnim}
+                className="py-0.5 text-center text-xs"
+                style={{ color: "var(--skin-text-muted)" }}
+              >
                 — {log.content} —
-                {log.is_private && (
-                  <span className="text-xs text-neutral-400 dark:text-neutral-500 ml-1">🔒</span>
-                )}
-              </div>
+                {log.is_private && <span className="ml-1">🔒</span>}
+              </motion.div>
             );
           }
 
-          if (log.speaker_type === "player") {
-            const diceRoll = (log.state_changes as { dice_roll?: DiceRoll }).dice_roll;
-            return (
-              <div key={log.id} className="flex flex-col items-end">
-                <div className="max-w-[80%]">
-                  <p className="mb-1 text-right text-xs text-neutral-500">
-                    {log.speaker_name}
-                  </p>
-                  <div className="rounded-2xl rounded-tr-sm bg-indigo-600/80 px-4 py-2 text-sm text-white">
-                    {log.content}
-                  </div>
-                  {diceRoll && <DiceRollCard dice={diceRoll} outcome={log.outcome} />}
-                </div>
-              </div>
-            );
-          }
-
+          // ── GM 서술 — 산문체, 중앙 정렬 ──
           if (log.speaker_type === "gm") {
             const stateChanges = log.state_changes as { hp_changes?: HpChange[]; failure_twist?: string };
-            const hpChanges = stateChanges.hp_changes;
-            const failureTwist = stateChanges.failure_twist;
             return (
-              <div key={log.id} className="flex flex-col items-start">
-                <div className="max-w-[90%]">
-                  <p className="mb-1 text-xs text-neutral-500">🎲 GM</p>
-                  <div className="rounded-2xl rounded-tl-sm bg-black/8 px-4 py-2 text-sm text-neutral-800 dark:bg-white/10 dark:text-neutral-200">
-                    {log.content}
-                  </div>
-                  {hpChanges && hpChanges.length > 0 && (
-                    <HpChangeCard changes={hpChanges} />
-                  )}
-                  {failureTwist && (
-                    <div className="mt-2 rounded-xl border border-orange-300/60 bg-orange-50/80 px-4 py-2.5 dark:border-orange-500/30 dark:bg-orange-500/10">
-                      <p className="mb-1 text-xs font-semibold text-orange-600 dark:text-orange-400">
-                        ⚡ 그러나...
-                      </p>
-                      <p className="text-sm text-orange-900 dark:text-orange-200">
-                        {failureTwist}
-                      </p>
-                    </div>
-                  )}
+              <motion.div key={log.id} {...msgAnim}
+                className="flex flex-col gap-2"
+              >
+                {/* 구분선 */}
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1" style={{ background: "var(--skin-border)" }} />
+                  <span className="text-[10px] tracking-widest" style={{ color: "var(--skin-text-muted)" }}>GM</span>
+                  <div className="h-px flex-1" style={{ background: "var(--skin-border)" }} />
                 </div>
-              </div>
+                <p
+                  className="px-2 text-center text-sm leading-relaxed"
+                  style={{ color: "var(--skin-text)", fontStyle: "italic", fontFamily: "var(--skin-font-body)" }}
+                >
+                  {log.content}
+                </p>
+                {stateChanges.hp_changes && stateChanges.hp_changes.length > 0 && (
+                  <HpChangeCard changes={stateChanges.hp_changes} />
+                )}
+                {stateChanges.failure_twist && (
+                  <div
+                    className="rounded-xl px-4 py-2.5"
+                    style={{ border: "1px solid rgba(251,146,60,0.5)", background: "rgba(251,146,60,0.08)" }}
+                  >
+                    <p className="mb-1 text-xs font-semibold text-orange-400">⚡ 그러나...</p>
+                    <p className="text-sm text-orange-200">{stateChanges.failure_twist}</p>
+                  </div>
+                )}
+                <div className="h-px" style={{ background: "var(--skin-border)" }} />
+              </motion.div>
             );
           }
 
+          // ── NPC 대화 — 좌측 말풍선 ──
           if (log.speaker_type === "npc") {
-            const npcStateChanges = log.state_changes as Record<string, unknown> | null;
-            const stageDirection = npcStateChanges?.stage_direction as string | undefined;
+            const stageDir = (log.state_changes as Record<string, unknown>)?.stage_direction as string | undefined;
             return (
-              <div key={log.id} className="flex flex-col items-start">
-                <div className="max-w-[80%]">
-                  <p className="mb-1 text-xs text-amber-600 dark:text-amber-400">
-                    🗣 {log.speaker_name}
+              <motion.div key={log.id} {...msgAnim}
+                className="flex items-start gap-2.5"
+              >
+                {/* NPC 아바타 */}
+                <div
+                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-base"
+                  style={{
+                    border: "1.5px solid var(--skin-accent)",
+                    background: "var(--skin-bg-secondary)",
+                    boxShadow: "0 0 8px var(--skin-accent-glow)",
+                  }}
+                >
+                  🗣
+                </div>
+                <div className="max-w-[78%]">
+                  <p
+                    className="mb-1.5 text-[11px] font-semibold tracking-wide"
+                    style={{ color: "var(--skin-accent)", fontFamily: "var(--skin-font-display)" }}
+                  >
+                    {log.speaker_name}
                   </p>
-                  {stageDirection && (
-                    <p className="mb-1.5 text-xs italic text-neutral-500 dark:text-neutral-400">
-                      {stageDirection}
+                  {stageDir && (
+                    <p className="mb-1 text-xs italic" style={{ color: "var(--skin-text-muted)" }}>
+                      {stageDir}
                     </p>
                   )}
                   {log.content && (
-                    <div className="rounded-2xl rounded-tl-sm border border-amber-200/60 bg-amber-50/80 px-4 py-2 text-sm text-neutral-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-neutral-200">
+                    <div
+                      className="rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed"
+                      style={{
+                        background: "var(--skin-bg-secondary)",
+                        border: "1px solid var(--skin-border)",
+                        color: "var(--skin-text)",
+                        fontFamily: "var(--skin-font-body)",
+                      }}
+                    >
                       {log.content}
                     </div>
                   )}
                 </div>
-              </div>
+              </motion.div>
             );
           }
 
+          // ── 플레이어 행동 — 우측 이탤릭 ──
+          if (log.speaker_type === "player") {
+            const diceRoll = (log.state_changes as { dice_roll?: DiceRoll }).dice_roll;
+            const isMe = log.speaker_id === myPlayerId;
+            return (
+              <motion.div key={log.id} {...msgAnim}
+                className="flex flex-col items-end"
+              >
+                <div className="max-w-[78%]">
+                  <p className="mb-1.5 text-right text-[11px]" style={{ color: "var(--skin-text-muted)" }}>
+                    {log.speaker_name}{isMe && " (나)"}
+                  </p>
+                  <div
+                    className="rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm italic leading-relaxed"
+                    style={{
+                      background: isMe ? "var(--skin-accent-glow)" : "var(--skin-bg-secondary)",
+                      border: `1px solid ${isMe ? "var(--skin-accent)" : "var(--skin-border)"}`,
+                      color: "var(--skin-text)",
+                      fontFamily: "var(--skin-font-body)",
+                    }}
+                  >
+                    {log.content}
+                  </div>
+                  {diceRoll && <DiceRollCard dice={diceRoll} outcome={log.outcome} />}
+                </div>
+              </motion.div>
+            );
+          }
+
+          // ── Lore 발견 ──
           if (log.action_type === "lore_discovery") {
             return (
-              <div key={log.id} className="flex justify-center">
-                <div className="w-full max-w-[90%] rounded-xl border border-violet-300/60 bg-violet-50/80 px-4 py-3 dark:border-violet-500/30 dark:bg-violet-500/10">
-                  <p className="mb-1.5 text-xs font-semibold text-violet-600 dark:text-violet-400">
-                    📜 세계관 단서 발견
-                    {log.is_private && (
-                      <span className="text-xs text-neutral-400 dark:text-neutral-500 ml-1">🔒</span>
-                    )}
+              <motion.div key={log.id} {...msgAnim}
+                className="w-full rounded-xl px-4 py-3.5"
+                style={{
+                  border: "1px solid var(--skin-accent)",
+                  background: "var(--skin-accent-glow)",
+                }}
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="text-lg">📜</span>
+                  <p
+                    className="text-[10px] font-bold uppercase tracking-widest"
+                    style={{ color: "var(--skin-accent)", fontFamily: "var(--skin-font-display)" }}
+                  >
+                    새로운 단서 발견
                   </p>
-                  <p className="whitespace-pre-line text-sm text-violet-900 dark:text-violet-200">
+                  {log.is_private && (
+                    <span
+                      className="ml-auto rounded-full px-1.5 py-0.5 text-[10px]"
+                      style={{ border: "1px solid var(--skin-border)", color: "var(--skin-text-muted)" }}
+                    >
+                      🔒 나만
+                    </span>
+                  )}
+                </div>
+                <div
+                  className="rounded-lg px-3 py-2.5"
+                  style={{ background: "var(--skin-bg-card)", border: "1px solid var(--skin-border)" }}
+                >
+                  <p className="whitespace-pre-line text-sm leading-relaxed" style={{ color: "var(--skin-text)" }}>
                     {log.content}
                   </p>
                 </div>
-              </div>
+              </motion.div>
             );
           }
 

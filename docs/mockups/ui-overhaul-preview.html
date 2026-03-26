@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TRPG UI Overhaul — 완성 예상 목업</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Special+Elite&family=Orbitron:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet" />
+  <style>
+    /* ═══════════════════════════════════════════
+       RESET & BASE
+    ═══════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ═══════════════════════════════════════════
+       SKIN SYSTEM — CSS Custom Properties
+    ═══════════════════════════════════════════ */
+    :root {
+      --skin-bg:           #0f0f11;
+      --skin-bg-secondary: #18181b;
+      --skin-bg-card:      #1c1c1f;
+      --skin-border:       rgba(255,255,255,0.08);
+      --skin-accent:       #a3a3a3;
+      --skin-accent-glow:  rgba(163,163,163,0.15);
+      --skin-text:         #e5e5e5;
+      --skin-text-muted:   #737373;
+      --skin-font-display: -apple-system, sans-serif;
+      --skin-font-body:    -apple-system, sans-serif;
+      --skin-dice-success: #22c55e;
+      --skin-dice-fail:    #ef4444;
+      --skin-dice-crit:    #f59e0b;
+    }
+
+    [data-theme="fantasy"] {
+      --skin-bg:           #110d07;
+      --skin-bg-secondary: #1c1409;
+      --skin-bg-card:      #221a0c;
+      --skin-border:       rgba(201,168,76,0.20);
+      --skin-accent:       #c9a84c;
+      --skin-accent-glow:  rgba(201,168,76,0.25);
+      --skin-text:         #f0e6d3;
+      --skin-text-muted:   #8a7a62;
+      --skin-font-display: 'Cinzel', serif;
+      --skin-font-body:    'Crimson Text', serif;
+    }
+
+    [data-theme="mystery"] {
+      --skin-bg:           #0a0a0d;
+      --skin-bg-secondary: #111118;
+      --skin-bg-card:      #141420;
+      --skin-border:       rgba(147,197,253,0.12);
+      --skin-accent:       #93c5fd;
+      --skin-accent-glow:  rgba(147,197,253,0.18);
+      --skin-text:         #e2e8f0;
+      --skin-text-muted:   #64748b;
+      --skin-font-display: 'Special Elite', monospace;
+      --skin-font-body:    'Crimson Text', serif;
+    }
+
+    [data-theme="horror"] {
+      --skin-bg:           #080608;
+      --skin-bg-secondary: #100c10;
+      --skin-bg-card:      #150f15;
+      --skin-border:       rgba(139,26,26,0.25);
+      --skin-accent:       #dc2626;
+      --skin-accent-glow:  rgba(220,38,38,0.20);
+      --skin-text:         #d4d4d4;
+      --skin-text-muted:   #6b6b6b;
+      --skin-font-display: 'IM Fell English', serif;
+      --skin-font-body:    'IM Fell English', serif;
+    }
+
+    [data-theme="sci-fi"] {
+      --skin-bg:           #050810;
+      --skin-bg-secondary: #080d18;
+      --skin-bg-card:      #0c1220;
+      --skin-border:       rgba(34,211,238,0.14);
+      --skin-accent:       #22d3ee;
+      --skin-accent-glow:  rgba(34,211,238,0.18);
+      --skin-text:         #e0f2fe;
+      --skin-text-muted:   #4b6a7a;
+      --skin-font-display: 'Orbitron', sans-serif;
+      --skin-font-body:    monospace;
+    }
+
+    /* ═══════════════════════════════════════════
+       MOCKUP CONTROLS (메타 UI — 테마/뷰 전환)
+    ═══════════════════════════════════════════ */
+    .ctrl-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px;
+      background: #111;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      font-size: 11px; color: rgba(255,255,255,0.45);
+      flex-shrink: 0; flex-wrap: wrap;
+    }
+    .ctrl-bar strong { color: rgba(255,255,255,0.7); margin-right: 4px; }
+    .ctrl-btn {
+      padding: 4px 12px; border-radius: 5px; cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.05);
+      color: rgba(255,255,255,0.5); font-size: 11px; transition: all 0.15s;
+      font-family: inherit;
+    }
+    .ctrl-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .ctrl-btn.active { color: #fff; border-color: var(--skin-accent, #a3a3a3); background: rgba(255,255,255,0.1); }
+    .ctrl-sep { color: rgba(255,255,255,0.15); margin: 0 4px; }
+
+    /* ═══════════════════════════════════════════
+       GAME SCREEN WRAPPER
+    ═══════════════════════════════════════════ */
+    .game-wrapper {
+      flex: 1; overflow: hidden;
+      background: var(--skin-bg);
+      color: var(--skin-text);
+      font-family: var(--skin-font-body);
+      transition: background 0.4s, color 0.4s;
+      display: flex; flex-direction: column;
+    }
+
+    /* ── 상단 씬 바 ── */
+    .scene-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 14px;
+      background: var(--skin-bg-secondary);
+      border-bottom: 1px solid var(--skin-border);
+      font-size: 11px; flex-shrink: 0;
+    }
+    .scene-phase {
+      padding: 2px 10px; border-radius: 20px;
+      border: 1px solid var(--skin-accent);
+      color: var(--skin-accent);
+      font-family: var(--skin-font-display);
+      font-size: 10px; letter-spacing: 0.05em;
+    }
+    .env-badge {
+      color: var(--skin-text-muted); font-size: 11px;
+    }
+    .turn-badge {
+      margin-left: auto;
+      padding: 2px 10px; border-radius: 20px;
+      background: var(--skin-accent-glow);
+      color: var(--skin-accent);
+      font-size: 11px;
+      animation: pulse-glow 2s infinite;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 0 0 var(--skin-accent-glow); }
+      50% { box-shadow: 0 0 12px 2px var(--skin-accent-glow); }
+    }
+
+    /* ═══════════════════════════════════════════
+       DESKTOP LAYOUT — 3-column
+    ═══════════════════════════════════════════ */
+    .desktop-layout {
+      display: flex; flex: 1; gap: 10px; padding: 10px;
+      overflow: hidden;
+    }
+
+    /* ── 좌 패널 ── */
+    .left-panel {
+      width: 240px; flex-shrink: 0;
+      display: flex; flex-direction: column; gap: 8px;
+      overflow-y: auto; overflow-x: hidden;
+    }
+
+    /* ── 중앙 ── */
+    .center-panel {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 8px;
+      overflow: hidden;
+    }
+
+    /* ── 우 패널 ── */
+    .right-panel {
+      width: 260px; flex-shrink: 0;
+      display: flex; flex-direction: column; gap: 8px;
+      overflow-y: auto;
+    }
+
+    /* ═══════════════════════════════════════════
+       CARD BASE
+    ═══════════════════════════════════════════ */
+    .panel-card {
+      background: var(--skin-bg-card);
+      border: 1px solid var(--skin-border);
+      border-radius: 12px;
+      padding: 12px;
+      transition: background 0.4s, border-color 0.4s;
+    }
+    .panel-label {
+      font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--skin-text-muted); margin-bottom: 8px;
+    }
+
+    /* ═══════════════════════════════════════════
+       CHARACTER CARD (좌 패널 상단)
+    ═══════════════════════════════════════════ */
+    .char-card { }
+    .char-portrait-row {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+    }
+    .char-portrait {
+      width: 52px; height: 52px; border-radius: 50%;
+      border: 2px solid var(--skin-accent);
+      box-shadow: 0 0 12px var(--skin-accent-glow);
+      overflow: hidden; flex-shrink: 0;
+      background: var(--skin-bg-secondary);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .char-info { min-width: 0; }
+    .char-name {
+      font-family: var(--skin-font-display);
+      font-size: 13px; font-weight: 600;
+      color: var(--skin-text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .char-job {
+      font-size: 11px; color: var(--skin-accent); margin-top: 1px;
+    }
+    .char-mbti {
+      font-size: 10px; color: var(--skin-text-muted); margin-top: 1px;
+    }
+    .stat-row {
+      display: flex; flex-direction: column; gap: 5px;
+    }
+    .stat-item {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .stat-name {
+      font-size: 10px; color: var(--skin-text-muted); width: 24px; flex-shrink: 0;
+    }
+    .stat-bar-bg {
+      flex: 1; height: 4px; border-radius: 2px;
+      background: var(--skin-bg-secondary);
+      overflow: hidden;
+    }
+    .stat-bar-fill {
+      height: 100%; border-radius: 2px;
+      background: var(--skin-accent);
+      transition: width 0.6s ease;
+    }
+    .stat-val {
+      font-size: 10px; color: var(--skin-text); width: 24px; text-align: right; flex-shrink: 0;
+    }
+
+    /* ═══════════════════════════════════════════
+       PLAYER LIST (좌 패널 하단)
+    ═══════════════════════════════════════════ */
+    .player-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--skin-border);
+    }
+    .player-item:last-child { border-bottom: none; }
+    .player-dot {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; flex-shrink: 0;
+    }
+    .player-dot.me { background: var(--skin-accent); color: var(--skin-bg); }
+    .player-dot.other { background: var(--skin-bg-secondary); color: var(--skin-text-muted); }
+    .player-dot.active-turn {
+      box-shadow: 0 0 0 2px var(--skin-accent), 0 0 10px var(--skin-accent-glow);
+    }
+    .player-meta { min-width: 0; }
+    .player-name { font-size: 12px; color: var(--skin-text); }
+    .player-job { font-size: 10px; color: var(--skin-text-muted); }
+
+    /* ═══════════════════════════════════════════
+       CHAT LOG (중앙)
+    ═══════════════════════════════════════════ */
+    .chat-log {
+      flex: 1; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 14px;
+      padding: 14px;
+      background: var(--skin-bg-card);
+      border: 1px solid var(--skin-border);
+      border-radius: 12px;
+      min-height: 0;
+    }
+    .chat-log::-webkit-scrollbar { width: 4px; }
+    .chat-log::-webkit-scrollbar-track { background: transparent; }
+    .chat-log::-webkit-scrollbar-thumb { background: var(--skin-border); border-radius: 2px; }
+
+    /* GM 서술 */
+    .msg-gm {
+      text-align: center;
+      padding: 6px 12px;
+      border-top: 1px solid var(--skin-border);
+      border-bottom: 1px solid var(--skin-border);
+    }
+    .msg-gm p {
+      font-family: var(--skin-font-body);
+      font-style: italic;
+      font-size: 14px; line-height: 1.75;
+      color: var(--skin-text);
+    }
+
+    /* NPC 대화 — 좌측 말풍선 */
+    .msg-npc { display: flex; gap: 8px; align-items: flex-start; }
+    .npc-portrait {
+      width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+      background: var(--skin-bg-secondary);
+      border: 1.5px solid var(--skin-accent);
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+    }
+    .npc-bubble {
+      max-width: 75%;
+    }
+    .npc-name {
+      font-size: 10px; color: var(--skin-accent);
+      font-family: var(--skin-font-display);
+      margin-bottom: 3px; letter-spacing: 0.04em;
+    }
+    .npc-text {
+      background: var(--skin-bg-secondary);
+      border: 1px solid var(--skin-border);
+      border-top-left-radius: 2px;
+      border-top-right-radius: 10px;
+      border-bottom-right-radius: 10px;
+      border-bottom-left-radius: 10px;
+      padding: 8px 12px;
+      font-size: 13px; line-height: 1.6;
+      color: var(--skin-text);
+    }
+
+    /* 플레이어 행동 — 우측 이탤릭 */
+    .msg-player {
+      text-align: right;
+      padding: 4px 0;
+    }
+    .msg-player .player-action-name {
+      font-size: 10px; color: var(--skin-text-muted); margin-bottom: 2px;
+    }
+    .msg-player .player-action-text {
+      font-style: italic;
+      font-size: 13px; color: var(--skin-text-muted);
+      display: inline-block;
+      background: var(--skin-bg-secondary);
+      padding: 6px 12px; border-radius: 10px 10px 2px 10px;
+      border: 1px solid var(--skin-border);
+    }
+
+    /* 주사위 결과 */
+    .msg-dice {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px;
+      background: var(--skin-bg-secondary);
+      border: 1px solid var(--skin-border);
+      border-radius: 10px;
+      font-size: 12px; color: var(--skin-text-muted);
+    }
+    .dice-result-num {
+      font-size: 20px; font-weight: 700;
+      font-family: var(--skin-font-display);
+    }
+    .dice-result-num.success { color: #22c55e; }
+    .dice-result-num.fail { color: #ef4444; }
+    .dice-result-num.crit { color: #f59e0b; text-shadow: 0 0 8px rgba(245,158,11,0.5); }
+
+    /* Lore 발견 카드 */
+    .msg-lore {
+      border: 1px solid var(--skin-accent);
+      border-radius: 10px;
+      padding: 10px 14px;
+      background: var(--skin-accent-glow);
+    }
+    .lore-header {
+      font-size: 10px; color: var(--skin-accent);
+      font-family: var(--skin-font-display);
+      letter-spacing: 0.08em; margin-bottom: 4px;
+    }
+    .lore-text { font-size: 12px; color: var(--skin-text); font-style: italic; }
+
+    /* 시스템 */
+    .msg-system {
+      text-align: center;
+      font-size: 11px; color: var(--skin-text-muted);
+    }
+
+    /* ═══════════════════════════════════════════
+       ACTION PANEL — 선택지 카드
+    ═══════════════════════════════════════════ */
+    .action-panel { flex-shrink: 0; }
+    .action-turn-info {
+      font-size: 11px; color: var(--skin-text-muted); margin-bottom: 8px;
+    }
+    .action-turn-info span { color: var(--skin-accent); font-weight: 600; }
+    .choice-cards {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    }
+    .choice-card {
+      background: var(--skin-bg-card);
+      border: 1px solid var(--skin-border);
+      border-radius: 12px;
+      padding: 12px 10px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .choice-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 30px var(--skin-accent-glow);
+      border-color: var(--skin-accent);
+    }
+    .choice-card:active { transform: translateY(-2px) scale(0.98); }
+    .choice-num {
+      font-size: 9px; color: var(--skin-accent);
+      font-family: var(--skin-font-display); letter-spacing: 0.1em;
+    }
+    .choice-text {
+      font-size: 12px; line-height: 1.5; color: var(--skin-text);
+      font-family: var(--skin-font-body);
+      flex: 1;
+    }
+    .choice-dc {
+      font-size: 10px; color: var(--skin-text-muted);
+      padding: 2px 7px; border-radius: 5px;
+      background: var(--skin-bg-secondary);
+      display: inline-block; width: fit-content;
+    }
+    .choice-dc.hard { color: #f59e0b; }
+    .choice-dc.easy { color: #22c55e; }
+
+    /* ═══════════════════════════════════════════
+       NPC EMOTION PANEL (우 패널)
+    ═══════════════════════════════════════════ */
+    .npc-list { display: flex; flex-direction: column; gap: 8px; }
+    .npc-emotion-item {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 8px;
+      background: var(--skin-bg-secondary);
+      border: 1px solid var(--skin-border);
+      border-radius: 10px;
+    }
+    .npc-em-portrait {
+      width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+      background: var(--skin-bg-card);
+      border: 1.5px solid var(--skin-border);
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .npc-em-info { flex: 1; min-width: 0; }
+    .npc-em-name {
+      font-size: 11px; font-weight: 600; color: var(--skin-text);
+      font-family: var(--skin-font-display);
+    }
+    .npc-em-role { font-size: 10px; color: var(--skin-text-muted); margin-bottom: 5px; }
+    .affinity-row { display: flex; align-items: center; gap: 5px; }
+    .affinity-label { font-size: 9px; color: var(--skin-text-muted); width: 14px; }
+    .affinity-bar-bg {
+      flex: 1; height: 3px; border-radius: 2px;
+      background: var(--skin-bg-card);
+      overflow: hidden;
+    }
+    .affinity-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
+    .affinity-bar-fill.positive { background: #22c55e; }
+    .affinity-bar-fill.negative { background: #ef4444; }
+    .affinity-val { font-size: 9px; color: var(--skin-text-muted); width: 20px; text-align: right; }
+    .npc-em-mood {
+      margin-top: 4px; font-size: 10px; color: var(--skin-text-muted);
+      font-style: italic;
+    }
+
+    /* ═══════════════════════════════════════════
+       QUEST TRACKER (우 패널)
+    ═══════════════════════════════════════════ */
+    .quest-list { display: flex; flex-direction: column; gap: 5px; }
+    .quest-item { display: flex; align-items: flex-start; gap: 6px; font-size: 11px; }
+    .quest-dot {
+      width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; margin-top: 1px;
+      border: 1.5px solid var(--skin-border);
+      display: flex; align-items: center; justify-content: center; font-size: 8px;
+    }
+    .quest-dot.done { background: var(--skin-accent); border-color: var(--skin-accent); }
+    .quest-dot.done::after { content: '✓'; color: var(--skin-bg); font-weight: 700; }
+    .quest-text { color: var(--skin-text); line-height: 1.4; }
+    .quest-text.done { color: var(--skin-text-muted); text-decoration: line-through; }
+
+    /* ═══════════════════════════════════════════
+       DICE ROLL OVERLAY
+    ═══════════════════════════════════════════ */
+    .dice-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.85);
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 20px;
+    }
+    .dice-overlay.visible { display: flex; }
+    .dice-container {
+      width: 140px; height: 140px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 80px;
+      animation: dice-spin 0.8s ease-out;
+    }
+    @keyframes dice-spin {
+      0% { transform: rotate(-360deg) scale(0.5); opacity: 0; }
+      60% { transform: rotate(15deg) scale(1.1); }
+      100% { transform: rotate(0deg) scale(1); opacity: 1; }
+    }
+    .dice-check-label {
+      font-family: var(--skin-font-display);
+      font-size: 14px; color: var(--skin-text-muted); letter-spacing: 0.1em;
+    }
+    .dice-result-display {
+      font-family: var(--skin-font-display);
+      font-size: 64px; font-weight: 700;
+      animation: result-appear 0.4s 0.6s both;
+    }
+    @keyframes result-appear {
+      from { transform: scale(0.3); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .dice-result-display.crit { color: #f59e0b; text-shadow: 0 0 30px rgba(245,158,11,0.6); }
+    .dice-result-display.success { color: #22c55e; text-shadow: 0 0 20px rgba(34,197,94,0.4); }
+    .dice-result-display.fail { color: #ef4444; text-shadow: 0 0 20px rgba(239,68,68,0.4); animation: shake 0.4s 0.6s both; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+    .dice-outcome-text {
+      font-size: 18px; font-weight: 700;
+      animation: result-appear 0.3s 0.9s both;
+    }
+    .dice-outcome-text.crit { color: #f59e0b; }
+    .dice-outcome-text.success { color: #22c55e; }
+    .dice-outcome-text.fail { color: #ef4444; }
+    .dice-close-btn {
+      margin-top: 10px;
+      padding: 8px 28px; border-radius: 8px;
+      background: var(--skin-bg-card); border: 1px solid var(--skin-border);
+      color: var(--skin-text); font-size: 13px; cursor: pointer;
+      font-family: inherit;
+      animation: result-appear 0.3s 1s both;
+    }
+    .dice-close-btn:hover { border-color: var(--skin-accent); color: var(--skin-accent); }
+
+    /* ═══════════════════════════════════════════
+       MOBILE LAYOUT
+    ═══════════════════════════════════════════ */
+    .mobile-layout {
+      display: none; flex: 1; flex-direction: column; overflow: hidden;
+    }
+    .mobile-chat-area {
+      flex: 1; overflow-y: auto;
+      padding: 10px; min-height: 0;
+    }
+    .mobile-action-area {
+      flex-shrink: 0;
+      border-top: 1px solid var(--skin-border);
+      padding: 8px;
+      background: var(--skin-bg-secondary);
+    }
+    .mobile-choice-cards {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .mobile-choice-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      background: var(--skin-bg-card);
+      border: 1px solid var(--skin-border);
+      border-radius: 10px; cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .mobile-choice-item:hover { border-color: var(--skin-accent); }
+    .mobile-choice-idx {
+      font-size: 11px; color: var(--skin-accent);
+      font-family: var(--skin-font-display); width: 16px; flex-shrink: 0;
+    }
+    .mobile-choice-text { font-size: 12px; color: var(--skin-text); flex: 1; }
+    .mobile-choice-dc { font-size: 10px; color: var(--skin-text-muted); }
+
+    /* 하단 탭 바 */
+    .mobile-tab-bar {
+      display: flex; flex-shrink: 0;
+      border-top: 1px solid var(--skin-border);
+      background: var(--skin-bg-secondary);
+      height: 56px;
+    }
+    .mobile-tab-btn {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 3px; cursor: pointer; border: none;
+      background: transparent; color: var(--skin-text-muted);
+      font-size: 10px; font-family: inherit;
+      transition: color 0.15s;
+    }
+    .mobile-tab-btn:hover, .mobile-tab-btn.active { color: var(--skin-accent); }
+    .mobile-tab-icon { font-size: 18px; }
+
+    /* Bottom Sheet */
+    .bottom-sheet {
+      display: none;
+      position: fixed; bottom: 56px; left: 0; right: 0; z-index: 50;
+      background: var(--skin-bg-secondary);
+      border-top: 1px solid var(--skin-border);
+      border-radius: 16px 16px 0 0;
+      padding: 12px 14px;
+      max-height: 55vh; overflow-y: auto;
+      animation: sheet-up 0.25s ease-out;
+    }
+    .bottom-sheet.visible { display: block; }
+    @keyframes sheet-up {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .sheet-handle {
+      width: 36px; height: 4px; border-radius: 2px;
+      background: var(--skin-border);
+      margin: 0 auto 12px;
+    }
+
+    /* layout visibility */
+    .mobile-layout.show { display: flex; }
+    .desktop-layout.show { display: flex; }
+
+    /* scrollbar global */
+    * { scrollbar-width: thin; scrollbar-color: var(--skin-border) transparent; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     MOCKUP CONTROL BAR
+══════════════════════════════════════════ -->
+<div class="ctrl-bar">
+  <strong>테마:</strong>
+  <button class="ctrl-btn" onclick="setTheme('')">Default</button>
+  <button class="ctrl-btn active" onclick="setTheme('fantasy')">⚔️ Fantasy</button>
+  <button class="ctrl-btn" onclick="setTheme('mystery')">🔍 Mystery</button>
+  <button class="ctrl-btn" onclick="setTheme('horror')">🩸 Horror</button>
+  <button class="ctrl-btn" onclick="setTheme('sci-fi')">🚀 Sci-Fi</button>
+  <span class="ctrl-sep">|</span>
+  <strong>뷰:</strong>
+  <button class="ctrl-btn active" onclick="setView('desktop')">🖥 Desktop</button>
+  <button class="ctrl-btn" onclick="setView('mobile')">📱 Mobile</button>
+  <span class="ctrl-sep">|</span>
+  <button class="ctrl-btn" onclick="showDice('crit')">🎲 대성공</button>
+  <button class="ctrl-btn" onclick="showDice('success')">🎲 성공</button>
+  <button class="ctrl-btn" onclick="showDice('fail')">🎲 실패</button>
+</div>
+
+<!-- ══════════════════════════════════════════
+     GAME WRAPPER
+══════════════════════════════════════════ -->
+<div class="game-wrapper" id="gameWrapper" data-theme="fantasy">
+
+  <!-- 상단 씬 바 -->
+  <div class="scene-bar">
+    <span class="scene-phase" id="scenePhase">탐색 페이즈</span>
+    <span class="env-badge">🌧 폭우  ·  🕐 심야</span>
+    <span class="turn-badge" id="turnBadge">아라벨의 차례</span>
+  </div>
+
+  <!-- ══ DESKTOP LAYOUT ══ -->
+  <div class="desktop-layout show" id="desktopLayout">
+
+    <!-- 좌 패널 -->
+    <div class="left-panel">
+
+      <!-- 내 캐릭터 -->
+      <div class="panel-card char-card">
+        <div class="panel-label">내 캐릭터</div>
+        <div class="char-portrait-row">
+          <div class="char-portrait" id="charPortrait">🧝</div>
+          <div class="char-info">
+            <div class="char-name" id="charName">아라벨 실베인</div>
+            <div class="char-job" id="charJob">⚔️ 전사</div>
+            <div class="char-mbti">INTJ · 중립선</div>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-item">
+            <span class="stat-name">HP</span>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" style="width:72%"></div></div>
+            <span class="stat-val">72/100</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-name">STR</span>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" style="width:80%"></div></div>
+            <span class="stat-val">16</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-name">INT</span>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" style="width:55%"></div></div>
+            <span class="stat-val">11</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-name">DEX</span>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" style="width:65%"></div></div>
+            <span class="stat-val">13</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 플레이어 목록 -->
+      <div class="panel-card">
+        <div class="panel-label">참여자</div>
+        <div>
+          <div class="player-item">
+            <div class="player-dot me active-turn">아</div>
+            <div class="player-meta">
+              <div class="player-name">아라벨 실베인</div>
+              <div class="player-job">⚔️ 전사 · 나</div>
+            </div>
+          </div>
+          <div class="player-item">
+            <div class="player-dot other">케</div>
+            <div class="player-meta">
+              <div class="player-name">케이든 브래드</div>
+              <div class="player-job">🔮 마법사</div>
+            </div>
+          </div>
+          <div class="player-item">
+            <div class="player-dot other">미</div>
+            <div class="player-meta">
+              <div class="player-name">미레이 아셔</div>
+              <div class="player-job">🗡️ 도적</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 중앙 패널 -->
+    <div class="center-panel">
+
+      <!-- 내러티브 로그 -->
+      <div class="chat-log" id="chatLog">
+
+        <div class="msg-system">— 세션 시작: 저주받은 밤의 성채 —</div>
+
+        <div class="msg-gm">
+          <p>빗속의 성채는 오늘따라 더욱 침묵했다. 횃불은 꺼진 지 오래, 돌벽 틈으로 새어 드는 빗소리만이 어둠을 채웠다. 세 사람의 발자국이 복도 깊숙이 메아리쳤다.</p>
+        </div>
+
+        <div class="msg-npc">
+          <div class="npc-portrait">🧙</div>
+          <div class="npc-bubble">
+            <div class="npc-name">수문장 오스카</div>
+            <div class="npc-text">"이 시간에 여기 있을 사람들이 아닌데... 목적을 말하시오. 그렇지 않으면 이 문을 통과시킬 수 없소."</div>
+          </div>
+        </div>
+
+        <div class="msg-player">
+          <div class="player-action-name">아라벨</div>
+          <div class="player-action-text">칼을 숨기고 평화로운 표정으로 다가선다. "우리는 영주님의 부름을 받은 조사관들이오."</div>
+        </div>
+
+        <div class="msg-dice">
+          <div>
+            <div style="font-size:10px;color:var(--skin-text-muted);margin-bottom:2px">기만 판정 DC 12</div>
+            <div class="dice-result-num success">17</div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:11px;color:var(--skin-text)">성공 (+5 수정치)</div>
+            <div style="font-size:10px;color:var(--skin-text-muted)">오스카가 의심의 눈빛을 거뒀다</div>
+          </div>
+        </div>
+
+        <div class="msg-gm">
+          <p>수문장의 굳은 표정이 잠시 흔들렸다. 그는 천천히 고개를 끄덕이며 열쇠를 꺼냈다. 녹슨 자물쇠가 무거운 소리를 내며 열렸다.</p>
+        </div>
+
+        <div class="msg-lore">
+          <div class="lore-header">📜 단서 발견 — 성채의 비밀</div>
+          <div class="lore-text">수문장의 왼손 장갑 아래, 낯선 문양이 새겨진 흉터가 잠깐 보였다. 칠흑단의 표식이다.</div>
+        </div>
+
+        <div class="msg-npc">
+          <div class="npc-portrait">🧙</div>
+          <div class="npc-bubble">
+            <div class="npc-name">수문장 오스카</div>
+            <div class="npc-text">"들어오시오. 하지만 경고하오 — 오늘 밤 이 성에서 일어나는 일은 절대 입 밖에 내지 마시오."</div>
+          </div>
+        </div>
+
+        <div class="msg-system">— 3턴 경과 —</div>
+
+      </div>
+
+      <!-- 선택지 카드 -->
+      <div class="panel-card action-panel">
+        <div class="action-turn-info">당신의 차례 — <span>아라벨 실베인</span></div>
+        <div class="choice-cards">
+          <div class="choice-card">
+            <div class="choice-num">선택지 1</div>
+            <div class="choice-text">오스카를 따라가며 성 내부 배치를 파악한다</div>
+            <div class="choice-dc easy">DC 8 · 관찰</div>
+          </div>
+          <div class="choice-card">
+            <div class="choice-num">선택지 2</div>
+            <div class="choice-text">흉터의 문양에 대해 조심스럽게 질문한다</div>
+            <div class="choice-dc hard">DC 14 · 설득</div>
+          </div>
+          <div class="choice-card">
+            <div class="choice-num">선택지 3</div>
+            <div class="choice-text">일행과 떨어져 혼자 지하실로 내려가는 통로를 찾는다</div>
+            <div class="choice-dc hard">DC 16 · 은신</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 우 패널 -->
+    <div class="right-panel">
+
+      <!-- NPC 감정 패널 -->
+      <div class="panel-card">
+        <div class="panel-label">NPC 관계</div>
+        <div class="npc-list">
+          <div class="npc-emotion-item">
+            <div class="npc-em-portrait">🧙</div>
+            <div class="npc-em-info">
+              <div class="npc-em-name">수문장 오스카</div>
+              <div class="npc-em-role">경계병 · 칠흑단 협력자</div>
+              <div class="affinity-row">
+                <span class="affinity-label">호감</span>
+                <div class="affinity-bar-bg">
+                  <div class="affinity-bar-fill positive" style="width:55%"></div>
+                </div>
+                <span class="affinity-val">+12</span>
+              </div>
+              <div class="affinity-row">
+                <span class="affinity-label">신뢰</span>
+                <div class="affinity-bar-bg">
+                  <div class="affinity-bar-fill positive" style="width:40%"></div>
+                </div>
+                <span class="affinity-val">+8</span>
+              </div>
+              <div class="npc-em-mood">경계심이 완화됨, 약간의 두려움</div>
+            </div>
+          </div>
+          <div class="npc-emotion-item">
+            <div class="npc-em-portrait">👸</div>
+            <div class="npc-em-info">
+              <div class="npc-em-name">영주 레나 발케</div>
+              <div class="npc-em-role">성주 · 행방불명</div>
+              <div class="affinity-row">
+                <span class="affinity-label">호감</span>
+                <div class="affinity-bar-bg">
+                  <div class="affinity-bar-fill positive" style="width:30%"></div>
+                </div>
+                <span class="affinity-val">+5</span>
+              </div>
+              <div class="npc-em-mood">아직 만나지 않음</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 퀘스트 트래커 -->
+      <div class="panel-card">
+        <div class="panel-label">목표</div>
+        <div class="quest-list">
+          <div class="quest-item">
+            <div class="quest-dot done"></div>
+            <div class="quest-text done">성채에 입장한다</div>
+          </div>
+          <div class="quest-item">
+            <div class="quest-dot"></div>
+            <div class="quest-text">칠흑단의 흔적을 찾는다</div>
+          </div>
+          <div class="quest-item">
+            <div class="quest-dot"></div>
+            <div class="quest-text">영주 레나의 행방을 파악한다</div>
+          </div>
+          <div class="quest-item">
+            <div class="quest-dot"></div>
+            <div class="quest-text">지하 의식을 저지한다</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lore 목록 -->
+      <div class="panel-card">
+        <div class="panel-label">발견한 단서 1</div>
+        <div style="font-size:11px;color:var(--skin-text);font-style:italic;line-height:1.5">
+          수문장의 왼손 장갑 아래 칠흑단의 표식이 새겨진 흉터.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ MOBILE LAYOUT ══ -->
+  <div class="mobile-layout" id="mobileLayout">
+
+    <!-- 채팅 영역 -->
+    <div class="mobile-chat-area">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="msg-system">— 세션 시작 —</div>
+        <div class="msg-gm"><p>빗속의 성채는 오늘따라 더욱 침묵했다. 돌벽 틈으로 새어 드는 빗소리만이 어둠을 채웠다.</p></div>
+        <div class="msg-npc">
+          <div class="npc-portrait">🧙</div>
+          <div class="npc-bubble">
+            <div class="npc-name">수문장 오스카</div>
+            <div class="npc-text">"이 시간에 여기 있을 사람들이 아닌데... 목적을 말하시오."</div>
+          </div>
+        </div>
+        <div class="msg-player">
+          <div class="player-action-name">아라벨</div>
+          <div class="player-action-text">"우리는 영주님의 부름을 받은 조사관들이오."</div>
+        </div>
+        <div class="msg-dice">
+          <div class="dice-result-num success" style="font-size:24px;margin-right:4px">17</div>
+          <div><div style="font-size:11px;color:var(--skin-text)">기만 성공</div><div style="font-size:10px;color:var(--skin-text-muted)">DC 12 통과</div></div>
+        </div>
+        <div class="msg-lore">
+          <div class="lore-header">📜 단서 — 성채의 비밀</div>
+          <div class="lore-text">수문장의 흉터에서 칠흑단의 표식이 보였다.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 행동 영역 -->
+    <div class="mobile-action-area">
+      <div style="font-size:10px;color:var(--skin-accent);margin-bottom:6px;font-family:var(--skin-font-display)">당신의 차례</div>
+      <div class="mobile-choice-cards">
+        <div class="mobile-choice-item">
+          <span class="mobile-choice-idx">①</span>
+          <span class="mobile-choice-text">오스카를 따라가며 성 내부를 파악한다</span>
+          <span class="mobile-choice-dc">DC 8</span>
+        </div>
+        <div class="mobile-choice-item">
+          <span class="mobile-choice-idx">②</span>
+          <span class="mobile-choice-text">흉터 문양에 대해 조심스럽게 질문한다</span>
+          <span class="mobile-choice-dc">DC 14</span>
+        </div>
+        <div class="mobile-choice-item">
+          <span class="mobile-choice-idx">③</span>
+          <span class="mobile-choice-text">혼자 지하실로 가는 통로를 찾는다</span>
+          <span class="mobile-choice-dc">DC 16</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 하단 탭 바 -->
+    <div class="mobile-tab-bar">
+      <button class="mobile-tab-btn active" onclick="selectMobileTab(this, null)">
+        <span class="mobile-tab-icon">📖</span>스토리
+      </button>
+      <button class="mobile-tab-btn" onclick="selectMobileTab(this, 'char-sheet')">
+        <span class="mobile-tab-icon">👤</span>캐릭터
+      </button>
+      <button class="mobile-tab-btn" onclick="selectMobileTab(this, 'npc-sheet')">
+        <span class="mobile-tab-icon">🎭</span>NPC
+      </button>
+      <button class="mobile-tab-btn" onclick="selectMobileTab(this, 'quest-sheet')">
+        <span class="mobile-tab-icon">🗺</span>퀘스트
+      </button>
+    </div>
+
+    <!-- Bottom Sheets -->
+    <div class="bottom-sheet" id="char-sheet">
+      <div class="sheet-handle"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div class="char-portrait" style="width:48px;height:48px">🧝</div>
+        <div>
+          <div class="char-name">아라벨 실베인</div>
+          <div class="char-job">⚔️ 전사 · INTJ</div>
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat-item"><span class="stat-name">HP</span><div class="stat-bar-bg"><div class="stat-bar-fill" style="width:72%"></div></div><span class="stat-val">72/100</span></div>
+        <div class="stat-item"><span class="stat-name">STR</span><div class="stat-bar-bg"><div class="stat-bar-fill" style="width:80%"></div></div><span class="stat-val">16</span></div>
+        <div class="stat-item"><span class="stat-name">INT</span><div class="stat-bar-bg"><div class="stat-bar-fill" style="width:55%"></div></div><span class="stat-val">11</span></div>
+      </div>
+    </div>
+
+    <div class="bottom-sheet" id="npc-sheet">
+      <div class="sheet-handle"></div>
+      <div class="npc-list">
+        <div class="npc-emotion-item">
+          <div class="npc-em-portrait">🧙</div>
+          <div class="npc-em-info">
+            <div class="npc-em-name">수문장 오스카</div>
+            <div class="npc-em-role">경계병 · 칠흑단 협력자</div>
+            <div class="affinity-row">
+              <span class="affinity-label">호감</span>
+              <div class="affinity-bar-bg"><div class="affinity-bar-fill positive" style="width:55%"></div></div>
+              <span class="affinity-val">+12</span>
+            </div>
+            <div class="npc-em-mood">경계심 완화, 약간의 두려움</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-sheet" id="quest-sheet">
+      <div class="sheet-handle"></div>
+      <div class="panel-label" style="margin-bottom:10px">목표</div>
+      <div class="quest-list">
+        <div class="quest-item"><div class="quest-dot done"></div><div class="quest-text done">성채에 입장한다</div></div>
+        <div class="quest-item"><div class="quest-dot"></div><div class="quest-text">칠흑단의 흔적을 찾는다</div></div>
+        <div class="quest-item"><div class="quest-dot"></div><div class="quest-text">영주 레나의 행방을 파악한다</div></div>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /game-wrapper -->
+
+<!-- ══════════════════════════════════════════
+     DICE ROLL OVERLAY
+══════════════════════════════════════════ -->
+<div class="dice-overlay" id="diceOverlay" onclick="hideDice()">
+  <div class="dice-check-label" id="diceLabel">은신 판정 · DC 16</div>
+  <div class="dice-container" id="diceContainer">🎲</div>
+  <div class="dice-result-display" id="diceNum">18</div>
+  <div class="dice-outcome-text" id="diceOutcome">대성공!</div>
+  <button class="dice-close-btn" onclick="hideDice()">계속하기</button>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCRIPT
+══════════════════════════════════════════ -->
+<script>
+  const themeData = {
+    '': {
+      scenePhase: '탐색 페이즈', charPortrait: '👤', charName: '플레이어',
+      charJob: '🎒 모험가', turnBadge: '플레이어의 차례'
+    },
+    'fantasy': {
+      scenePhase: '탐색 페이즈', charPortrait: '🧝', charName: '아라벨 실베인',
+      charJob: '⚔️ 전사', turnBadge: '아라벨의 차례'
+    },
+    'mystery': {
+      scenePhase: '조사 페이즈', charPortrait: '🕵️', charName: '레이먼드 코번',
+      charJob: '🔍 탐정', turnBadge: '레이먼드의 차례'
+    },
+    'horror': {
+      scenePhase: '공포 페이즈', charPortrait: '😰', charName: '에밀리 그레이',
+      charJob: '👤 일반인', turnBadge: '에밀리의 차례'
+    },
+    'sci-fi': {
+      scenePhase: 'SCAN PHASE', charPortrait: '🤖', charName: 'SYN-7 아리아',
+      charJob: '🤖 안드로이드', turnBadge: 'SYN-7 순서'
+    }
+  };
+
+  function setTheme(theme) {
+    document.getElementById('gameWrapper').setAttribute('data-theme', theme);
+    document.querySelectorAll('.ctrl-btn').forEach(b => {
+      if (b.getAttribute('onclick') === `setTheme('${theme}')`) b.classList.add('active');
+      else if (b.getAttribute('onclick')?.startsWith('setTheme')) b.classList.remove('active');
+    });
+    const d = themeData[theme] || themeData[''];
+    document.getElementById('scenePhase').textContent = d.scenePhase;
+    document.getElementById('charPortrait').textContent = d.charPortrait;
+    document.getElementById('charName').textContent = d.charName;
+    document.getElementById('charJob').textContent = d.charJob;
+    document.getElementById('turnBadge').textContent = d.turnBadge;
+  }
+
+  function setView(view) {
+    const d = document.getElementById('desktopLayout');
+    const m = document.getElementById('mobileLayout');
+    if (view === 'mobile') {
+      d.classList.remove('show'); m.classList.add('show');
+    } else {
+      m.classList.remove('show'); d.classList.add('show');
+      closeBottomSheets();
+    }
+    document.querySelectorAll('.ctrl-btn').forEach(b => {
+      if (b.getAttribute('onclick') === `setView('${view}')`) b.classList.add('active');
+      else if (b.getAttribute('onclick')?.startsWith('setView')) b.classList.remove('active');
+    });
+  }
+
+  let openSheet = null;
+  function selectMobileTab(btn, sheetId) {
+    document.querySelectorAll('.mobile-tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    closeBottomSheets();
+    if (sheetId) {
+      const sheet = document.getElementById(sheetId);
+      if (sheet) { sheet.classList.add('visible'); openSheet = sheet; }
+    }
+  }
+  function closeBottomSheets() {
+    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('visible'));
+    openSheet = null;
+  }
+
+  const diceConfigs = {
+    crit:    { num: 20, label: '은신 판정 · DC 16', outcome: '대성공!', cls: 'crit' },
+    success: { num: 14, label: '기만 판정 · DC 12', outcome: '성공', cls: 'success' },
+    fail:    { num: 5,  label: '설득 판정 · DC 14', outcome: '실패', cls: 'fail' },
+  };
+
+  function showDice(type) {
+    const cfg = diceConfigs[type];
+    const overlay = document.getElementById('diceOverlay');
+    const numEl = document.getElementById('diceNum');
+    const outcomeEl = document.getElementById('diceOutcome');
+    document.getElementById('diceLabel').textContent = cfg.label;
+    numEl.textContent = cfg.num;
+    numEl.className = `dice-result-display ${cfg.cls}`;
+    outcomeEl.textContent = cfg.outcome;
+    outcomeEl.className = `dice-outcome-text ${cfg.cls}`;
+    // re-trigger animation
+    const container = document.getElementById('diceContainer');
+    container.style.animation = 'none';
+    container.offsetHeight;
+    container.style.animation = '';
+    numEl.style.animation = 'none';
+    numEl.offsetHeight;
+    numEl.style.animation = '';
+    overlay.classList.add('visible');
+  }
+  function hideDice() {
+    document.getElementById('diceOverlay').classList.remove('visible');
+  }
+
+  // init
+  setTheme('fantasy');
+</script>
+</body>
+</html>

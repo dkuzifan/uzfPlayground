@@ -245,6 +245,8 @@ export interface NpcDynamicState {
   camaraderie: number;        // 0~100 (전우애)
   // 이벤트 트리거 중복 방지
   fired_triggers?: string[];  // 이미 발동된 트리거 ID 목록
+  // 비상호작용 추적
+  last_interaction_turn?: number; // 마지막으로 플레이어가 이 NPC와 상호작용한 턴
 }
 
 // 세션 환경 (다이내믹 DC 보정에 사용)

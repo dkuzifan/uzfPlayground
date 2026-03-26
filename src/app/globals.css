@@ -25,3 +25,105 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ================================================================
+   시나리오 스킨 시스템
+   게임 화면에서 <body data-theme="fantasy"> 처럼 적용됨
+   ================================================================ */
+
+/* 기본 스킨 (테마 없을 때) */
+:root {
+  --skin-bg:           #0f0f11;
+  --skin-bg-secondary: #18181b;
+  --skin-bg-card:      #1c1c1f;
+  --skin-border:       rgba(255, 255, 255, 0.08);
+  --skin-accent:       #a3a3a3;
+  --skin-accent-glow:  rgba(163, 163, 163, 0.15);
+  --skin-text:         #e5e5e5;
+  --skin-text-muted:   #737373;
+  --skin-font-display: var(--font-geist-sans), sans-serif;
+  --skin-font-body:    var(--font-geist-sans), sans-serif;
+}
+
+/* ── fantasy ─────────────────────────────────────────────────── */
+[data-theme="fantasy"] {
+  --skin-bg:           #110d07;
+  --skin-bg-secondary: #1c1409;
+  --skin-bg-card:      #221a0c;
+  --skin-border:       rgba(201, 168, 76, 0.18);
+  --skin-accent:       #c9a84c;
+  --skin-accent-glow:  rgba(201, 168, 76, 0.20);
+  --skin-text:         #f0e6d3;
+  --skin-text-muted:   #8a7a62;
+  --skin-font-display: var(--font-cinzel), serif;
+  --skin-font-body:    var(--font-crimson), serif;
+}
+
+/* ── mystery ─────────────────────────────────────────────────── */
+[data-theme="mystery"] {
+  --skin-bg:           #0a0a0d;
+  --skin-bg-secondary: #111118;
+  --skin-bg-card:      #141420;
+  --skin-border:       rgba(147, 197, 253, 0.10);
+  --skin-accent:       #93c5fd;
+  --skin-accent-glow:  rgba(147, 197, 253, 0.15);
+  --skin-text:         #e2e8f0;
+  --skin-text-muted:   #64748b;
+  --skin-font-display: var(--font-special-elite), monospace;
+  --skin-font-body:    var(--font-crimson), serif;
+}
+
+/* ── horror ──────────────────────────────────────────────────── */
+[data-theme="horror"] {
+  --skin-bg:           #080608;
+  --skin-bg-secondary: #100c10;
+  --skin-bg-card:      #150f15;
+  --skin-border:       rgba(139, 26, 26, 0.22);
+  --skin-accent:       #dc2626;
+  --skin-accent-glow:  rgba(220, 38, 38, 0.18);
+  --skin-text:         #d4d4d4;
+  --skin-text-muted:   #6b6b6b;
+  --skin-font-display: var(--font-im-fell), serif;
+  --skin-font-body:    var(--font-im-fell), serif;
+}
+
+/* ── sci-fi ──────────────────────────────────────────────────── */
+[data-theme="sci-fi"] {
+  --skin-bg:           #050810;
+  --skin-bg-secondary: #080d18;
+  --skin-bg-card:      #0c1220;
+  --skin-border:       rgba(34, 211, 238, 0.12);
+  --skin-accent:       #22d3ee;
+  --skin-accent-glow:  rgba(34, 211, 238, 0.15);
+  --skin-text:         #e0f2fe;
+  --skin-text-muted:   #4b6a7a;
+  --skin-font-display: var(--font-orbitron), sans-serif;
+  --skin-font-body:    var(--font-geist-mono), monospace;
+}
+
+/* ================================================================
+   스킨 유틸리티 클래스
+   ================================================================ */
+
+.skin-bg           { background-color: var(--skin-bg); }
+.skin-bg-secondary { background-color: var(--skin-bg-secondary); }
+.skin-bg-card      { background-color: var(--skin-bg-card); }
+.skin-border       { border-color: var(--skin-border); }
+.skin-text         { color: var(--skin-text); }
+.skin-text-muted   { color: var(--skin-text-muted); }
+.skin-accent       { color: var(--skin-accent); }
+.skin-accent-bg    { background-color: var(--skin-accent); }
+.skin-font-display { font-family: var(--skin-font-display); }
+.skin-font-body    { font-family: var(--skin-font-body); }
+
+.skin-glow {
+  box-shadow: 0 0 20px var(--skin-accent-glow);
+}
+
+/* 스킨 적용된 게임 화면 전체 */
+.game-screen {
+  background-color: var(--skin-bg);
+  color: var(--skin-text);
+  font-family: var(--skin-font-body);
+  min-height: 100dvh;
+}

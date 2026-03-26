@@ -7,7 +7,7 @@ import Button from "@/components/ui/Button";
 import ScenarioSelectStep, { type ScenarioSummary } from "./ScenarioSelectStep";
 import ScenarioCreateStep, { type ScenarioInitialData } from "./ScenarioCreateStep";
 import PersonalityTest from "@/components/trpg/onboarding/PersonalityTest";
-import type { GuestProfile } from "@/lib/types/lobby";
+import type { AuthProfile } from "@/hooks/useAuthProfile";
 import type { PersonalityProfile, CharacterJob, CharacterCreationConfig } from "@/lib/trpg/types/character";
 import { AVATAR_COLORS } from "@/lib/types/lobby";
 
@@ -22,7 +22,7 @@ interface OnboardingDraft {
 interface CreateRoomModalProps {
   open: boolean;
   onClose: () => void;
-  profile: GuestProfile;
+  profile: AuthProfile;
   onSaveProfile: (nickname: string, avatarIndex: number) => void;
   resumeDraft?: boolean;
 }
@@ -58,8 +58,9 @@ export default function CreateRoomModal({ open, onClose, profile, onSaveProfile,
   const [draftSceneIdx, setDraftSceneIdx] = useState<number | undefined>(undefined);
   const [draftChoices, setDraftChoices] = useState<number[] | undefined>(undefined);
 
-  // 복사 기능
+  // 복사/수정 기능
   const [copyInitialData, setCopyInitialData] = useState<ScenarioInitialData | undefined>(undefined);
+  const [editScenarioId, setEditScenarioId] = useState<string | undefined>(undefined);
   const [copyLoading, setCopyLoading] = useState(false);
 
   // room step state
@@ -94,6 +95,7 @@ export default function CreateRoomModal({ open, onClose, profile, onSaveProfile,
     setDraftSceneIdx(undefined);
     setDraftChoices(undefined);
     setCopyInitialData(undefined);
+    setEditScenarioId(undefined);
     setRoomName("");
     setError(null);
     onClose();
@@ -113,10 +115,29 @@ export default function CreateRoomModal({ open, onClose, profile, onSaveProfile,
       if (!res.ok) return;
       const data = await res.json() as ScenarioInitialData;
       setCopyInitialData(data);
+      setEditScenarioId(undefined);
       setStep("create-scenario");
     } catch {
-      // 실패 시 빈 폼으로 새 시나리오 만들기
       setCopyInitialData(undefined);
+      setStep("create-scenario");
+    } finally {
+      setCopyLoading(false);
+    }
+  }
+
+  // ── 시나리오 직접 수정 ─────────────────────────────────────────────
+  async function handleEditScenario(scenarioId: string) {
+    setCopyLoading(true);
+    try {
+      const res = await fetch(`/api/trpg/scenarios/${scenarioId}`);
+      if (!res.ok) return;
+      const data = await res.json() as ScenarioInitialData;
+      setCopyInitialData(data);
+      setEditScenarioId(scenarioId);
+      setStep("create-scenario");
+    } catch {
+      setCopyInitialData(undefined);
+      setEditScenarioId(undefined);
       setStep("create-scenario");
     } finally {
       setCopyLoading(false);
@@ -166,7 +187,6 @@ export default function CreateRoomModal({ open, onClose, profile, onSaveProfile,
           room_name: roomName.trim(),
           max_players: maxPlayers,
           scenario_id: selectedScenario.id,
-          localId: profile.localId,
           nickname: characterData.characterName,
           avatarIndex,
           characterName: characterData.characterName,
@@ -199,7 +219,7 @@ export default function CreateRoomModal({ open, onClose, profile, onSaveProfile,
   // ── 모달 타이틀 ────────────────────────────────────────────────────
   const titles: Record<Step, string> = {
     "scenario":        "시나리오 선택",
-    "create-scenario": "새 시나리오 만들기",
+    "create-scenario": editScenarioId ? "시나리오 수정" : "새 시나리오 만들기",
     "character":       "캐릭터 생성",
     "room":            "방 설정",
   };
@@ -245,8 +265,9 @@ export default function CreateRoomModal({ open, onClose, profile, onSaveProfile,
         <>
           <ScenarioSelectStep
             onSelect={handleScenarioSelect}
-            onCreateNew={() => { setCopyInitialData(undefined); setStep("create-scenario"); }}
+            onCreateNew={() => { setCopyInitialData(undefined); setEditScenarioId(undefined); setStep("create-scenario"); }}
             onCopyScenario={handleCopyScenario}
+            onEditScenario={handleEditScenario}
           />
           {copyLoading && (
             <div className="mt-3 flex items-center justify-center gap-2 text-xs text-neutral-400">
@@ -261,8 +282,9 @@ export default function CreateRoomModal({ open, onClose, profile, onSaveProfile,
       {step === "create-scenario" && (
         <ScenarioCreateStep
           onComplete={handleScenarioCreated}
-          onBack={() => { setCopyInitialData(undefined); setStep("scenario"); }}
+          onBack={() => { setCopyInitialData(undefined); setEditScenarioId(undefined); setStep("scenario"); }}
           initialData={copyInitialData}
+          scenarioId={editScenarioId}
         />
       )}
 
