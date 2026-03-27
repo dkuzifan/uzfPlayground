@@ -1,4 +1,4 @@
-import { getGeminiModel } from "@/lib/ai/gemini";
+import { getGeminiClient } from "@/lib/ai/gemini";
 import type { ChatMessage, EmotionState, Mood } from "./types";
 
 const VALID_MOODS: Mood[] = ["happy", "neutral", "sad", "angry", "surprised"];
@@ -49,11 +49,13 @@ export async function generateChatReply(
   userMessage: string
 ): Promise<AgentResponse> {
   try {
-    const model = getGeminiModel();
     const systemPrompt = buildSystemPrompt(personality, creatorBio);
+    const model = getGeminiClient().getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction: systemPrompt,
+    });
 
     const chat = model.startChat({
-      systemInstruction: systemPrompt,
       history: buildHistory(history),
     });
 
@@ -82,6 +84,6 @@ export async function generateChatReply(
     };
   } catch (e) {
     console.error("[chat-agent] 응답 파싱 실패:", e);
-    return { ...FALLBACK, reply: `[DEBUG] ${(e as Error).message ?? String(e)}` };
+    return FALLBACK;
   }
 }
