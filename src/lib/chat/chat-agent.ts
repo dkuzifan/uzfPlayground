@@ -1,3 +1,4 @@
+import { HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { getGeminiClient } from "@/lib/ai/gemini";
 import type { ChatMessage, EmotionState, Mood } from "./types";
 
@@ -53,6 +54,12 @@ export async function generateChatReply(
     const model = getGeminiClient().getGenerativeModel({
       model: "gemini-2.5-flash",
       systemInstruction: systemPrompt,
+      safetySettings: [
+        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+      ],
     });
 
     const chat = model.startChat({
