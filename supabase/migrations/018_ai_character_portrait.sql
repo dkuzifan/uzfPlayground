@@ -7,6 +7,16 @@ VALUES ('chat-portraits', 'chat-portraits', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- 공개 읽기 정책
-CREATE POLICY IF NOT EXISTS "chat portraits public read"
-ON storage.objects FOR SELECT
-USING (bucket_id = 'chat-portraits');
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'chat portraits public read'
+  ) THEN
+    CREATE POLICY "chat portraits public read"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'chat-portraits');
+  END IF;
+END $$;
