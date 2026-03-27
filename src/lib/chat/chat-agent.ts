@@ -82,6 +82,6 @@ export async function generateChatReply(
     };
   } catch (e) {
     console.error("[chat-agent] 응답 파싱 실패:", e);
-    return FALLBACK;
+    return { ...FALLBACK, reply: `[DEBUG] ${(e as Error).message ?? String(e)}` };
   }
 }
