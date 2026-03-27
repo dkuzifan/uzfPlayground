@@ -49,7 +49,7 @@ export async function generateChatReply(
   userMessage: string
 ): Promise<AgentResponse> {
   try {
-    const model = getGeminiModel("gemini-2.0-flash");
+    const model = getGeminiModel();
     const systemPrompt = buildSystemPrompt(personality, creatorBio);
 
     const chat = model.startChat({
