@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import Image from "next/image";
+
+type PortraitMode = "none" | "generate" | "url" | "upload";
 
 interface FormValues {
   name: string;
@@ -8,14 +11,24 @@ interface FormValues {
   personality: string;
   creator_bio: string;
   is_public: boolean;
+  portrait_mode: PortraitMode;
+  portrait_url_input: string;
+  portrait_file: File | null;
 }
 
 interface Props {
   onSubmit: (values: FormValues) => Promise<void>;
   onCancel: () => void;
-  initialValues?: Partial<FormValues>;
+  initialValues?: Partial<Omit<FormValues, "portrait_file">>;
   submitLabel?: string;
 }
+
+const PORTRAIT_TABS: { mode: PortraitMode; label: string }[] = [
+  { mode: "none",     label: "없음" },
+  { mode: "generate", label: "AI 생성" },
+  { mode: "url",      label: "URL 입력" },
+  { mode: "upload",   label: "파일 업로드" },
+];
 
 export default function CharacterForm({
   onSubmit,
@@ -24,25 +37,54 @@ export default function CharacterForm({
   submitLabel = "캐릭터 만들고 대화 시작",
 }: Props) {
   const [values, setValues] = useState<FormValues>({
-    name: initialValues?.name ?? "",
-    bio: initialValues?.bio ?? "",
-    personality: initialValues?.personality ?? "",
-    creator_bio: initialValues?.creator_bio ?? "",
-    is_public: initialValues?.is_public ?? false,
+    name:              initialValues?.name              ?? "",
+    bio:               initialValues?.bio               ?? "",
+    personality:       initialValues?.personality       ?? "",
+    creator_bio:       initialValues?.creator_bio       ?? "",
+    is_public:         initialValues?.is_public         ?? false,
+    portrait_mode:     initialValues?.portrait_mode     ?? "none",
+    portrait_url_input: initialValues?.portrait_url_input ?? "",
+    portrait_file:     null,
   });
-  const [errors, setErrors] = useState<Partial<Record<keyof FormValues, string>>>({});
+  const [errors, setErrors]   = useState<Partial<Record<keyof FormValues, string>>>({});
+  const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  function set(field: keyof FormValues, value: string | boolean) {
+  function set(field: keyof FormValues, value: string | boolean | File | null) {
     setValues((v) => ({ ...v, [field]: value }));
     setErrors((e) => ({ ...e, [field]: undefined }));
+  }
+
+  function handleModeChange(mode: PortraitMode) {
+    set("portrait_mode", mode);
+    // 다른 모드 데이터 초기화
+    set("portrait_url_input", "");
+    set("portrait_file", null);
+    setPreview(null);
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    set("portrait_file", file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setPreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setPreview(null);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const newErrors: typeof errors = {};
-    if (!values.name.trim()) newErrors.name = "이름을 입력해주세요";
+    if (!values.name.trim())        newErrors.name = "이름을 입력해주세요";
     if (!values.personality.trim()) newErrors.personality = "성격 설명을 입력해주세요";
+    if (values.portrait_mode === "url" && !values.portrait_url_input.trim())
+      newErrors.portrait_url_input = "URL을 입력해주세요";
+    if (values.portrait_mode === "upload" && !values.portrait_file)
+      newErrors.portrait_file = "파일을 선택해주세요";
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
 
     setLoading(true);
@@ -100,6 +142,94 @@ export default function CharacterForm({
         />
         {errors.personality && <p className="text-xs text-red-400">{errors.personality}</p>}
         <p className="text-xs text-neutral-600">상세할수록 더 일관된 대화를 할 수 있어요.</p>
+      </div>
+
+      {/* 초상화 */}
+      <div className="flex flex-col gap-2">
+        <label className="text-xs font-semibold text-neutral-400">초상화</label>
+
+        {/* 모드 탭 */}
+        <div className="flex gap-1.5">
+          {PORTRAIT_TABS.map(({ mode, label }) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => handleModeChange(mode)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                values.portrait_mode === mode
+                  ? "bg-purple-500 text-black"
+                  : "border border-white/10 text-neutral-400 hover:border-white/20 hover:text-neutral-300"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* URL 입력 */}
+        {values.portrait_mode === "url" && (
+          <div className="flex flex-col gap-1.5">
+            <input
+              type="url"
+              value={values.portrait_url_input}
+              onChange={(e) => set("portrait_url_input", e.target.value)}
+              placeholder="https://example.com/portrait.jpg"
+              className={`rounded-xl border bg-white/[0.05] px-3 py-2.5 text-sm text-white outline-none transition-colors placeholder:text-neutral-600 focus:border-purple-500 ${
+                errors.portrait_url_input ? "border-red-400" : "border-white/10"
+              }`}
+            />
+            {errors.portrait_url_input && (
+              <p className="text-xs text-red-400">{errors.portrait_url_input}</p>
+            )}
+            {values.portrait_url_input && (
+              <div className="relative h-24 w-24 overflow-hidden rounded-xl border border-white/10">
+                <Image
+                  src={values.portrait_url_input}
+                  alt="미리보기"
+                  fill
+                  className="object-cover"
+                  onError={() => {}}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 파일 업로드 */}
+        {values.portrait_mode === "upload" && (
+          <div className="flex flex-col gap-1.5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-xl border border-dashed border-white/20 py-3 text-sm text-neutral-400 transition-colors hover:border-white/30 hover:text-neutral-300"
+            >
+              {values.portrait_file ? values.portrait_file.name : "이미지 파일 선택"}
+            </button>
+            {errors.portrait_file && (
+              <p className="text-xs text-red-400">{errors.portrait_file}</p>
+            )}
+            {preview && (
+              <div className="relative h-24 w-24 overflow-hidden rounded-xl border border-white/10">
+                <Image src={preview} alt="미리보기" fill className="object-cover" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* AI 생성 안내 */}
+        {values.portrait_mode === "generate" && (
+          <p className="text-xs leading-relaxed text-neutral-500">
+            캐릭터 생성 후 성격 설명을 바탕으로 AI가 자동으로 초상화를 만들어요.<br />
+            생성에 10~20초 정도 걸릴 수 있어요.
+          </p>
+        )}
       </div>
 
       {/* 제작자 정보 */}

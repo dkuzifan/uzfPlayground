@@ -35,14 +35,49 @@ export default function ChatListPage() {
 
   async function handleCreate(values: {
     name: string; bio: string; personality: string; creator_bio: string; is_public: boolean;
+    portrait_mode: "none" | "generate" | "url" | "upload";
+    portrait_url_input: string;
+    portrait_file: File | null;
   }) {
+    const { portrait_mode, portrait_url_input, portrait_file, ...charValues } = values;
+
     const res = await fetch("/api/chat/characters", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ local_id: localId, ...values }),
+      body: JSON.stringify({ local_id: localId, ...charValues }),
     });
     if (!res.ok) return;
     const created: AiCharacter = await res.json();
+
+    // 초상화 처리
+    if (portrait_mode !== "none") {
+      try {
+        if (portrait_mode === "upload" && portrait_file) {
+          const form = new FormData();
+          form.append("file", portrait_file);
+          await fetch(`/api/chat/characters/${created.id}/portrait`, {
+            method: "POST",
+            body: form,
+          });
+        } else if (portrait_mode === "url" && portrait_url_input) {
+          await fetch(`/api/chat/characters/${created.id}/portrait`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mode: "url", url: portrait_url_input }),
+          });
+        } else if (portrait_mode === "generate") {
+          await fetch(`/api/chat/characters/${created.id}/portrait`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mode: "generate", personality: charValues.personality }),
+          });
+        }
+      } catch (e) {
+        console.error("[handleCreate] portrait upload failed:", e);
+        // 초상화 실패해도 대화는 시작
+      }
+    }
+
     router.push(`/tales/chat/${created.id}`);
   }
 

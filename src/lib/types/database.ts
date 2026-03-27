@@ -395,6 +395,7 @@ export interface Database {
           personality: string;
           creator_bio: string | null;
           is_public: boolean;
+          portrait_url: string | null;
           created_at: string;
         };
         Insert: {
@@ -405,6 +406,7 @@ export interface Database {
           personality: string;
           creator_bio?: string | null;
           is_public?: boolean;
+          portrait_url?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["AI_Character"]["Insert"]>;

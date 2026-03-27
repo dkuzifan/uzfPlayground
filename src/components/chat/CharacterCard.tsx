@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { AiCharacter, AiCharacterPublic } from "@/lib/chat/types";
 
 interface Props {
@@ -28,10 +29,21 @@ export default function CharacterCard({ character, onClick }: Props) {
       onClick={onClick}
       className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left transition-colors hover:border-white/20 hover:bg-white/[0.07]"
     >
-      <div
-        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg font-bold ${colorClass}`}
-      >
-        {initial}
+      <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full">
+        {character.portrait_url ? (
+          <Image
+            src={character.portrait_url}
+            alt={character.name}
+            fill
+            className="object-cover"
+          />
+        ) : (
+          <div
+            className={`flex h-full w-full items-center justify-center text-lg font-bold ${colorClass}`}
+          >
+            {initial}
+          </div>
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-white">{character.name}</div>

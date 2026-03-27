@@ -13,6 +13,7 @@ export interface AiCharacter {
   personality: string;
   creator_bio: string | null;
   is_public: boolean;
+  portrait_url: string | null;
   created_at: string;
 }
 

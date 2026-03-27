@@ -73,6 +73,7 @@ export default function ChatScreen({ character, localId }: Props) {
         initial={initial}
         mood={emotionState.mood}
         vibe={vibe}
+        portraitUrl={character.portrait_url}
         onBack={() => router.push("/tales/chat")}
         onMenu={() => setShowDeleteModal(true)}
       />

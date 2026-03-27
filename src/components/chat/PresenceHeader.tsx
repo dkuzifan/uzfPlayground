@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { Mood } from "@/lib/chat/types";
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
   initial: string;
   mood: Mood;
   vibe: string;
+  portraitUrl?: string | null;
   onBack: () => void;
   onMenu: () => void;
 }
@@ -19,7 +21,7 @@ const MOOD_CONFIG: Record<Mood, { ring: string; bg: string; glow: string; gradie
   surprised: { ring: "#34d399", bg: "rgba(52,211,153,0.12)",  glow: "rgba(52,211,153,0.20)",  gradient: "rgba(52,211,153,0.08)" },
 };
 
-export default function PresenceHeader({ name, initial, mood, vibe, onBack, onMenu }: Props) {
+export default function PresenceHeader({ name, initial, mood, vibe, portraitUrl, onBack, onMenu }: Props) {
   const cfg = MOOD_CONFIG[mood];
 
   return (
@@ -47,14 +49,18 @@ export default function PresenceHeader({ name, initial, mood, vibe, onBack, onMe
 
       {/* 아바타 */}
       <div
-        className="flex h-[72px] w-[72px] items-center justify-center rounded-full text-2xl font-bold transition-all duration-700"
+        className="relative flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-full text-2xl font-bold transition-all duration-700"
         style={{
-          background: cfg.bg,
+          background: portraitUrl ? undefined : cfg.bg,
           color: cfg.ring,
           boxShadow: `0 0 0 3px ${cfg.ring}, 0 0 24px ${cfg.glow}`,
         }}
       >
-        {initial}
+        {portraitUrl ? (
+          <Image src={portraitUrl} alt={name} fill className="object-cover" />
+        ) : (
+          initial
+        )}
       </div>
 
       <div className="text-[15px] font-semibold text-white">{name}</div>
