@@ -15,7 +15,7 @@ function buildSystemPrompt(personality: string, creatorBio: string | null): stri
 {"reply":"...","mood":"happy|neutral|sad|angry|surprised","intensity":0,"inner_monologue":"..."}
 
 규칙:
-- reply: 캐릭터 말투와 성격을 반영한 자연스러운 답변
+- reply: 캐릭터 말투와 성격을 반영한 자연스러운 답변. 불쾌하거나 화가 나는 상황에서도 반드시 무언가 말해야 한다. 대화를 끊고 싶다면 그 감정을 직접 표현하라. (예: "그런 말은 별로야.", "더 이상 대화하기 싫어.", "꺼져.")
 - mood: 이 답변을 할 때의 감정 (happy/neutral/sad/angry/surprised 중 하나)
 - intensity: 감정의 강도 (0=거의 없음, 100=매우 강함)
 - inner_monologue: 겉으로 드러내지 않는 속마음 (절대 reply에 포함 금지)
@@ -38,8 +38,8 @@ interface AgentResponse {
 }
 
 const FALLBACK: AgentResponse = {
-  reply: "…",
-  emotionState: { mood: "neutral", intensity: 0 },
+  reply: "지금은 그냥 아무 말도 하기 싫어.",
+  emotionState: { mood: "angry", intensity: 60 },
   innerMonologue: "",
 };
 
