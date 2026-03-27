@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-const GAMES = [
+const GAMES: { href: string; icon: string; title: string; description: string; soon?: boolean }[] = [
   {
     href: "/tales/trpg",
     icon: "⚔️",
@@ -12,7 +12,6 @@ const GAMES = [
     icon: "💬",
     title: "AI 채팅",
     description: "개성 있는 AI 캐릭터와 나누는 1:1 대화",
-    soon: true,
   },
 ];
 
@@ -27,7 +26,7 @@ export default function TalesPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {GAMES.map(({ href, icon, title, description, soon }) => (
+        {GAMES.map(({ href, icon, title, description, soon = false }) => (
           <Link
             key={href}
             href={soon ? "#" : href}

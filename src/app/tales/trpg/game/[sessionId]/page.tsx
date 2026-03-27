@@ -2,20 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useGameScreen } from "@/hooks/tales/trpg/useGameScreen";
+import { useGameScreen } from "@/hooks/trpg/useGameScreen";
 import { useAuthProfile } from "@/hooks/useAuthProfile";
-import ChatLog from "@/components/tales/trpg/game/ChatLog";
-import ActionPanel from "@/components/tales/trpg/game/ActionPanel";
-import CharacterStatus from "@/components/tales/trpg/game/CharacterStatus";
-import PlayerList from "@/components/tales/trpg/game/PlayerList";
-import GameControls from "@/components/tales/trpg/game/GameControls";
-import DiceRollOverlay from "@/components/tales/trpg/game/DiceRollOverlay";
-import NpcEmotionPanel from "@/components/tales/trpg/game/NpcEmotionPanel";
-import QuestTrackerPanel from "@/components/tales/trpg/game/QuestTrackerPanel";
-import LoreDiscoveryPanel from "@/components/tales/trpg/game/LoreDiscoveryPanel";
-import GmPanel from "@/components/tales/trpg/game/GmPanel";
-import ScenePhaseIndicator from "@/components/tales/trpg/game/ScenePhaseIndicator";
-import EndingScreen from "@/components/tales/trpg/game/EndingScreen";
+import ChatLog from "@/components/trpg/game/ChatLog";
+import ActionPanel from "@/components/trpg/game/ActionPanel";
+import CharacterStatus from "@/components/trpg/game/CharacterStatus";
+import PlayerList from "@/components/trpg/game/PlayerList";
+import GameControls from "@/components/trpg/game/GameControls";
+import DiceRollOverlay from "@/components/trpg/game/DiceRollOverlay";
+import NpcEmotionPanel from "@/components/trpg/game/NpcEmotionPanel";
+import QuestTrackerPanel from "@/components/trpg/game/QuestTrackerPanel";
+import LoreDiscoveryPanel from "@/components/trpg/game/LoreDiscoveryPanel";
+import GmPanel from "@/components/trpg/game/GmPanel";
+import ScenePhaseIndicator from "@/components/trpg/game/ScenePhaseIndicator";
+import EndingScreen from "@/components/trpg/game/EndingScreen";
 
 // ── 모바일 탭 ────────────────────────────────────────────
 type MobileTab = "story" | "character" | "npc" | "quest" | "gm";

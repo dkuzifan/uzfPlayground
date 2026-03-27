@@ -2,7 +2,7 @@
 
 import { use, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import WaitingRoom from "@/components/tales/trpg/lobby/WaitingRoom";
+import WaitingRoom from "@/components/trpg/lobby/WaitingRoom";
 import { useAuthProfile } from "@/hooks/useAuthProfile";
 
 interface WaitingRoomPageProps {

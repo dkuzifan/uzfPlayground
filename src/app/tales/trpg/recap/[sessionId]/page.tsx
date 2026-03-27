@@ -1,7 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import type { QuestTracker, ScenarioObjectives, ScenarioEndings, EndingCondition } from "@/lib/tales/trpg/types/game";
-import type { NpcDynamicState, CharacterStats, PersonalityProfile } from "@/lib/tales/trpg/types/character";
+import type { QuestTracker, ScenarioObjectives, ScenarioEndings, EndingCondition } from "@/lib/trpg/types/game";
+import type { NpcDynamicState, CharacterStats, PersonalityProfile } from "@/lib/trpg/types/character";
 
 interface PageProps {
   params: Promise<{ sessionId: string }>;

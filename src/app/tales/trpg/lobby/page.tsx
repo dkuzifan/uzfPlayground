@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import RoomCard from "@/components/tales/trpg/lobby/RoomCard";
-import CreateRoomModal from "@/components/tales/trpg/lobby/CreateRoomModal";
+import RoomCard from "@/components/trpg/lobby/RoomCard";
+import CreateRoomModal from "@/components/trpg/lobby/CreateRoomModal";
 import { useAuthProfile } from "@/hooks/useAuthProfile";
 import type { LobbySession } from "@/lib/types/lobby";
 

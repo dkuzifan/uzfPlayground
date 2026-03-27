@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 채팅 — 목업</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0a;
+    --bg-card: #141414;
+    --bg-input: #1c1c1c;
+    --border: rgba(255,255,255,0.1);
+    --text: #f5f5f5;
+    --text-muted: #737373;
+    --accent: #a78bfa;
+    --accent-dim: rgba(167,139,250,0.15);
+    --user-bubble: #1d2d44;
+    --ai-bubble: #1c1c1c;
+    --mood-happy: #fbbf24;
+    --mood-neutral: #a78bfa;
+    --mood-sad: #60a5fa;
+    --mood-angry: #f87171;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── 네비게이션 탭 ── */
+  .nav { display: flex; gap: 6px; padding: 12px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .nav-btn { padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 12px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+  .nav-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .nav-sep { width: 1px; background: var(--border); margin: 4px 2px; }
+
+  /* ── 화면 컨테이너 ── */
+  .screen { display: none; max-width: 480px; margin: 0 auto; padding: 20px; min-height: calc(100vh - 57px); }
+  .screen.active { display: flex; flex-direction: column; }
+  .screen.no-pad { padding: 0; height: calc(100vh - 57px); }
+
+  /* ── 공통 ── */
+  .section-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; margin-top: 20px; }
+  .section-title:first-child { margin-top: 0; }
+  .btn-primary { padding: 10px 24px; border-radius: 10px; background: var(--accent); color: #0a0a0a; font-size: 14px; font-weight: 600; border: none; cursor: pointer; transition: opacity 0.2s; }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-ghost { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--text); font-size: 14px; cursor: pointer; }
+  .btn-danger { flex: 1; padding: 10px; border-radius: 10px; border: none; background: #ef4444; color: white; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+  /* ══════════════════════════════
+     화면 ①: 빈 상태
+  ══════════════════════════════ */
+  #screen-empty { justify-content: center; align-items: center; gap: 16px; text-align: center; }
+  .empty-icon { font-size: 48px; }
+  .empty-title { font-size: 18px; font-weight: 600; }
+  .empty-desc { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+
+  /* ══════════════════════════════
+     화면 ②: 캐릭터 목록
+  ══════════════════════════════ */
+  .list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .list-header h1 { font-size: 20px; font-weight: 700; }
+  .btn-icon { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--text); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .char-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+  .char-card:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .char-avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; flex-shrink: 0; }
+  .avatar-purple { background: rgba(167,139,250,0.2); color: var(--accent); }
+  .avatar-blue { background: rgba(96,165,250,0.2); color: #60a5fa; }
+  .avatar-green { background: rgba(52,211,153,0.2); color: #34d399; }
+  .char-info { flex: 1; min-width: 0; }
+  .char-name { font-size: 14px; font-weight: 600; }
+  .char-desc { font-size: 12px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .char-badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; background: rgba(167,139,250,0.15); color: var(--accent); border: 1px solid rgba(167,139,250,0.3); flex-shrink: 0; }
+  .public-badge { background: rgba(52,211,153,0.1); color: #34d399; border-color: rgba(52,211,153,0.3); }
+
+  /* ══════════════════════════════
+     화면 ③: 캐릭터 생성 폼
+  ══════════════════════════════ */
+  .form-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .btn-back { background: transparent; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; padding: 4px; line-height: 1; }
+  .form-header h1 { font-size: 18px; font-weight: 700; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .form-label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+  .required { color: #f87171; }
+  .form-input, .form-textarea { background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; color: var(--text); font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.2s; width: 100%; resize: none; }
+  .form-input:focus, .form-textarea:focus { border-color: var(--accent); }
+  .form-hint { font-size: 12px; color: var(--text-muted); }
+  .creator-bio-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .creator-bio-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .creator-bio-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px; }
+  .form-footer { margin-top: auto; padding-top: 8px; }
+
+  /* ══════════════════════════════
+     화면 ④-A: 대화 (메신저 스타일)
+  ══════════════════════════════ */
+  .chat-header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .btn-back-sm { background: transparent; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; }
+  .chat-avatar-sm { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; flex-shrink: 0; position: relative; transition: box-shadow 0.5s; }
+  .chat-avatar-sm.mood-happy { box-shadow: 0 0 0 2px var(--mood-happy), 0 0 12px rgba(251,191,36,0.3); }
+  .chat-avatar-sm.mood-neutral { box-shadow: 0 0 0 2px var(--mood-neutral), 0 0 12px rgba(167,139,250,0.3); }
+  .chat-avatar-sm.mood-sad { box-shadow: 0 0 0 2px var(--mood-sad), 0 0 12px rgba(96,165,250,0.3); }
+  .mood-icon-sm { position: absolute; bottom: -2px; right: -2px; font-size: 11px; background: var(--bg); border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+  .chat-char-info { flex: 1; }
+  .chat-char-name { font-size: 15px; font-weight: 600; }
+  .chat-char-mood { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .msg-row { display: flex; gap: 8px; }
+  .msg-row.user { flex-direction: row-reverse; }
+  .msg-avatar-mini { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  .bubble { max-width: 75%; padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.55; }
+  .bubble.ai { background: var(--ai-bubble); border: 1px solid var(--border); border-radius: 4px 16px 16px 16px; }
+  .bubble.user { background: var(--user-bubble); border-radius: 16px 4px 16px 16px; }
+  .bubble-time { font-size: 10px; color: var(--text-muted); margin-top: 4px; padding: 0 4px; }
+  .msg-row.user .bubble-time { text-align: right; }
+  .chat-input-area { padding: 12px 16px; border-top: 1px solid var(--border); flex-shrink: 0; }
+  .chat-input-row { display: flex; gap: 8px; align-items: flex-end; }
+  .chat-textarea { flex: 1; background: var(--bg-input); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; color: var(--text); font-size: 14px; font-family: inherit; outline: none; resize: none; max-height: 120px; line-height: 1.5; transition: border-color 0.2s; }
+  .chat-textarea:focus { border-color: var(--accent); }
+  .send-btn { width: 40px; height: 40px; border-radius: 10px; background: var(--accent); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px; color: #0a0a0a; }
+  .typing-indicator { display: flex; gap: 4px; align-items: center; padding: 10px 14px; }
+  .typing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); animation: bounce 1.2s infinite; }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)} }
+
+  /* ══════════════════════════════
+     화면 ④-B: 대화 (친밀감 스타일)
+  ══════════════════════════════ */
+  .intimate-wrap { display: flex; flex-direction: column; height: 100%; position: relative; overflow: hidden; }
+
+  /* 상단 캐릭터 존재감 영역 */
+  .intimate-presence { flex-shrink: 0; position: relative; padding: 20px 20px 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; transition: background 0.8s; }
+  .intimate-presence::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 40px; background: linear-gradient(to bottom, transparent, var(--bg)); }
+  .intimate-presence.mood-happy { background: radial-gradient(ellipse at 50% 0%, rgba(251,191,36,0.12) 0%, transparent 70%); }
+  .intimate-presence.mood-neutral { background: radial-gradient(ellipse at 50% 0%, rgba(167,139,250,0.12) 0%, transparent 70%); }
+  .intimate-presence.mood-sad { background: radial-gradient(ellipse at 50% 0%, rgba(96,165,250,0.10) 0%, transparent 70%); }
+  .intimate-presence.mood-angry { background: radial-gradient(ellipse at 50% 0%, rgba(248,113,113,0.10) 0%, transparent 70%); }
+
+  .intimate-avatar { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; transition: box-shadow 0.5s; }
+  .intimate-avatar.mood-happy { box-shadow: 0 0 0 3px var(--mood-happy), 0 0 24px rgba(251,191,36,0.25); background: rgba(251,191,36,0.15); color: var(--mood-happy); }
+  .intimate-avatar.mood-neutral { box-shadow: 0 0 0 3px var(--mood-neutral), 0 0 24px rgba(167,139,250,0.25); background: rgba(167,139,250,0.15); color: var(--mood-neutral); }
+  .intimate-avatar.mood-sad { box-shadow: 0 0 0 3px var(--mood-sad), 0 0 24px rgba(96,165,250,0.20); background: rgba(96,165,250,0.12); color: var(--mood-sad); }
+  .intimate-avatar.mood-angry { box-shadow: 0 0 0 3px var(--mood-angry), 0 0 24px rgba(248,113,113,0.20); background: rgba(248,113,113,0.12); color: var(--mood-angry); }
+  .intimate-name { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+  .intimate-vibe { font-size: 12px; color: var(--text-muted); }
+
+  .intimate-back { position: absolute; top: 14px; left: 14px; background: transparent; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; }
+  .intimate-menu { position: absolute; top: 14px; right: 14px; background: transparent; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; }
+
+  /* 대화 내용 영역 */
+  .intimate-messages { flex: 1; overflow-y: auto; padding: 0 24px 16px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* AI 메시지: 말풍선 없이 중앙 텍스트 */
+  .imsg-ai { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .imsg-ai-text { font-size: 16px; line-height: 1.7; color: var(--text); max-width: 320px; font-weight: 400; }
+  .imsg-ai-time { font-size: 10px; color: var(--text-muted); }
+
+  /* 사용자 메시지: 작고 우측, 흐리게 */
+  .imsg-user { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; opacity: 0.55; }
+  .imsg-user-text { font-size: 13px; color: var(--text-muted); background: var(--bg-input); padding: 7px 12px; border-radius: 12px 2px 12px 12px; max-width: 240px; line-height: 1.5; }
+  .imsg-user-time { font-size: 10px; color: var(--text-muted); padding-right: 2px; }
+
+  /* 타이핑 인디케이터 */
+  .imsg-typing { text-align: center; display: flex; justify-content: center; }
+
+  /* 입력 영역 */
+  .intimate-input-area { padding: 12px 20px 16px; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
+
+  /* ── 모달 ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 50; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; width: 300px; display: flex; flex-direction: column; gap: 16px; }
+  .modal-title { font-size: 16px; font-weight: 700; }
+  .modal-desc { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+  .modal-actions { display: flex; gap: 8px; }
+</style>
+</head>
+<body>
+
+<!-- 네비게이션 탭 -->
+<div class="nav">
+  <button class="nav-btn active" onclick="showScreen('empty')">① 빈 상태</button>
+  <button class="nav-btn" onclick="showScreen('list')">② 목록</button>
+  <button class="nav-btn" onclick="showScreen('create')">③ 생성 폼</button>
+  <div class="nav-sep"></div>
+  <button class="nav-btn" onclick="showScreen('chat-a')">④-A 메신저형</button>
+  <button class="nav-btn" onclick="showScreen('chat-b')">④-B 친밀형</button>
+</div>
+
+<!-- ① 빈 상태 -->
+<div id="screen-empty" class="screen active">
+  <div class="empty-icon">💬</div>
+  <div>
+    <div class="empty-title">아직 캐릭터가 없어요</div>
+    <div class="empty-desc" style="margin-top:8px;">나만의 AI 캐릭터를 만들고<br>대화를 시작해 보세요.</div>
+  </div>
+  <button class="btn-primary" onclick="showScreen('create')">+ 캐릭터 만들기</button>
+</div>
+
+<!-- ② 캐릭터 목록 -->
+<div id="screen-list" class="screen">
+  <div class="list-header">
+    <h1>AI 채팅</h1>
+    <button class="btn-icon" onclick="showScreen('create')">+</button>
+  </div>
+  <div class="section-title">내 캐릭터</div>
+  <div class="char-card" onclick="showScreen('chat-b')">
+    <div class="char-avatar avatar-purple">아</div>
+    <div class="char-info"><div class="char-name">아리아</div><div class="char-desc">말수가 적지만 깊이 있는 대화를 좋아하는 엘프 현자</div></div>
+    <span class="char-badge">비공개</span>
+  </div>
+  <div class="char-card" onclick="showScreen('chat-b')">
+    <div class="char-avatar avatar-blue">루</div>
+    <div class="char-info"><div class="char-name">루카스</div><div class="char-desc">유머러스하고 낙천적인 여행 음유시인</div></div>
+    <span class="char-badge public-badge">공개</span>
+  </div>
+  <div class="section-title">공개 캐릭터</div>
+  <div class="char-card" onclick="showScreen('chat-b')">
+    <div class="char-avatar avatar-green">세</div>
+    <div class="char-info"><div class="char-name">세라핀</div><div class="char-desc">냉정하지만 의외로 감성적인 마법사 — by uzifan</div></div>
+    <span class="char-badge public-badge">공개</span>
+  </div>
+</div>
+
+<!-- ③ 캐릭터 생성 폼 -->
+<div id="screen-create" class="screen">
+  <div class="form-header">
+    <button class="btn-back" onclick="showScreen('list')">←</button>
+    <h1>캐릭터 만들기</h1>
+  </div>
+  <div class="form-group">
+    <label class="form-label">이름 <span class="required">*</span></label>
+    <input class="form-input" type="text" placeholder="캐릭터 이름을 입력하세요">
+  </div>
+  <div class="form-group">
+    <label class="form-label">한 줄 소개</label>
+    <input class="form-input" type="text" placeholder="목록에 표시될 짧은 설명 (선택)">
+  </div>
+  <div class="form-group">
+    <label class="form-label">성격 설명 <span class="required">*</span></label>
+    <textarea class="form-textarea" rows="5" placeholder="이 캐릭터는 어떤 사람인가요? 말투, 성격, 배경, 특이한 버릇 등을 자유롭게 써주세요.&#10;&#10;예) 냉정한 겉모습과 달리 작은 친절에도 감동받는 전직 기사."></textarea>
+    <span class="form-hint">상세할수록 더 일관된 대화를 할 수 있어요.</span>
+  </div>
+  <div class="creator-bio-section">
+    <div class="creator-bio-title">제작자 정보 <span style="font-size:11px;color:var(--text-muted);font-weight:400;">(선택)</span></div>
+    <div class="creator-bio-desc">다른 사람이 "너를 누가 만들었어?" 라고 물으면 이 내용으로 답해요.</div>
+    <textarea class="form-textarea" rows="2" placeholder="예) 판타지를 좋아하는 개발자 uzifan이 만들었어." style="margin-top:10px;"></textarea>
+  </div>
+  <div class="form-group">
+    <label class="form-label" style="flex-direction:row;gap:8px;cursor:pointer;">
+      <input type="checkbox" style="width:15px;height:15px;accent-color:var(--accent);">
+      친구들과 공유 (공개 캐릭터로 등록)
+    </label>
+  </div>
+  <div class="form-footer">
+    <button class="btn-primary" style="width:100%;" onclick="showScreen('chat-b')">캐릭터 만들고 대화 시작</button>
+  </div>
+</div>
+
+<!-- ④-A 대화: 메신저형 -->
+<div id="screen-chat-a" class="screen no-pad">
+  <div class="chat-header">
+    <button class="btn-back-sm" onclick="showScreen('list')">←</button>
+    <div class="chat-avatar-sm avatar-purple mood-neutral" id="avatarA">
+      아<span class="mood-icon-sm" id="moodIconA">😶</span>
+    </div>
+    <div class="chat-char-info">
+      <div class="chat-char-name">아리아</div>
+      <div class="chat-char-mood" id="moodLabelA">조용한 분위기</div>
+    </div>
+    <button style="background:transparent;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;" onclick="document.getElementById('modalA').classList.add('open')">⋯</button>
+  </div>
+  <div class="chat-messages" id="messagesA">
+    <div class="msg-row">
+      <div class="msg-avatar-mini avatar-purple">아</div>
+      <div><div class="bubble ai">…처음 보는 얼굴이군요. 무슨 일로 찾아오셨나요?</div><div class="bubble-time">오후 3:12</div></div>
+    </div>
+    <div class="msg-row user">
+      <div><div class="bubble user">안녕하세요. 당신에 대해 이야기를 나눠보고 싶어서요.</div><div class="bubble-time" style="text-align:right;">오후 3:13</div></div>
+    </div>
+    <div class="msg-row">
+      <div class="msg-avatar-mini avatar-purple">아</div>
+      <div><div class="bubble ai">…그런가요. 궁금한 게 있으면 물어보세요. 대답할 수 있는 건 대답하겠습니다.</div><div class="bubble-time">오후 3:13</div></div>
+    </div>
+  </div>
+  <div class="chat-input-area">
+    <div class="chat-input-row">
+      <textarea class="chat-textarea" rows="1" id="inputA" placeholder="메시지를 입력하세요…" oninput="autoResize(this)"></textarea>
+      <button class="send-btn" onclick="sendA()">➤</button>
+    </div>
+  </div>
+</div>
+
+<!-- ④-B 대화: 친밀형 -->
+<div id="screen-chat-b" class="screen no-pad">
+  <div class="intimate-wrap">
+    <!-- 캐릭터 존재감 영역 -->
+    <div class="intimate-presence mood-neutral" id="presenceB">
+      <button class="intimate-back" onclick="showScreen('list')">←</button>
+      <button class="intimate-menu" onclick="document.getElementById('modalB').classList.add('open')">⋯</button>
+      <div class="intimate-avatar mood-neutral" id="avatarB">아</div>
+      <div class="intimate-name">아리아</div>
+      <div class="intimate-vibe" id="vibeB">조용한 분위기</div>
+    </div>
+
+    <!-- 메시지 -->
+    <div class="intimate-messages" id="messagesB">
+      <div class="imsg-ai">
+        <div class="imsg-ai-text">…처음 보는 얼굴이군요. 무슨 일로 찾아오셨나요?</div>
+        <div class="imsg-ai-time">오후 3:12</div>
+      </div>
+      <div class="imsg-user">
+        <div class="imsg-user-text">안녕하세요. 당신에 대해 이야기를 나눠보고 싶어서요.</div>
+        <div class="imsg-user-time">오후 3:13</div>
+      </div>
+      <div class="imsg-ai">
+        <div class="imsg-ai-text">…그런가요. 궁금한 게 있으면 물어보세요. 대답할 수 있는 건 대답하겠습니다.</div>
+        <div class="imsg-ai-time">오후 3:13</div>
+      </div>
+    </div>
+
+    <!-- 입력 -->
+    <div class="intimate-input-area">
+      <div class="chat-input-row">
+        <textarea class="chat-textarea" rows="1" id="inputB" placeholder="메시지를 입력하세요…" oninput="autoResize(this)"></textarea>
+        <button class="send-btn" onclick="sendB()">➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 삭제 모달 A -->
+<div class="modal-overlay" id="modalA">
+  <div class="modal">
+    <div class="modal-title">대화를 초기화할까요?</div>
+    <div class="modal-desc">아리아와의 모든 대화 기록이 삭제됩니다. 캐릭터는 유지됩니다.</div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="document.getElementById('modalA').classList.remove('open')">취소</button>
+      <button class="btn-danger" onclick="clearA()">초기화</button>
+    </div>
+  </div>
+</div>
+
+<!-- 삭제 모달 B -->
+<div class="modal-overlay" id="modalB">
+  <div class="modal">
+    <div class="modal-title">대화를 초기화할까요?</div>
+    <div class="modal-desc">아리아와의 모든 대화 기록이 삭제됩니다. 캐릭터는 유지됩니다.</div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="document.getElementById('modalB').classList.remove('open')">취소</button>
+      <button class="btn-danger" onclick="clearB()">초기화</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showScreen(name) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('screen-' + name).classList.add('active');
+    const idx = {empty:0,list:1,create:2,'chat-a':3,'chat-b':4}[name];
+    if (idx !== undefined) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+  }
+
+  function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
+
+  const MOODS = [
+    {cls:'mood-happy',  icon:'😊', vibe:'밝은 분위기'},
+    {cls:'mood-neutral',icon:'😶', vibe:'조용한 분위기'},
+    {cls:'mood-sad',    icon:'😔', vibe:'차분한 분위기'},
+    {cls:'mood-neutral',icon:'🤔', vibe:'생각하는 중'},
+  ];
+  const AI_REPLIES = [
+    "…흥미롭네요. 계속 말해보세요.",
+    "그런 생각을 하고 있었군요. 저는 조금 다르게 봅니다만.",
+    "…잠시 생각해볼게요. 쉽게 답할 수 있는 질문이 아니에요.",
+    "솔직히 말하면, 그 질문은 저도 잘 모르겠어요.",
+    "당신은 항상 그런 식으로 이야기하나요? 재미있네요.",
+  ];
+
+  function timeStr() { return new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); }
+
+  // ── 메신저형 전송 ──
+  function sendA() {
+    const input = document.getElementById('inputA');
+    const text = input.value.trim(); if(!text) return;
+    const msgs = document.getElementById('messagesA');
+    msgs.innerHTML += `<div class="msg-row user"><div><div class="bubble user">${text}</div><div class="bubble-time" style="text-align:right;">${timeStr()}</div></div></div>`;
+    input.value=''; input.style.height='auto'; msgs.scrollTop=msgs.scrollHeight;
+    const tid='t'+Date.now();
+    msgs.innerHTML += `<div class="msg-row" id="${tid}"><div class="msg-avatar-mini avatar-purple">아</div><div><div class="bubble ai"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div></div></div>`;
+    msgs.scrollTop=msgs.scrollHeight;
+    setTimeout(()=>{
+      document.getElementById(tid)?.remove();
+      const mood=MOODS[Math.floor(Math.random()*MOODS.length)];
+      const reply=AI_REPLIES[Math.floor(Math.random()*AI_REPLIES.length)];
+      const av=document.getElementById('avatarA');
+      av.className=`chat-avatar-sm avatar-purple ${mood.cls}`;
+      document.getElementById('moodIconA').textContent=mood.icon;
+      document.getElementById('moodLabelA').textContent=mood.vibe;
+      msgs.innerHTML+=`<div class="msg-row"><div class="msg-avatar-mini avatar-purple">아</div><div><div class="bubble ai">${reply}</div><div class="bubble-time">${timeStr()}</div></div></div>`;
+      msgs.scrollTop=msgs.scrollHeight;
+    },1500);
+  }
+  document.addEventListener('DOMContentLoaded',()=>{
+    document.getElementById('inputA').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendA();}});
+    document.getElementById('inputB').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendB();}});
+  });
+
+  function clearA() {
+    document.getElementById('messagesA').innerHTML=`<div class="msg-row"><div class="msg-avatar-mini avatar-purple">아</div><div><div class="bubble ai">…처음 보는 얼굴이군요. 무슨 일로 찾아오셨나요?</div><div class="bubble-time">${timeStr()}</div></div></div>`;
+    document.getElementById('modalA').classList.remove('open');
+    document.getElementById('avatarA').className='chat-avatar-sm avatar-purple mood-neutral';
+    document.getElementById('moodIconA').textContent='😶';
+    document.getElementById('moodLabelA').textContent='조용한 분위기';
+  }
+
+  // ── 친밀형 전송 ──
+  function sendB() {
+    const input = document.getElementById('inputB');
+    const text = input.value.trim(); if(!text) return;
+    const msgs = document.getElementById('messagesB');
+    msgs.innerHTML += `<div class="imsg-user"><div class="imsg-user-text">${text}</div><div class="imsg-user-time">${timeStr()}</div></div>`;
+    input.value=''; input.style.height='auto'; msgs.scrollTop=msgs.scrollHeight;
+    const tid='tb'+Date.now();
+    msgs.innerHTML += `<div class="imsg-typing" id="${tid}"><div class="bubble ai" style="background:transparent;border:none;"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div></div>`;
+    msgs.scrollTop=msgs.scrollHeight;
+    setTimeout(()=>{
+      document.getElementById(tid)?.remove();
+      const mood=MOODS[Math.floor(Math.random()*MOODS.length)];
+      const reply=AI_REPLIES[Math.floor(Math.random()*AI_REPLIES.length)];
+      // 감정 전환
+      const av=document.getElementById('avatarB');
+      av.className=`intimate-avatar ${mood.cls}`;
+      const pr=document.getElementById('presenceB');
+      pr.className=`intimate-presence ${mood.cls}`;
+      document.getElementById('vibeB').textContent=mood.vibe;
+      msgs.innerHTML+=`<div class="imsg-ai"><div class="imsg-ai-text">${reply}</div><div class="imsg-ai-time">${timeStr()}</div></div>`;
+      msgs.scrollTop=msgs.scrollHeight;
+    },1500);
+  }
+
+  function clearB() {
+    document.getElementById('messagesB').innerHTML=`<div class="imsg-ai"><div class="imsg-ai-text">…처음 보는 얼굴이군요. 무슨 일로 찾아오셨나요?</div><div class="imsg-ai-time">${timeStr()}</div></div>`;
+    document.getElementById('modalB').classList.remove('open');
+    document.getElementById('avatarB').className='intimate-avatar mood-neutral';
+    document.getElementById('presenceB').className='intimate-presence mood-neutral';
+    document.getElementById('vibeB').textContent='조용한 분위기';
+  }
+</script>
+</body>
+</html>

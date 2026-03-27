@@ -384,6 +384,57 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["World_Dictionary"]["Insert"]>;
         Relationships: [];
       };
+
+      // v6 추가: AI 채팅 피처
+      AI_Character: {
+        Row: {
+          id: string;
+          local_id: string;
+          name: string;
+          bio: string | null;
+          personality: string;
+          creator_bio: string | null;
+          is_public: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          local_id: string;
+          name: string;
+          bio?: string | null;
+          personality: string;
+          creator_bio?: string | null;
+          is_public?: boolean;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["AI_Character"]["Insert"]>;
+        Relationships: [];
+      };
+
+      AI_Chat_Message: {
+        Row: {
+          id: string;
+          character_id: string;
+          local_id: string;
+          role: "user" | "assistant";
+          content: string;
+          inner_monologue: string | null;
+          emotion_state: { mood: string; intensity: number } | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          character_id: string;
+          local_id: string;
+          role: "user" | "assistant";
+          content: string;
+          inner_monologue?: string | null;
+          emotion_state?: { mood: string; intensity: number } | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["AI_Chat_Message"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
