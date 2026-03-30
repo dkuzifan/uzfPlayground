@@ -6,6 +6,7 @@ import {
   SEQUENCE_MODIFIER,
   BASE_DISTANCE,
   MAX_SPEED,
+  ZONE_SELECT_STRIKE_BASE,
 } from './config'
 
 // 5×5 그리드의 모든 존 ID 목록
@@ -59,7 +60,9 @@ export function selectTargetZone(
   const prev = recentPitches[recentPitches.length - 1]
 
   const weights = ALL_ZONES.map(zone => {
-    let w = affinity[zone] ?? 1.0
+    // 스트라이크 존 기본 가중치 보정 (9 strike vs 16 ball → ~63% strike rate)
+    const strikeBase = BALL_ZONES.has(zone) ? 1.0 : ZONE_SELECT_STRIKE_BASE
+    let w = (affinity[zone] ?? 1.0) * strikeBase
 
     // Count Modifier
     const balls    = count.balls

@@ -50,9 +50,11 @@ export const BASE_DISTANCE = 18.44  // m
 export const MAX_SPEED = 50         // m/s
 
 // 우타자 기준 몸통 영역 (좌타자는 x 부호 반전)
+// x_max=-0.68: X_LEFT_BALL=-0.58과 분리 → 최소 0.10m 여백, HBP는 큰 제구 오차 시만 발생
+// z: 무릎~어깨 (0.45~1.55m), MLB HBP ~1% 기준 역산
 export const BATTER_BODY = {
-  x_min: -0.90, x_max: -0.50,
-  z_min:  0.20, z_max:  1.80,
+  x_min: -1.05, x_max: -0.75,
+  z_min:  0.45, z_max:  1.55,
   y_min: -0.10, y_max:  0.50,
 }
 
@@ -87,11 +89,27 @@ export const PITCH_AFFINITY: Record<PitchType, Partial<Record<ZoneId, number>>> 
 }
 
 // ============================================================
+// Zone Select — 스트라이크 존 기본 가중치 보정
+// 스트라이크 9개 vs 볼 16개 → 기본 가중치 1:1이면 strike%≈36%
+// 2.3× 보정 시 strike%≈62% (MLB ~62%)
+// ============================================================
+
+export const ZONE_SELECT_STRIKE_BASE = 2.3
+
+// ============================================================
 // Count Modifier
 // ============================================================
 
+// ZONE_SELECT_STRIKE_BASE=2.5 도입 후 재조정
+// behind_3balls: 원래 strike_zones×1.8 설계 → base=1.0 기준. base=2.5로 바뀐 후엔
+//   3볼 시 strike% = 9×2.5×1.8/(9×2.5×1.8+16×0.3) ≈ 93% → 비현실적
+//   목표: 3볼 시 strike% ≈ 77% (MLB 3-0 카운트 실제 기준)
+// strike_zones: 1.8→1.2, ball_zones: 0.3→0.5 로 조정
+// behind_3balls: 3볼 카운트 시 스트라이크 존 선호 증가
+// ZONE_SELECT_STRIKE_BASE=2.5 기준으로 재조정
+// {1.0, 0.8}: 3볼에서도 기본 스트라이크 비율 유지 → BB% 개선
 export const COUNT_MODIFIER = {
-  behind_3balls: { strike_zones: 1.8, ball_zones: 0.3 },
+  behind_3balls: { strike_zones: 1.0, ball_zones: 0.8 },
   ahead_0_2:     { natural_fall: 1.6, dirt: 1.4 },
   ahead_1_2:     { natural_fall: 1.6, dirt: 1.4 },
   first_pitch:   {},

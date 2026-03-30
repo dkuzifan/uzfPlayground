@@ -11,8 +11,10 @@ import { classifyZone } from './zone-classify'
 
 // 우타자 기준 x 중심 (좌 / 중 / 우)
 const X_CENTERS = [-0.14, 0.0, 0.14]  // col 2,3,4 (strike zone columns)
-const X_LEFT_BALL  = -0.36            // B2x 좌측 볼 중심
-const X_RIGHT_BALL =  0.36            // B2x 우측 볼 중심
+// ABS 스트라이크 존 좌우 경계: ±(PLATE_HALF_WIDTH + ABS_MARGIN_X) = ±0.4684m
+// 볼 존 중심은 이 경계 바깥에 위치해야 함
+const X_LEFT_BALL  = -0.58            // B2x 좌측 볼 중심 (ABS 경계 -0.4684m 바깥)
+const X_RIGHT_BALL =  0.58            // B2x 우측 볼 중심
 
 // 스트라이크 존 z 중심 계산용 — 런타임에 batter 데이터로 계산
 function strikeZCenters(zoneBottom: number, zoneTop: number): [number, number, number] {
