@@ -1,0 +1,1194 @@
+{
+  "teams": [
+    {
+      "id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Seoul Dragons",
+      "short_name": "SDR",
+      "primary_color": "#1a3a6b"
+    },
+    {
+      "id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Busan Tigers",
+      "short_name": "BTG",
+      "primary_color": "#b5000f"
+    }
+  ],
+  "players": [
+    {
+      "id": "00000001-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Kim Junho",
+      "number": 11,
+      "age": 28,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "SP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball",  "weight": 45, "ball_power": 88, "ball_control": 72, "ball_break": 18, "ball_speed": 91 },
+        { "type": "slider",   "weight": 30, "ball_power": 70, "ball_control": 78, "ball_break": 82, "ball_speed": 77 },
+        { "type": "changeup", "weight": 25, "ball_power": 64, "ball_control": 83, "ball_break": 68, "ball_speed": 71 }
+      ],
+      "stats": {
+        "ball_power": 76, "ball_control": 77, "ball_break": 53, "ball_speed": 82,
+        "contact": 40, "power": 35, "defence": 38, "throw": 55, "running": 42,
+        "stamina": 85
+      },
+      "zone_bottom": 0.52,
+      "zone_top": 1.12,
+      "portrait_url": null
+    },
+    {
+      "id": "00000002-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Lee Sangwoo",
+      "number": 18,
+      "age": 25,
+      "bats": "L",
+      "throws": "L",
+      "position_1": "SP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball",  "weight": 40, "ball_power": 80, "ball_control": 85, "ball_break": 20, "ball_speed": 87 },
+        { "type": "curveball", "weight": 35, "ball_power": 65, "ball_control": 82, "ball_break": 90, "ball_speed": 68 },
+        { "type": "changeup",  "weight": 25, "ball_power": 60, "ball_control": 88, "ball_break": 72, "ball_speed": 70 }
+      ],
+      "stats": {
+        "ball_power": 70, "ball_control": 84, "ball_break": 57, "ball_speed": 77,
+        "contact": 38, "power": 32, "defence": 40, "throw": 52, "running": 44,
+        "stamina": 78
+      },
+      "zone_bottom": 0.51,
+      "zone_top": 1.10,
+      "portrait_url": null
+    },
+    {
+      "id": "00000003-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Park Jinhyuk",
+      "number": 21,
+      "age": 30,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "SP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "sinker",   "weight": 50, "ball_power": 85, "ball_control": 80, "ball_break": 55, "ball_speed": 88 },
+        { "type": "cutter",   "weight": 30, "ball_power": 78, "ball_control": 75, "ball_break": 65, "ball_speed": 84 },
+        { "type": "splitter", "weight": 20, "ball_power": 72, "ball_control": 70, "ball_break": 88, "ball_speed": 75 }
+      ],
+      "stats": {
+        "ball_power": 81, "ball_control": 77, "ball_break": 64, "ball_speed": 85,
+        "contact": 42, "power": 38, "defence": 35, "throw": 58, "running": 40,
+        "stamina": 90
+      },
+      "zone_bottom": 0.53,
+      "zone_top": 1.14,
+      "portrait_url": null
+    },
+    {
+      "id": "00000004-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Choi Minjun",
+      "number": 34,
+      "age": 27,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "SP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball",  "weight": 55, "ball_power": 93, "ball_control": 65, "ball_break": 15, "ball_speed": 95 },
+        { "type": "slider",   "weight": 25, "ball_power": 75, "ball_control": 68, "ball_break": 80, "ball_speed": 80 },
+        { "type": "forkball", "weight": 20, "ball_power": 68, "ball_control": 62, "ball_break": 92, "ball_speed": 73 }
+      ],
+      "stats": {
+        "ball_power": 84, "ball_control": 65, "ball_break": 45, "ball_speed": 88,
+        "contact": 36, "power": 33, "defence": 37, "throw": 50, "running": 38,
+        "stamina": 72
+      },
+      "zone_bottom": 0.54,
+      "zone_top": 1.15,
+      "portrait_url": null
+    },
+    {
+      "id": "00000005-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Yoon Seokjin",
+      "number": 40,
+      "age": 32,
+      "bats": "L",
+      "throws": "L",
+      "position_1": "SP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball",  "weight": 35, "ball_power": 75, "ball_control": 90, "ball_break": 22, "ball_speed": 83 },
+        { "type": "curveball", "weight": 30, "ball_power": 60, "ball_control": 88, "ball_break": 93, "ball_speed": 65 },
+        { "type": "changeup",  "weight": 35, "ball_power": 58, "ball_control": 92, "ball_break": 78, "ball_speed": 68 }
+      ],
+      "stats": {
+        "ball_power": 64, "ball_control": 90, "ball_break": 63, "ball_speed": 72,
+        "contact": 44, "power": 30, "defence": 42, "throw": 48, "running": 46,
+        "stamina": 88
+      },
+      "zone_bottom": 0.50,
+      "zone_top": 1.08,
+      "portrait_url": null
+    },
+    {
+      "id": "00000006-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Han Donghyun",
+      "number": 57,
+      "age": 24,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "RP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball", "weight": 60, "ball_power": 89, "ball_control": 70, "ball_break": 12, "ball_speed": 93 },
+        { "type": "slider",  "weight": 40, "ball_power": 74, "ball_control": 72, "ball_break": 85, "ball_speed": 79 }
+      ],
+      "stats": {
+        "ball_power": 83, "ball_control": 71, "ball_break": 41, "ball_speed": 87,
+        "contact": 35, "power": 31, "defence": 36, "throw": 54, "running": 39,
+        "stamina": 65
+      },
+      "zone_bottom": 0.53,
+      "zone_top": 1.13,
+      "portrait_url": null
+    },
+    {
+      "id": "00000007-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Jang Hyunseok",
+      "number": 62,
+      "age": 26,
+      "bats": "L",
+      "throws": "L",
+      "position_1": "RP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball",  "weight": 50, "ball_power": 82, "ball_control": 75, "ball_break": 16, "ball_speed": 88 },
+        { "type": "changeup",  "weight": 50, "ball_power": 65, "ball_control": 80, "ball_break": 75, "ball_speed": 72 }
+      ],
+      "stats": {
+        "ball_power": 74, "ball_control": 78, "ball_break": 46, "ball_speed": 80,
+        "contact": 37, "power": 33, "defence": 39, "throw": 51, "running": 41,
+        "stamina": 62
+      },
+      "zone_bottom": 0.51,
+      "zone_top": 1.09,
+      "portrait_url": null
+    },
+    {
+      "id": "00000008-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Oh Jungmin",
+      "number": 68,
+      "age": 29,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "RP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "cutter",   "weight": 55, "ball_power": 80, "ball_control": 78, "ball_break": 70, "ball_speed": 86 },
+        { "type": "fastball", "weight": 45, "ball_power": 85, "ball_control": 72, "ball_break": 14, "ball_speed": 90 }
+      ],
+      "stats": {
+        "ball_power": 82, "ball_control": 75, "ball_break": 45, "ball_speed": 88,
+        "contact": 36, "power": 34, "defence": 38, "throw": 56, "running": 40,
+        "stamina": 68
+      },
+      "zone_bottom": 0.52,
+      "zone_top": 1.11,
+      "portrait_url": null
+    },
+    {
+      "id": "00000009-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Seo Youngchan",
+      "number": 71,
+      "age": 23,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "RP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball",  "weight": 65, "ball_power": 91, "ball_control": 62, "ball_break": 10, "ball_speed": 96 },
+        { "type": "splitter",  "weight": 35, "ball_power": 70, "ball_control": 65, "ball_break": 90, "ball_speed": 77 }
+      ],
+      "stats": {
+        "ball_power": 84, "ball_control": 63, "ball_break": 38, "ball_speed": 89,
+        "contact": 34, "power": 30, "defence": 35, "throw": 52, "running": 37,
+        "stamina": 60
+      },
+      "zone_bottom": 0.54,
+      "zone_top": 1.14,
+      "portrait_url": null
+    },
+    {
+      "id": "00000010-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Kwon Taehyun",
+      "number": 75,
+      "age": 31,
+      "bats": "L",
+      "throws": "L",
+      "position_1": "RP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball",  "weight": 40, "ball_power": 78, "ball_control": 82, "ball_break": 18, "ball_speed": 85 },
+        { "type": "curveball", "weight": 60, "ball_power": 62, "ball_control": 84, "ball_break": 94, "ball_speed": 66 }
+      ],
+      "stats": {
+        "ball_power": 69, "ball_control": 83, "ball_break": 64, "ball_speed": 74,
+        "contact": 39, "power": 31, "defence": 40, "throw": 49, "running": 43,
+        "stamina": 66
+      },
+      "zone_bottom": 0.51,
+      "zone_top": 1.10,
+      "portrait_url": null
+    },
+    {
+      "id": "00000011-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Im Daewon",
+      "number": 79,
+      "age": 27,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "RP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball", "weight": 50, "ball_power": 86, "ball_control": 68, "ball_break": 14, "ball_speed": 92 },
+        { "type": "slider",  "weight": 30, "ball_power": 72, "ball_control": 70, "ball_break": 82, "ball_speed": 78 },
+        { "type": "forkball","weight": 20, "ball_power": 66, "ball_control": 65, "ball_break": 91, "ball_speed": 74 }
+      ],
+      "stats": {
+        "ball_power": 79, "ball_control": 68, "ball_break": 47, "ball_speed": 86,
+        "contact": 36, "power": 32, "defence": 37, "throw": 53, "running": 38,
+        "stamina": 63
+      },
+      "zone_bottom": 0.53,
+      "zone_top": 1.12,
+      "portrait_url": null
+    },
+    {
+      "id": "00000012-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Moon Seungho",
+      "number": 83,
+      "age": 25,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "RP",
+      "position_2": "RF",
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball", "weight": 55, "ball_power": 84, "ball_control": 74, "ball_break": 16, "ball_speed": 90 },
+        { "type": "slider",  "weight": 45, "ball_power": 71, "ball_control": 76, "ball_break": 83, "ball_speed": 78 }
+      ],
+      "stats": {
+        "ball_power": 78, "ball_control": 75, "ball_break": 46, "ball_speed": 85,
+        "contact": 68, "power": 72, "defence": 76, "throw": 74, "running": 78,
+        "stamina": 80
+      },
+      "zone_bottom": 0.52,
+      "zone_top": 1.11,
+      "portrait_url": null
+    },
+    {
+      "id": "00000013-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Shin Jaeho",
+      "number": 2,
+      "age": 30,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "C",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 72, "power": 65, "defence": 88, "throw": 85, "running": 55,
+        "stamina": 82
+      },
+      "zone_bottom": 0.50,
+      "zone_top": 1.08,
+      "portrait_url": null
+    },
+    {
+      "id": "00000014-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Bae Kyungjin",
+      "number": 27,
+      "age": 24,
+      "bats": "L",
+      "throws": "R",
+      "position_1": "C",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 65, "power": 58, "defence": 80, "throw": 78, "running": 52,
+        "stamina": 75
+      },
+      "zone_bottom": 0.51,
+      "zone_top": 1.09,
+      "portrait_url": null
+    },
+    {
+      "id": "00000015-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Jung Minsu",
+      "number": 3,
+      "age": 28,
+      "bats": "L",
+      "throws": "R",
+      "position_1": "1B",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 76, "power": 88, "defence": 72, "throw": 66, "running": 58,
+        "stamina": 80
+      },
+      "zone_bottom": 0.54,
+      "zone_top": 1.16,
+      "portrait_url": null
+    },
+    {
+      "id": "00000016-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Kang Dongjun",
+      "number": 4,
+      "age": 26,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "2B",
+      "position_2": "SS",
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 82, "power": 60, "defence": 86, "throw": 80, "running": 88,
+        "stamina": 83
+      },
+      "zone_bottom": 0.51,
+      "zone_top": 1.10,
+      "portrait_url": null
+    },
+    {
+      "id": "00000017-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Lim Hyunjoon",
+      "number": 5,
+      "age": 31,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "3B",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 74, "power": 82, "defence": 80, "throw": 85, "running": 62,
+        "stamina": 78
+      },
+      "zone_bottom": 0.53,
+      "zone_top": 1.13,
+      "portrait_url": null
+    },
+    {
+      "id": "00000018-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Nam Juwon",
+      "number": 6,
+      "age": 25,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "SS",
+      "position_2": "2B",
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 80, "power": 55, "defence": 90, "throw": 82, "running": 92,
+        "stamina": 85
+      },
+      "zone_bottom": 0.52,
+      "zone_top": 1.11,
+      "portrait_url": null
+    },
+    {
+      "id": "00000019-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Song Changhyun",
+      "number": 7,
+      "age": 29,
+      "bats": "L",
+      "throws": "R",
+      "position_1": "1B",
+      "position_2": "3B",
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 70, "power": 78, "defence": 74, "throw": 70, "running": 60,
+        "stamina": 77
+      },
+      "zone_bottom": 0.53,
+      "zone_top": 1.14,
+      "portrait_url": null
+    },
+    {
+      "id": "00000020-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Ahn Jaehoon",
+      "number": 51,
+      "age": 27,
+      "bats": "L",
+      "throws": "L",
+      "position_1": "LF",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 78, "power": 85, "defence": 76, "throw": 72, "running": 80,
+        "stamina": 82
+      },
+      "zone_bottom": 0.51,
+      "zone_top": 1.10,
+      "portrait_url": null
+    },
+    {
+      "id": "00000021-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Ryu Sungmin",
+      "number": 52,
+      "age": 26,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "CF",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 84, "power": 62, "defence": 94, "throw": 78, "running": 96,
+        "stamina": 88
+      },
+      "zone_bottom": 0.52,
+      "zone_top": 1.12,
+      "portrait_url": null
+    },
+    {
+      "id": "00000022-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Cho Hyunwoo",
+      "number": 53,
+      "age": 30,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "RF",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 75, "power": 90, "defence": 80, "throw": 86, "running": 72,
+        "stamina": 79
+      },
+      "zone_bottom": 0.53,
+      "zone_top": 1.15,
+      "portrait_url": null
+    },
+    {
+      "id": "00000023-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Yoo Taejun",
+      "number": 54,
+      "age": 33,
+      "bats": "L",
+      "throws": "R",
+      "position_1": "CF",
+      "position_2": "LF",
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 80, "power": 68, "defence": 88, "throw": 74, "running": 90,
+        "stamina": 84
+      },
+      "zone_bottom": 0.50,
+      "zone_top": 1.09,
+      "portrait_url": null
+    },
+    {
+      "id": "00000024-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Hong Jaemin",
+      "number": 44,
+      "age": 34,
+      "bats": "L",
+      "throws": "R",
+      "position_1": "DH",
+      "position_2": "1B",
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 77, "power": 95, "defence": 58, "throw": 62, "running": 50,
+        "stamina": 74
+      },
+      "zone_bottom": 0.54,
+      "zone_top": 1.15,
+      "portrait_url": null
+    },
+    {
+      "id": "00000025-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Do Kyungsoo",
+      "number": 45,
+      "age": 28,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "UTIL",
+      "position_2": "2B",
+      "position_3": "3B",
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 73, "power": 65, "defence": 82, "throw": 76, "running": 78,
+        "stamina": 80
+      },
+      "zone_bottom": 0.52,
+      "zone_top": 1.11,
+      "portrait_url": null
+    },
+    {
+      "id": "00000026-0001-0000-0000-000000000001",
+      "team_id": "a1b2c3d4-0001-0000-0000-000000000001",
+      "name": "Woo Injae",
+      "number": 99,
+      "age": 29,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "SS",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 68, "power": 58, "defence": 85, "throw": 80, "running": 84,
+        "stamina": 76
+      },
+      "zone_bottom": 0.51,
+      "zone_top": 1.10,
+      "portrait_url": null
+    },
+    {
+      "id": "00000001-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Go Sunwoo",
+      "number": 11,
+      "age": 29,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "SP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball",  "weight": 50, "ball_power": 90, "ball_control": 70, "ball_break": 14, "ball_speed": 94 },
+        { "type": "slider",   "weight": 30, "ball_power": 73, "ball_control": 74, "ball_break": 86, "ball_speed": 80 },
+        { "type": "changeup", "weight": 20, "ball_power": 62, "ball_control": 80, "ball_break": 70, "ball_speed": 70 }
+      ],
+      "stats": {
+        "ball_power": 80, "ball_control": 73, "ball_break": 48, "ball_speed": 86,
+        "contact": 39, "power": 34, "defence": 36, "throw": 54, "running": 40,
+        "stamina": 84
+      },
+      "zone_bottom": 0.53,
+      "zone_top": 1.14,
+      "portrait_url": null
+    },
+    {
+      "id": "00000002-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Hwang Jihoon",
+      "number": 17,
+      "age": 26,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "SP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "sinker",    "weight": 45, "ball_power": 83, "ball_control": 82, "ball_break": 52, "ball_speed": 87 },
+        { "type": "curveball", "weight": 30, "ball_power": 62, "ball_control": 86, "ball_break": 92, "ball_speed": 66 },
+        { "type": "fastball",  "weight": 25, "ball_power": 78, "ball_control": 75, "ball_break": 18, "ball_speed": 84 }
+      ],
+      "stats": {
+        "ball_power": 75, "ball_control": 82, "ball_break": 60, "ball_speed": 80,
+        "contact": 41, "power": 36, "defence": 38, "throw": 56, "running": 43,
+        "stamina": 82
+      },
+      "zone_bottom": 0.52,
+      "zone_top": 1.12,
+      "portrait_url": null
+    },
+    {
+      "id": "00000003-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Jeon Seungyeol",
+      "number": 22,
+      "age": 31,
+      "bats": "L",
+      "throws": "L",
+      "position_1": "SP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball",  "weight": 40, "ball_power": 76, "ball_control": 88, "ball_break": 20, "ball_speed": 85 },
+        { "type": "changeup",  "weight": 35, "ball_power": 60, "ball_control": 90, "ball_break": 78, "ball_speed": 69 },
+        { "type": "curveball", "weight": 25, "ball_power": 58, "ball_control": 86, "ball_break": 95, "ball_speed": 63 }
+      ],
+      "stats": {
+        "ball_power": 66, "ball_control": 88, "ball_break": 60, "ball_speed": 74,
+        "contact": 43, "power": 31, "defence": 41, "throw": 48, "running": 47,
+        "stamina": 86
+      },
+      "zone_bottom": 0.50,
+      "zone_top": 1.08,
+      "portrait_url": null
+    },
+    {
+      "id": "00000004-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Bang Hyunwook",
+      "number": 35,
+      "age": 28,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "SP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball",  "weight": 55, "ball_power": 92, "ball_control": 66, "ball_break": 12, "ball_speed": 96 },
+        { "type": "cutter",   "weight": 25, "ball_power": 80, "ball_control": 70, "ball_break": 68, "ball_speed": 87 },
+        { "type": "splitter", "weight": 20, "ball_power": 70, "ball_control": 65, "ball_break": 90, "ball_speed": 76 }
+      ],
+      "stats": {
+        "ball_power": 85, "ball_control": 67, "ball_break": 43, "ball_speed": 90,
+        "contact": 37, "power": 33, "defence": 36, "throw": 52, "running": 38,
+        "stamina": 71
+      },
+      "zone_bottom": 0.54,
+      "zone_top": 1.15,
+      "portrait_url": null
+    },
+    {
+      "id": "00000005-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Noh Jaesung",
+      "number": 41,
+      "age": 33,
+      "bats": "L",
+      "throws": "L",
+      "position_1": "SP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball",  "weight": 35, "ball_power": 74, "ball_control": 91, "ball_break": 24, "ball_speed": 82 },
+        { "type": "changeup",  "weight": 40, "ball_power": 57, "ball_control": 93, "ball_break": 80, "ball_speed": 67 },
+        { "type": "curveball", "weight": 25, "ball_power": 55, "ball_control": 89, "ball_break": 96, "ball_speed": 62 }
+      ],
+      "stats": {
+        "ball_power": 63, "ball_control": 91, "ball_break": 62, "ball_speed": 72,
+        "contact": 45, "power": 30, "defence": 43, "throw": 47, "running": 48,
+        "stamina": 89
+      },
+      "zone_bottom": 0.50,
+      "zone_top": 1.07,
+      "portrait_url": null
+    },
+    {
+      "id": "00000006-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Cha Minwoo",
+      "number": 58,
+      "age": 25,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "RP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball", "weight": 65, "ball_power": 88, "ball_control": 72, "ball_break": 14, "ball_speed": 93 },
+        { "type": "slider",  "weight": 35, "ball_power": 73, "ball_control": 74, "ball_break": 84, "ball_speed": 79 }
+      ],
+      "stats": {
+        "ball_power": 82, "ball_control": 73, "ball_break": 39, "ball_speed": 88,
+        "contact": 35, "power": 31, "defence": 36, "throw": 53, "running": 38,
+        "stamina": 64
+      },
+      "zone_bottom": 0.53,
+      "zone_top": 1.13,
+      "portrait_url": null
+    },
+    {
+      "id": "00000007-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Ko Eunsoo",
+      "number": 63,
+      "age": 27,
+      "bats": "L",
+      "throws": "L",
+      "position_1": "RP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball",  "weight": 50, "ball_power": 80, "ball_control": 78, "ball_break": 18, "ball_speed": 86 },
+        { "type": "changeup",  "weight": 50, "ball_power": 63, "ball_control": 82, "ball_break": 76, "ball_speed": 71 }
+      ],
+      "stats": {
+        "ball_power": 72, "ball_control": 80, "ball_break": 47, "ball_speed": 79,
+        "contact": 38, "power": 32, "defence": 40, "throw": 50, "running": 42,
+        "stamina": 61
+      },
+      "zone_bottom": 0.51,
+      "zone_top": 1.09,
+      "portrait_url": null
+    },
+    {
+      "id": "00000008-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Min Jungwoo",
+      "number": 69,
+      "age": 30,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "RP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "cutter",   "weight": 60, "ball_power": 82, "ball_control": 76, "ball_break": 72, "ball_speed": 87 },
+        { "type": "fastball", "weight": 40, "ball_power": 86, "ball_control": 70, "ball_break": 12, "ball_speed": 91 }
+      ],
+      "stats": {
+        "ball_power": 84, "ball_control": 74, "ball_break": 48, "ball_speed": 89,
+        "contact": 36, "power": 33, "defence": 37, "throw": 55, "running": 39,
+        "stamina": 67
+      },
+      "zone_bottom": 0.52,
+      "zone_top": 1.12,
+      "portrait_url": null
+    },
+    {
+      "id": "00000009-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Baek Jungho",
+      "number": 72,
+      "age": 24,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "RP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball",  "weight": 60, "ball_power": 90, "ball_control": 64, "ball_break": 10, "ball_speed": 95 },
+        { "type": "forkball",  "weight": 40, "ball_power": 68, "ball_control": 66, "ball_break": 93, "ball_speed": 74 }
+      ],
+      "stats": {
+        "ball_power": 81, "ball_control": 65, "ball_break": 43, "ball_speed": 87,
+        "contact": 34, "power": 30, "defence": 35, "throw": 51, "running": 37,
+        "stamina": 59
+      },
+      "zone_bottom": 0.54,
+      "zone_top": 1.14,
+      "portrait_url": null
+    },
+    {
+      "id": "00000010-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Sim Taehwan",
+      "number": 76,
+      "age": 32,
+      "bats": "L",
+      "throws": "L",
+      "position_1": "RP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball",  "weight": 40, "ball_power": 77, "ball_control": 84, "ball_break": 20, "ball_speed": 84 },
+        { "type": "curveball", "weight": 60, "ball_power": 60, "ball_control": 86, "ball_break": 96, "ball_speed": 65 }
+      ],
+      "stats": {
+        "ball_power": 67, "ball_control": 85, "ball_break": 66, "ball_speed": 73,
+        "contact": 40, "power": 30, "defence": 41, "throw": 48, "running": 44,
+        "stamina": 65
+      },
+      "zone_bottom": 0.51,
+      "zone_top": 1.10,
+      "portrait_url": null
+    },
+    {
+      "id": "00000011-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Yim Changsoo",
+      "number": 80,
+      "age": 26,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "RP",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball", "weight": 50, "ball_power": 85, "ball_control": 70, "ball_break": 16, "ball_speed": 91 },
+        { "type": "slider",  "weight": 30, "ball_power": 70, "ball_control": 72, "ball_break": 84, "ball_speed": 77 },
+        { "type": "splitter","weight": 20, "ball_power": 65, "ball_control": 68, "ball_break": 90, "ball_speed": 73 }
+      ],
+      "stats": {
+        "ball_power": 77, "ball_control": 70, "ball_break": 49, "ball_speed": 84,
+        "contact": 36, "power": 31, "defence": 37, "throw": 52, "running": 38,
+        "stamina": 62
+      },
+      "zone_bottom": 0.53,
+      "zone_top": 1.12,
+      "portrait_url": null
+    },
+    {
+      "id": "00000012-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Tak Jinhwan",
+      "number": 84,
+      "age": 26,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "RP",
+      "position_2": "CF",
+      "position_3": null,
+      "pitch_types": [
+        { "type": "fastball", "weight": 55, "ball_power": 83, "ball_control": 76, "ball_break": 18, "ball_speed": 89 },
+        { "type": "cutter",  "weight": 45, "ball_power": 76, "ball_control": 78, "ball_break": 66, "ball_speed": 85 }
+      ],
+      "stats": {
+        "ball_power": 80, "ball_control": 77, "ball_break": 41, "ball_speed": 87,
+        "contact": 72, "power": 70, "defence": 82, "throw": 76, "running": 84,
+        "stamina": 82
+      },
+      "zone_bottom": 0.52,
+      "zone_top": 1.11,
+      "portrait_url": null
+    },
+    {
+      "id": "00000013-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Heo Sungjae",
+      "number": 2,
+      "age": 31,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "C",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 74, "power": 68, "defence": 90, "throw": 87, "running": 54,
+        "stamina": 83
+      },
+      "zone_bottom": 0.51,
+      "zone_top": 1.09,
+      "portrait_url": null
+    },
+    {
+      "id": "00000014-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Eum Donghun",
+      "number": 28,
+      "age": 23,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "C",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 63, "power": 55, "defence": 78, "throw": 75, "running": 51,
+        "stamina": 72
+      },
+      "zone_bottom": 0.50,
+      "zone_top": 1.08,
+      "portrait_url": null
+    },
+    {
+      "id": "00000015-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Pyo Kyunghwan",
+      "number": 3,
+      "age": 29,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "1B",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 75, "power": 90, "defence": 70, "throw": 65, "running": 56,
+        "stamina": 79
+      },
+      "zone_bottom": 0.54,
+      "zone_top": 1.16,
+      "portrait_url": null
+    },
+    {
+      "id": "00000016-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Gil Youngsu",
+      "number": 4,
+      "age": 27,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "2B",
+      "position_2": "SS",
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 83, "power": 62, "defence": 88, "throw": 82, "running": 89,
+        "stamina": 84
+      },
+      "zone_bottom": 0.51,
+      "zone_top": 1.10,
+      "portrait_url": null
+    },
+    {
+      "id": "00000017-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Ju Seungwhan",
+      "number": 5,
+      "age": 32,
+      "bats": "L",
+      "throws": "R",
+      "position_1": "3B",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 72, "power": 84, "defence": 81, "throw": 86, "running": 61,
+        "stamina": 77
+      },
+      "zone_bottom": 0.53,
+      "zone_top": 1.13,
+      "portrait_url": null
+    },
+    {
+      "id": "00000018-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Ha Jaeyoung",
+      "number": 6,
+      "age": 26,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "SS",
+      "position_2": "2B",
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 81, "power": 57, "defence": 92, "throw": 84, "running": 93,
+        "stamina": 86
+      },
+      "zone_bottom": 0.52,
+      "zone_top": 1.11,
+      "portrait_url": null
+    },
+    {
+      "id": "00000019-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Son Hyunseok",
+      "number": 7,
+      "age": 30,
+      "bats": "L",
+      "throws": "R",
+      "position_1": "1B",
+      "position_2": "3B",
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 71, "power": 80, "defence": 75, "throw": 72, "running": 62,
+        "stamina": 76
+      },
+      "zone_bottom": 0.53,
+      "zone_top": 1.14,
+      "portrait_url": null
+    },
+    {
+      "id": "00000020-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Bok Junhyuk",
+      "number": 51,
+      "age": 28,
+      "bats": "L",
+      "throws": "L",
+      "position_1": "LF",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 79, "power": 86, "defence": 77, "throw": 73, "running": 81,
+        "stamina": 83
+      },
+      "zone_bottom": 0.51,
+      "zone_top": 1.10,
+      "portrait_url": null
+    },
+    {
+      "id": "00000021-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Myung Changsik",
+      "number": 52,
+      "age": 27,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "CF",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 86, "power": 64, "defence": 95, "throw": 79, "running": 97,
+        "stamina": 90
+      },
+      "zone_bottom": 0.52,
+      "zone_top": 1.12,
+      "portrait_url": null
+    },
+    {
+      "id": "00000022-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Pan Jihyun",
+      "number": 53,
+      "age": 31,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "RF",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 76, "power": 92, "defence": 82, "throw": 88, "running": 74,
+        "stamina": 80
+      },
+      "zone_bottom": 0.53,
+      "zone_top": 1.15,
+      "portrait_url": null
+    },
+    {
+      "id": "00000023-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Tae Wonseok",
+      "number": 54,
+      "age": 34,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "LF",
+      "position_2": "RF",
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 78, "power": 74, "defence": 84, "throw": 80, "running": 76,
+        "stamina": 78
+      },
+      "zone_bottom": 0.52,
+      "zone_top": 1.13,
+      "portrait_url": null
+    },
+    {
+      "id": "00000024-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Byun Seungheon",
+      "number": 44,
+      "age": 35,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "DH",
+      "position_2": "1B",
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 78, "power": 96, "defence": 56, "throw": 60, "running": 48,
+        "stamina": 72
+      },
+      "zone_bottom": 0.55,
+      "zone_top": 1.16,
+      "portrait_url": null
+    },
+    {
+      "id": "00000025-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "Cheon Minkyu",
+      "number": 45,
+      "age": 29,
+      "bats": "R",
+      "throws": "R",
+      "position_1": "UTIL",
+      "position_2": "3B",
+      "position_3": "SS",
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 74, "power": 67, "defence": 84, "throw": 78, "running": 80,
+        "stamina": 81
+      },
+      "zone_bottom": 0.52,
+      "zone_top": 1.11,
+      "portrait_url": null
+    },
+    {
+      "id": "00000026-0002-0000-0000-000000000002",
+      "team_id": "a1b2c3d4-0002-0000-0000-000000000002",
+      "name": "In Jaehyuk",
+      "number": 99,
+      "age": 30,
+      "bats": "L",
+      "throws": "R",
+      "position_1": "2B",
+      "position_2": null,
+      "position_3": null,
+      "pitch_types": [],
+      "stats": {
+        "ball_power": 30, "ball_control": 30, "ball_break": 30, "ball_speed": 30,
+        "contact": 69, "power": 59, "defence": 83, "throw": 79, "running": 85,
+        "stamina": 75
+      },
+      "zone_bottom": 0.51,
+      "zone_top": 1.10,
+      "portrait_url": null
+    }
+  ]
+}

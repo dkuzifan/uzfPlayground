@@ -437,6 +437,66 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["AI_Chat_Message"]["Insert"]>;
         Relationships: [];
       };
+
+      baseball_teams: {
+        Row: {
+          id: string;
+          name: string;
+          short_name: string;
+          primary_color: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          short_name: string;
+          primary_color?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["baseball_teams"]["Insert"]>;
+        Relationships: [];
+      };
+
+      baseball_players: {
+        Row: {
+          id: string;
+          team_id: string;
+          name: string;
+          number: number | null;
+          age: number | null;
+          bats: string | null;
+          throws: string | null;
+          position_1: string;
+          position_2: string | null;
+          position_3: string | null;
+          stats: Record<string, unknown>;
+          pitch_types: unknown[];
+          zone_bottom: number | null;
+          zone_top: number | null;
+          portrait_url: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          team_id: string;
+          name: string;
+          number?: number | null;
+          age?: number | null;
+          bats?: string | null;
+          throws?: string | null;
+          position_1: string;
+          position_2?: string | null;
+          position_3?: string | null;
+          stats: Record<string, unknown>;
+          pitch_types?: unknown[];
+          zone_bottom?: number | null;
+          zone_top?: number | null;
+          portrait_url?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["baseball_players"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
