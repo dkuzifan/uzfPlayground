@@ -43,3 +43,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# baseball reference files (binary, local only)
+docs/baseball/check/
