@@ -4,6 +4,7 @@ import { EMPTY_RUNNERS } from './types'
 import { decayFamiliarity } from '../engine/familiarity'
 import { shouldAutoRelieve } from '../engine/stamina'
 import { runAtBat }          from './at-bat'
+import { findCatcher }       from './util'
 
 // ============================================================
 // runHalfInning
@@ -25,6 +26,8 @@ export function runHalfInning(
     isTop,
     payload: { inning, isTop },
   })
+
+  const catcher = findCatcher(lineup)
 
   let outs           = init.outs
   let runners        = init.runners
@@ -68,6 +71,7 @@ export function runHalfInning(
       familiarity,
       stamina,
       recent_pitches,
+      catcher,
     })
 
     events.push(...outcome.events)

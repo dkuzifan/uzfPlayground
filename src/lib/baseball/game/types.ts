@@ -28,6 +28,7 @@ export interface AtBatContext {
   familiarity:    FamiliarityMap
   stamina:        number
   recent_pitches: Array<{ type: PitchType; zone: ZoneId }>
+  catcher:        Player  // 도루/견제 판정용
 }
 
 export interface AtBatOutcome {
@@ -54,8 +55,12 @@ export type GameEventType =
   | 'inning_start'
   | 'inning_end'
   | 'pitching_change'
+  | 'steal_attempt'   // { runner: Player; from: 1|2 }
+  | 'steal_result'    // { runner: Player; from: 1|2; to: 2|3|'home'; success: boolean }
+  | 'pickoff_attempt' // { pitcher: Player; runner: Player; base: 1|2 }
+  | 'pickoff_result'  // { runner: Player; base: 1|2; out: boolean }
   | 'game_end'
-  // 향후 추가: 'error' | 'double_play' | 'tag_up' | 'pickoff' | 'stolen_base'
+  // 향후 추가: 'error' | 'double_play' | 'tag_up'
 
 export interface GameEvent {
   type:    GameEventType

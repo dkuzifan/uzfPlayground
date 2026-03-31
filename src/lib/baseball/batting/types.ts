@@ -6,15 +6,17 @@ import type { FamiliarityMap } from '../engine/types'
 // ============================================================
 
 export type AtBatResult =
-  | 'in_progress'   // 타석 진행 중
-  | 'strikeout'     // 삼진
-  | 'walk'          // 볼넷
-  | 'hit_by_pitch'  // 사구
-  | 'single'        // 1루타
-  | 'double'        // 2루타
-  | 'triple'        // 3루타
-  | 'home_run'      // 홈런
-  | 'out'           // 인플레이 아웃
+  | 'in_progress'     // 타석 진행 중
+  | 'strikeout'       // 삼진
+  | 'walk'            // 볼넷
+  | 'hit_by_pitch'    // 사구
+  | 'single'          // 1루타
+  | 'double'          // 2루타
+  | 'triple'          // 3루타
+  | 'home_run'        // 홈런
+  | 'out'             // 인플레이 아웃
+  | 'pickoff_out'     // 견제 성공 (타석 중단)
+  | 'caught_stealing' // 도루 실패 (타석 중단)
 
 // ============================================================
 // Engine I/O

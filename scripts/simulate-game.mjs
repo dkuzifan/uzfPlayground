@@ -27,13 +27,15 @@ function makePitcher(id, name, control, stamina = 100) {
 }
 
 function makeBatter(id, teamId, name, number, contact, power) {
+  // running: 60~90 분산 (평균 75, 일부 선수는 고속 주자)
+  const running = 60 + Math.floor(Math.random() * 31)
   return {
     id, team_id: teamId, name, number,
     age: 28, bats: 'R', throws: 'R',
     position_1: 'CF', position_2: null, position_3: null,
     stats: {
       ball_power: 0, ball_control: 0, ball_break: 0, ball_speed: 0,
-      contact, power, defence: 70, throw: 65, running: 75, stamina: 100,
+      contact, power, defence: 70, throw: 65, running, stamina: 100,
     },
     pitch_types: [],
     zone_bottom: 0.55, zone_top: 1.20, portrait_url: null,
@@ -42,13 +44,30 @@ function makeBatter(id, teamId, name, number, contact, power) {
 
 // ── 라인업 구성 ──────────────────────────────────────────────────
 
+function makeCatcher(id, teamId, name, number) {
+  return {
+    id, team_id: teamId, name, number,
+    age: 28, bats: 'R', throws: 'R',
+    position_1: 'C', position_2: null, position_3: null,
+    stats: {
+      ball_power: 0, ball_control: 0, ball_break: 0, ball_speed: 0,
+      contact: 65, power: 60, defence: 72, throw: 75, running: 55, stamina: 100,
+    },
+    pitch_types: [],
+    zone_bottom: 0.55, zone_top: 1.20, portrait_url: null,
+  }
+}
+
 function makeLineup(teamId, prefix, contactBase, powerBase) {
-  return Array.from({ length: 9 }, (_, i) =>
+  const lineup = Array.from({ length: 9 }, (_, i) =>
     makeBatter(`${teamId}-b${i+1}`, teamId, `${prefix}${i+1}번`, i + 1,
       contactBase + Math.floor(Math.random() * 10) - 5,
       powerBase   + Math.floor(Math.random() * 10) - 5,
     )
   )
+  // 2번 타자를 포수로 교체 (findCatcher fallback: lineup[1])
+  lineup[1] = makeCatcher(`${teamId}-c`, teamId, `${prefix}포수`, 2)
+  return lineup
 }
 
 const homeTeam = {
@@ -127,6 +146,19 @@ for (const [result, count] of Object.entries(atBatResults).sort((a, b) => b[1] -
 }
 console.log()
 
+// 도루/견제 요약
+const stealAttempts  = events.filter(e => e.type === 'steal_attempt').length
+const stealResults   = events.filter(e => e.type === 'steal_result')
+const stealSuccess   = stealResults.filter(e => e.payload.success).length
+const pickoffAttempts = events.filter(e => e.type === 'pickoff_attempt').length
+const pickoffOuts    = events.filter(e => e.type === 'pickoff_result' && e.payload.out).length
+if (stealAttempts > 0 || pickoffAttempts > 0) {
+  console.log('도루/견제:')
+  console.log(`  도루 시도: ${stealAttempts}회  성공: ${stealSuccess}회  성공률: ${stealAttempts > 0 ? ((stealSuccess/stealAttempts)*100).toFixed(0) : 0}%`)
+  console.log(`  견제 시도: ${pickoffAttempts}회  성공(아웃): ${pickoffOuts}회`)
+  console.log()
+}
+
 // 이닝별 득점 이벤트 (score events)
 const scoreEvents = events.filter(e => e.type === 'score')
 if (scoreEvents.length > 0) {
@@ -171,7 +203,22 @@ for (let g = 0; g < GAMES; g++) {
   // 평균 득점
   resultCounts.homeScore = (resultCounts.homeScore ?? 0) + r.score.home
   resultCounts.awayScore = (resultCounts.awayScore ?? 0) + r.score.away
+
+  // 도루/견제 집계
+  for (const e of r.events) {
+    if (e.type === 'steal_attempt')  resultCounts.stealAttempts  = (resultCounts.stealAttempts  ?? 0) + 1
+    if (e.type === 'steal_result' && e.payload.success)
+                                     resultCounts.stealSuccess   = (resultCounts.stealSuccess   ?? 0) + 1
+    if (e.type === 'pickoff_attempt') resultCounts.pickoffAttempts = (resultCounts.pickoffAttempts ?? 0) + 1
+    if (e.type === 'pickoff_result' && e.payload.out)
+                                     resultCounts.pickoffOuts    = (resultCounts.pickoffOuts    ?? 0) + 1
+  }
 }
+
+const sa = resultCounts.stealAttempts  ?? 0
+const ss = resultCounts.stealSuccess   ?? 0
+const pa = resultCounts.pickoffAttempts ?? 0
+const po = resultCounts.pickoffOuts    ?? 0
 
 console.log()
 console.log(`${GAMES}경기 결과:`)
@@ -179,4 +226,6 @@ console.log(`  홈팀 승: ${homeWins}  원정팀 승: ${awayWins}  무승부: $
 console.log(`  평균 이닝수:       ${(totalInnings / GAMES).toFixed(2)}`)
 console.log(`  홈팀 평균 득점:    ${(resultCounts.homeScore / GAMES).toFixed(2)}`)
 console.log(`  원정팀 평균 득점:  ${(resultCounts.awayScore / GAMES).toFixed(2)}`)
+console.log(`  도루 시도(경기당):  ${(sa / GAMES).toFixed(2)}  성공률: ${sa > 0 ? ((ss/sa)*100).toFixed(0) : 0}%`)
+console.log(`  견제 시도(경기당):  ${(pa / GAMES).toFixed(2)}  아웃:   ${po}회`)
 console.log()

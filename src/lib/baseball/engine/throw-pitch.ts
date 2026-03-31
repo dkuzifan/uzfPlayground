@@ -1,6 +1,5 @@
 import type { GamePitchState, PitchResult } from './types'
 import { selectPitchType }   from './pitch-select'
-import { decidePickoff }     from './pickoff-stub'
 import { selectTargetZone }  from './zone-select'
 import { applyControlScatter } from './control-scatter'
 import { classifyZone }      from './zone-classify'
@@ -19,7 +18,7 @@ export function throwPitch(state: GamePitchState): PitchResult {
     recent_pitches,
     remaining_stamina,
     familiarity,
-    inning, is_scoring_position,
+    is_scoring_position,
   } = state
 
   // 1. 구종 선택
@@ -29,15 +28,8 @@ export function throwPitch(state: GamePitchState): PitchResult {
     { count, is_scoring_position }
   )
 
-  // 2. 견제 결정 (stub — 항상 attempt: false)
-  // 견제 피처 구현 시 decidePickoff 교체 및 attempt: true 분기에 PickoffResult 반환 추가
-  const pickoff = decidePickoff(pitcher, runners, { count, inning })
-  if (pickoff.attempt) {
-    // 현재 stub이므로 이 분기에 도달하지 않음
-    return undefined as never
-  }
-
-  // 3. 코스 선택 + delivery_time
+  // 2. 코스 선택 + delivery_time
+  // (견제 판정은 at-bat.ts의 runAtBat 루프에서 투구 전에 처리)
   const { zone: targetZone, delivery_time } = selectTargetZone(
     pitcher,
     pitchType,
