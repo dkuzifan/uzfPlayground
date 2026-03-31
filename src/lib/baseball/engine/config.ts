@@ -27,7 +27,7 @@ export const STAMINA_CONFIG = {
     splitter:  0.9,
     forkball:  0.9,
   } satisfies Record<PitchType, number>,
-  relief_threshold: 0,
+  relief_threshold: 20,
 }
 
 // ============================================================

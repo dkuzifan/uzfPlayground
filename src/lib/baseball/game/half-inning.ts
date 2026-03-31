@@ -2,7 +2,8 @@ import type { Player } from '../types/player'
 import type { GameEvent, HalfInningInit, HalfInningResult } from './types'
 import { EMPTY_RUNNERS } from './types'
 import { decayFamiliarity } from '../engine/familiarity'
-import { runAtBat }         from './at-bat'
+import { shouldAutoRelieve } from '../engine/stamina'
+import { runAtBat }          from './at-bat'
 
 // ============================================================
 // runHalfInning
@@ -36,9 +37,30 @@ export function runHalfInning(
   let scoreHome      = init.scoreHome
   let scoreAway      = init.scoreAway
 
+  // mutable 투수 상태 — 교체 발생 시 갱신
+  let currentPitcher = pitcher
+  let bullpen        = [...(init.bullpen ?? [])]
+
   while (outs < 3) {
+    // ── 타석 시작 전 교체 체크 (볼카운트 0-0 타이밍) ─────────
+    if (shouldAutoRelieve(stamina, bullpen)) {
+      const outgoing = currentPitcher
+      const incoming = bullpen.shift()!
+      currentPitcher  = incoming
+      stamina         = incoming.stats.stamina
+      familiarity     = {}
+      recent_pitches  = []
+
+      events.push({
+        type:    'pitching_change',
+        inning,
+        isTop,
+        payload: { outgoing, incoming, outs },
+      })
+    }
+
     const batter  = lineup[currentIdx]
-    const outcome = runAtBat(pitcher, batter, {
+    const outcome = runAtBat(currentPitcher, batter, {
       outs,
       runners,
       inning,
@@ -103,12 +125,14 @@ export function runHalfInning(
   })
 
   return {
-    runs:            totalRuns,
-    finalRunners:    walkOff ? runners : EMPTY_RUNNERS,
-    nextBatterIdx:   currentIdx,
-    nextStamina:     stamina,
-    nextFamiliarity: familiarity,
+    runs:             totalRuns,
+    finalRunners:     walkOff ? runners : EMPTY_RUNNERS,
+    nextBatterIdx:    currentIdx,
+    nextStamina:      stamina,
+    nextFamiliarity:  familiarity,
     walkOff,
+    currentPitcher,
+    remainingBullpen: bullpen,
     events,
   }
 }

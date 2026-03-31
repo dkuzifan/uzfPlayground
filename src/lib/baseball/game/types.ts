@@ -53,8 +53,9 @@ export type GameEventType =
   | 'score'
   | 'inning_start'
   | 'inning_end'
+  | 'pitching_change'
   | 'game_end'
-  // 향후 추가: 'error' | 'double_play' | 'tag_up' | 'pickoff' | 'pitching_change' | 'stolen_base'
+  // 향후 추가: 'error' | 'double_play' | 'tag_up' | 'pickoff' | 'stolen_base'
 
 export interface GameEvent {
   type:    GameEventType
@@ -83,16 +84,19 @@ export interface HalfInningInit {
   scoreHome:     number   // 끝내기 감지용
   scoreAway:     number
   allowWalkOff?: boolean  // 9이닝 이상에서만 true (끝내기 허용 이닝)
+  bullpen?:      Player[] // 교체 가능한 불펜 투수 목록
 }
 
 export interface HalfInningResult {
-  runs:             number
-  finalRunners:     Runners
-  nextBatterIdx:    number
-  nextStamina:      number
-  nextFamiliarity:  FamiliarityMap
-  walkOff:          boolean
-  events:           GameEvent[]
+  runs:              number
+  finalRunners:      Runners
+  nextBatterIdx:     number
+  nextStamina:       number
+  nextFamiliarity:   FamiliarityMap
+  walkOff:           boolean
+  currentPitcher:    Player    // 교체 발생 시 새 투수, 아니면 원래 투수
+  remainingBullpen:  Player[]  // 교체 후 남은 불펜
+  events:            GameEvent[]
 }
 
 // ============================================================

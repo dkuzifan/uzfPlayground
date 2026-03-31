@@ -9,8 +9,8 @@ import { runHalfInning } from './half-inning'
 // ============================================================
 
 export function runGame(
-  homeTeam: { lineup: Player[]; pitcher: Player },
-  awayTeam: { lineup: Player[]; pitcher: Player },
+  homeTeam: { lineup: Player[]; pitcher: Player; bullpen?: Player[] },
+  awayTeam: { lineup: Player[]; pitcher: Player; bullpen?: Player[] },
   options?: { extra_innings_rule?: ExtraInningsRule },
 ): GameResult {
   const extraRule = options?.extra_innings_rule ?? GAME_CONFIG.extra_innings_rule
@@ -27,6 +27,12 @@ export function runGame(
   let awayFamiliarity: any = {}
   let homeFamiliarity: any = {}
 
+  // 투수 교체 추적
+  let homePitcher  = homeTeam.pitcher
+  let awayPitcher  = awayTeam.pitcher
+  let homeBullpen  = [...(homeTeam.bullpen ?? [])]
+  let awayBullpen  = [...(awayTeam.bullpen ?? [])]
+
   let inning = 1
   let winner: 'home' | 'away' | 'draw' | null = null
   let reason: 'normal' | 'walk_off' | 'draw' = 'normal'
@@ -35,7 +41,7 @@ export function runGame(
     // ── 이닝 초 (원정팀 공격) ──────────────────────────────
     const topResult = runHalfInning(
       awayTeam.lineup,
-      homeTeam.pitcher,
+      homePitcher,
       awayBatterIdx,
       inning,
       true,
@@ -46,6 +52,7 @@ export function runGame(
         familiarity: homeFamiliarity,
         scoreHome,
         scoreAway,
+        bullpen:     homeBullpen,
       },
     )
 
@@ -54,6 +61,8 @@ export function runGame(
     awayBatterIdx   = topResult.nextBatterIdx
     homeStamina     = topResult.nextStamina
     homeFamiliarity = topResult.nextFamiliarity
+    homePitcher     = topResult.currentPitcher
+    homeBullpen     = topResult.remainingBullpen
 
     // ── 말 이닝 생략 조건 ──────────────────────────────────
     // 9회 이상이고 홈팀이 이미 앞서면 말 공격 없이 종료
@@ -67,7 +76,7 @@ export function runGame(
     // ── 이닝 말 (홈팀 공격) ───────────────────────────────
     const botResult = runHalfInning(
       homeTeam.lineup,
-      awayTeam.pitcher,
+      awayPitcher,
       homeBatterIdx,
       inning,
       false,
@@ -79,6 +88,7 @@ export function runGame(
         scoreHome,
         scoreAway,
         allowWalkOff: inning >= GAME_CONFIG.max_innings,
+        bullpen:      awayBullpen,
       },
     )
 
@@ -87,6 +97,8 @@ export function runGame(
     homeBatterIdx   = botResult.nextBatterIdx
     awayStamina     = botResult.nextStamina
     awayFamiliarity = botResult.nextFamiliarity
+    awayPitcher     = botResult.currentPitcher
+    awayBullpen     = botResult.remainingBullpen
 
     linescore.away.push(topResult.runs)
     linescore.home.push(botResult.runs)

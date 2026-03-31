@@ -1,4 +1,4 @@
-import type { PitchType } from '../types/player'
+import type { PitchType, Player } from '../types/player'
 import { STAMINA_CONFIG } from './config'
 
 // ============================================================
@@ -17,4 +17,9 @@ export function consumeStamina(
 
 export function checkRelief(stamina: number): boolean {
   return stamina <= STAMINA_CONFIG.relief_threshold
+}
+
+// 자동 교체 판단 — 감독 모드에서는 이 함수 대신 유저 입력 사용
+export function shouldAutoRelieve(stamina: number, bullpen: Player[]): boolean {
+  return checkRelief(stamina) && bullpen.length > 0
 }

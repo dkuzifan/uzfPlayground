@@ -7,14 +7,14 @@ const { runGame } = await import('../src/lib/baseball/game/game-loop.ts')
 
 // ── 선수 데이터 팩토리 ──────────────────────────────────────────
 
-function makePitcher(id, name, control) {
+function makePitcher(id, name, control, stamina = 100) {
   return {
     id, team_id: 't1', name, number: 1,
     age: 28, bats: 'R', throws: 'R',
     position_1: 'P', position_2: null, position_3: null,
     stats: {
       ball_power: 75, ball_control: control, ball_break: 65, ball_speed: 80,
-      contact: 0, power: 0, defence: 0, throw: 0, running: 0, stamina: 100,
+      contact: 0, power: 0, defence: 0, throw: 0, running: 0, stamina,
     },
     pitch_types: [
       { type: 'fastball',  weight: 40, ball_power: 80, ball_control: control,      ball_break: 20, ball_speed: 88 },
@@ -53,12 +53,20 @@ function makeLineup(teamId, prefix, contactBase, powerBase) {
 
 const homeTeam = {
   lineup:  makeLineup('home', '홈', 72, 68),
-  pitcher: makePitcher('home-p', '홈선발', 70),
+  pitcher: makePitcher('home-p', '홈선발', 70, 100),
+  bullpen: [
+    makePitcher('home-r1', '홈불펜1', 55, 60),
+    makePitcher('home-r2', '홈불펜2', 50, 60),
+  ],
 }
 
 const awayTeam = {
   lineup:  makeLineup('away', '원정', 70, 65),
-  pitcher: makePitcher('away-p', '원정선발', 65),
+  pitcher: makePitcher('away-p', '원정선발', 65, 100),
+  bullpen: [
+    makePitcher('away-r1', '원정불펜1', 52, 60),
+    makePitcher('away-r2', '원정불펜2', 48, 60),
+  ],
 }
 
 // ── 게임 실행 ────────────────────────────────────────────────────
@@ -142,9 +150,16 @@ const resultCounts = {}
 console.log(`\n${GAMES}경기 시뮬레이션 중...`)
 
 for (let g = 0; g < GAMES; g++) {
-  // 라인업 랜덤화 (재시드)
-  const ht = { lineup: makeLineup('home', '홈', 72, 68), pitcher: makePitcher('home-p', '홈선발', 70) }
-  const at = { lineup: makeLineup('away', '원정', 70, 65), pitcher: makePitcher('away-p', '원정선발', 65) }
+  const ht = {
+    lineup:  makeLineup('home', '홈', 72, 68),
+    pitcher: makePitcher('home-p', '홈선발', 70, 100),
+    bullpen: [makePitcher('home-r1', '홈불펜1', 55, 60), makePitcher('home-r2', '홈불펜2', 50, 60)],
+  }
+  const at = {
+    lineup:  makeLineup('away', '원정', 70, 65),
+    pitcher: makePitcher('away-p', '원정선발', 65, 100),
+    bullpen: [makePitcher('away-r1', '원정불펜1', 52, 60), makePitcher('away-r2', '원정불펜2', 48, 60)],
+  }
   const r  = runGame(ht, at)
 
   if (r.winner === 'home')      homeWins++
