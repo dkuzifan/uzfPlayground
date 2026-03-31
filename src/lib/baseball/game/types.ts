@@ -3,6 +3,7 @@ import type { PitchType } from '../types/player'
 import type { ZoneId, FamiliarityMap } from '../engine/types'
 import type { AtBatResult } from '../batting/types'
 import type { RunnerMove } from './runner-advance'
+import type { GameStats } from './stats-types'
 
 // ============================================================
 // Runners
@@ -116,4 +117,5 @@ export interface GameResult {
   linescore: { away: number[]; home: number[] }
   reason:    'normal' | 'walk_off' | 'draw'
   events:    GameEvent[]
+  stats:     GameStats
 }

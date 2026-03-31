@@ -99,7 +99,7 @@ const result = runGame(homeTeam, awayTeam)
 
 // ── 박스 스코어 출력 ────────────────────────────────────────────
 
-const { winner, score, linescore, reason, events } = result
+const { winner, score, linescore, reason, events, stats } = result
 
 // 라인스코어 헤더
 const innings = linescore.away.length
@@ -170,6 +170,34 @@ if (scoreEvents.length > 0) {
   }
 }
 console.log()
+
+// ── 박스스코어 ───────────────────────────────────────────────────
+
+function printBoxScore(label, teamStats) {
+  console.log(`[${label}] 타자`)
+  console.log(`  ${'이름'.padEnd(10)} ${'AB'.padStart(3)} ${'H'.padStart(3)} ${'HR'.padStart(3)} ${'RBI'.padStart(4)} ${'AVG'.padStart(5)}`)
+  console.log('  ' + '-'.repeat(34))
+  for (const b of teamStats.batters) {
+    if (b.AB === 0 && b.BB === 0) continue
+    const avg = b.AB > 0 ? (b.H / b.AB).toFixed(3).replace('0.', '.') : '---'
+    console.log(`  ${b.player.name.padEnd(10)} ${String(b.AB).padStart(3)} ${String(b.H).padStart(3)} ${String(b.HR).padStart(3)} ${String(b.RBI).padStart(4)} ${avg.padStart(5)}`)
+  }
+  console.log()
+  console.log(`[${label}] 투수`)
+  console.log(`  ${'이름'.padEnd(10)} ${'IP'.padStart(5)} ${'H'.padStart(3)} ${'ER'.padStart(3)} ${'BB'.padStart(3)} ${'SO'.padStart(3)} ${'ERA'.padStart(6)}  결과`)
+  console.log('  ' + '-'.repeat(46))
+  for (const p of teamStats.pitchers) {
+    const ip  = `${Math.floor(p.outs/3)}.${p.outs%3}`
+    const era = p.outs > 0 ? ((p.ER * 27) / p.outs).toFixed(2) : '-.-'
+    const wls = p.W ? 'W' : p.L ? 'L' : p.SV ? 'S' : ''
+    console.log(`  ${p.player.name.padEnd(10)} ${ip.padStart(5)} ${String(p.H).padStart(3)} ${String(p.ER).padStart(3)} ${String(p.BB).padStart(3)} ${String(p.SO).padStart(3)} ${era.padStart(6)}  ${wls}`)
+  }
+  console.log()
+}
+
+printBoxScore('원정', stats.away)
+printBoxScore('홈  ', stats.home)
+
 console.log('='.repeat(60))
 
 // ── 다경기 시뮬레이션 ───────────────────────────────────────────

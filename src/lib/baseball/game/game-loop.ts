@@ -3,6 +3,7 @@ import type { GameEvent, GameResult, ExtraInningsRule } from './types'
 import { EMPTY_RUNNERS } from './types'
 import { GAME_CONFIG }   from './config'
 import { runHalfInning } from './half-inning'
+import { calcGameStats } from './calc-game-stats'
 
 // ============================================================
 // runGame — 9이닝 경기 (연장 포함)
@@ -148,11 +149,14 @@ export function runGame(
     payload: { winner, reason, score: { home: scoreHome, away: scoreAway } },
   })
 
+  const stats = calcGameStats(allEvents, homeTeam, awayTeam)
+
   return {
     winner,
     score:     { home: scoreHome, away: scoreAway },
     linescore,
     reason,
     events:    allEvents,
+    stats,
   }
 }
