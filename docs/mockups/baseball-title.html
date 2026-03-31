@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Baseball Title Screen — Mockup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: rgba(255,255,255,0.05);
+      --surface-hover: rgba(255,255,255,0.10);
+      --border: rgba(255,255,255,0.10);
+      --border-hover: rgba(255,255,255,0.20);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.55);
+      --accent: #22c55e;
+      --accent-hover: #16a34a;
+      --disabled-bg: rgba(255,255,255,0.04);
+      --disabled-border: rgba(255,255,255,0.08);
+      --disabled-text: rgba(255,255,255,0.25);
+      --badge-bg: rgba(255,255,255,0.10);
+      --badge-text: rgba(255,255,255,0.40);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    /* ── 배경 그라디언트 (N1: 야구장 분위기) ── */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(34,197,94,0.12) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 40% at 80% 100%, rgba(234,179,8,0.06) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 40px;
+    }
+
+    /* ── 타이틀 영역 ── */
+    .title-block {
+      text-align: center;
+    }
+
+    .title-icon {
+      font-size: 56px;
+      line-height: 1;
+      margin-bottom: 16px;
+      filter: drop-shadow(0 0 24px rgba(34,197,94,0.4));
+    }
+
+    .title-text {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 10px;
+    }
+
+    .title-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* ── 모드 선택 버튼 영역 ── */
+    .mode-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+
+    /* 기본 모드 버튼 */
+    .mode-btn {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 24px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      text-decoration: none;
+      color: var(--text-primary);
+      transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    }
+
+    .mode-btn:hover {
+      border-color: var(--border-hover);
+      background: var(--surface-hover);
+      transform: translateY(-1px);
+    }
+
+    .mode-btn:active {
+      transform: translateY(0);
+    }
+
+    /* 한 경기 플레이 — 강조 버튼 */
+    .mode-btn--primary {
+      border-color: rgba(34,197,94,0.35);
+      background: rgba(34,197,94,0.08);
+    }
+
+    .mode-btn--primary:hover {
+      border-color: rgba(34,197,94,0.6);
+      background: rgba(34,197,94,0.14);
+    }
+
+    /* 시즌 모드 — 비활성 버튼 */
+    .mode-btn--disabled {
+      border-color: var(--disabled-border);
+      background: var(--disabled-bg);
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .mode-btn--disabled:hover {
+      border-color: var(--disabled-border);
+      background: var(--disabled-bg);
+      transform: none;
+    }
+
+    .btn-icon {
+      font-size: 28px;
+      flex-shrink: 0;
+      width: 40px;
+      text-align: center;
+    }
+
+    .btn-content {
+      flex: 1;
+      text-align: left;
+    }
+
+    .btn-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+
+    .mode-btn--disabled .btn-title {
+      color: var(--disabled-text);
+    }
+
+    .btn-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .mode-btn--disabled .btn-desc {
+      color: rgba(255,255,255,0.18);
+    }
+
+    /* 준비 중 배지 */
+    .soon-badge {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--badge-bg);
+      color: var(--badge-text);
+      letter-spacing: 0.3px;
+    }
+
+    /* 화살표 */
+    .btn-arrow {
+      font-size: 18px;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+      transition: transform 0.15s;
+    }
+
+    .mode-btn:not(.mode-btn--disabled):hover .btn-arrow {
+      transform: translateX(3px);
+    }
+
+    /* ── 뒤로가기 링크 ── */
+    .back-link {
+      font-size: 13px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.15s;
+    }
+
+    .back-link:hover {
+      color: var(--text-primary);
+    }
+
+    /* ── 상태 레이블 (목업 전용) ── */
+    .mockup-label {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      font-size: 11px;
+      padding: 4px 10px;
+      background: rgba(99,102,241,0.2);
+      border: 1px solid rgba(99,102,241,0.3);
+      border-radius: 6px;
+      color: rgba(199,210,254,0.8);
+    }
+
+    /* ── 반응형 ── */
+    @media (min-width: 640px) {
+      .mode-buttons {
+        flex-direction: row;
+      }
+      .mode-btn {
+        flex: 1;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 24px;
+      }
+      .soon-badge {
+        top: 10px;
+        right: 10px;
+      }
+      .btn-arrow {
+        display: none;
+      }
+      .btn-icon {
+        font-size: 32px;
+        width: auto;
+      }
+      .btn-title {
+        font-size: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <span class="mockup-label">Mockup — Phase 3</span>
+
+  <div class="container">
+
+    <!-- 타이틀 -->
+    <div class="title-block">
+      <div class="title-icon">⚾</div>
+      <h1 class="title-text">야구 시뮬레이터</h1>
+      <p class="title-desc">투구 단위로 진행되는 실시간 야구 시뮬레이션<br>팀을 골라 직접 감독이 되거나 풀 시뮬레이션을 돌려보세요</p>
+    </div>
+
+    <!-- 모드 선택 -->
+    <div class="mode-buttons">
+
+      <!-- 한 경기 플레이 (활성) -->
+      <a href="/arena/baseball/setup" class="mode-btn mode-btn--primary">
+        <div class="btn-icon">🆚</div>
+        <div class="btn-content">
+          <div class="btn-title">한 경기 플레이</div>
+          <div class="btn-desc">팀 선택 후 바로 게임 시작</div>
+        </div>
+        <span class="btn-arrow">→</span>
+      </a>
+
+      <!-- 시즌 모드 (비활성) -->
+      <div class="mode-btn mode-btn--disabled" aria-disabled="true">
+        <span class="soon-badge">준비 중</span>
+        <div class="btn-icon">🗓️</div>
+        <div class="btn-content">
+          <div class="btn-title">시즌 모드</div>
+          <div class="btn-desc">페넌트레이스 · 포스트시즌</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 뒤로가기 -->
+    <a href="/arena" class="back-link">← Arena로 돌아가기</a>
+
+  </div>
+
+</body>
+</html>

@@ -6,7 +6,7 @@ const GAMES = [
     icon: "⚾",
     title: "야구 시뮬레이터",
     description: "투구 단위로 진행되는 실시간 야구 시뮬레이션",
-    soon: true,
+    soon: false,
   },
 ];
 
