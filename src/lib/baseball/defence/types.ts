@@ -1,0 +1,18 @@
+// ============================================================
+// 수비 엔진 공통 타입
+// ============================================================
+
+export interface FieldCoords {
+  field_x: number   // m, 홈 기준 좌우 (1루 방향 +)
+  field_y: number   // m, 홈→중견수 방향 +
+}
+
+export interface BallPhysicsResult {
+  range:    number        // Magnus 보정 착지 거리 (m)
+  v_roll_0: number        // 첫 바운드 직후 수평 속도 (m/s)
+  t_bounce: number        // 첫 바운드 시간 (s)
+  landing:  FieldCoords   // 착지 필드 좌표
+}
+
+// LA 기준 타구 분류 — 포구 확률 로직 분기에 사용
+export type BallType = 'popup' | 'fly' | 'line_drive' | 'grounder'

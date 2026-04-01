@@ -1,4 +1,4 @@
-import type { Player } from '../types/player'
+import type { Player }                                        from '../types/player'
 import type { Runners, AtBatContext, AtBatOutcome, GameEvent } from './types'
 import { throwPitch }      from '../engine/throw-pitch'
 import { hitBall }         from '../batting/hit-ball'
@@ -39,9 +39,10 @@ function advanceStealRunner(runners: Runners, from: 1 | 2): Runners {
 // ============================================================
 
 export function runAtBat(
-  pitcher: Player,
-  batter:  Player,
-  ctx:     AtBatContext,
+  pitcher:         Player,
+  batter:          Player,
+  ctx:             AtBatContext,
+  defenceLineup?:  Player[],
 ): AtBatOutcome {
   const { inning, isTop, catcher } = ctx
   const events: GameEvent[] = []
@@ -142,7 +143,7 @@ export function runAtBat(
           familiarity,
           inning,
         }
-        const batting = hitBall(battingState, pitch)
+        const batting = hitBall(battingState, pitch, defenceLineup)
         const isSwingAndMiss = batting.swing && batting.contact === false
 
         // ⑤ 포수 송구 결정
@@ -280,7 +281,7 @@ export function runAtBat(
       inning,
     }
 
-    const batting = hitBall(battingState, pitch)
+    const batting = hitBall(battingState, pitch, defenceLineup)
     count = batting.next_count
 
     events.push({

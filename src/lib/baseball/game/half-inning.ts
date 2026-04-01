@@ -11,12 +11,13 @@ import { findCatcher }       from './util'
 // ============================================================
 
 export function runHalfInning(
-  lineup:    Player[],   // 9명 타선
-  pitcher:   Player,
-  batterIdx: number,     // 이 반이닝 시작 타자 인덱스 (0~8)
-  inning:    number,
-  isTop:     boolean,
-  init:      HalfInningInit,
+  lineup:          Player[],   // 9명 타선
+  pitcher:         Player,
+  batterIdx:       number,     // 이 반이닝 시작 타자 인덱스 (0~8)
+  inning:          number,
+  isTop:           boolean,
+  init:            HalfInningInit,
+  defenceLineup?:  Player[],   // 수비팀 라인업 (수비 엔진용)
 ): HalfInningResult {
   const events: GameEvent[] = []
 
@@ -72,7 +73,7 @@ export function runHalfInning(
       stamina,
       recent_pitches,
       catcher,
-    })
+    }, defenceLineup)
 
     events.push(...outcome.events)
 

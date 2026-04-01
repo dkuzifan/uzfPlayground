@@ -1,3 +1,4 @@
+import type { Player }     from '../types/player'
 import type { PitchResult } from '../engine/types'
 import type { BattingState, BattingResult } from './types'
 import { decideBunt }      from './bunt-stub'
@@ -12,7 +13,11 @@ import { applyPitchToCount } from './count'
 // 순수 함수: 모든 상태 변경은 반환값으로만 전달
 // ============================================================
 
-export function hitBall(state: BattingState, pitch: PitchResult): BattingResult {
+export function hitBall(
+  state:          BattingState,
+  pitch:          PitchResult,
+  defenceLineup?: Player[],
+): BattingResult {
   const { pitcher, batter, count, outs, runners, familiarity, inning } = state
 
   // 0. HBP early return — 스윙 판단 이전 처리
@@ -88,7 +93,7 @@ export function hitBall(state: BattingState, pitch: PitchResult): BattingResult 
   const { exit_velocity, launch_angle } = calcBattedBall(pitch.zone_type, batter)
 
   // 6. 타구 결과
-  const hit_type = resolveHitResult(exit_velocity, launch_angle)
+  const hit_type = resolveHitResult(exit_velocity, launch_angle, batter, defenceLineup ?? [])
 
   return {
     swing: true,

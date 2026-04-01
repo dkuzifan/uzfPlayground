@@ -55,6 +55,7 @@ export function runGame(
         scoreAway,
         bullpen:     homeBullpen,
       },
+      homeTeam.lineup,   // 홈팀 수비
     )
 
     allEvents.push(...topResult.events)
@@ -91,6 +92,7 @@ export function runGame(
         allowWalkOff: inning >= GAME_CONFIG.max_innings,
         bullpen:      awayBullpen,
       },
+      awayTeam.lineup,   // 원정팀 수비
     )
 
     allEvents.push(...botResult.events)

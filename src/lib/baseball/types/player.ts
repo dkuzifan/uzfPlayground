@@ -70,6 +70,7 @@ export interface Player {
   zone_bottom: number          // 스트라이크 존 하단 (m)
   zone_top: number             // 스트라이크 존 상단 (m)
   portrait_url: string | null
+  defence_pos?: { x: number; y: number }  // 미설정 시 FIELDER_DEFAULT_POS 폴백
 }
 
 export interface Team {

@@ -1,45 +1,75 @@
+import type { Player }      from '../types/player'
 import type { AtBatResult } from './types'
-import { BATTED_BALL_CONFIG, HIT_RESULT_TABLE, type EVTier, type LATier } from './config'
+import {
+  selectDirectionAngle,
+  calcBattedBallPhysics,
+  classifyBallType,
+} from '../defence/ball-physics'
+import {
+  findResponsibleFielder,
+  calcCatchProbability,
+} from '../defence/catch-probability'
 
 // ============================================================
-// 가중치 랜덤 선택 유틸
+// 상수
 // ============================================================
 
-function weightedRandom<T>(items: T[], weights: number[]): T {
-  const total = weights.reduce((s, w) => s + w, 0)
-  let r = Math.random() * total
-  for (let i = 0; i < items.length; i++) {
-    r -= weights[i]
-    if (r <= 0) return items[i]
+const FENCE_DISTANCE = 120  // m (구장별 override는 N1 피처에서 처리)
+
+// ============================================================
+// 거리 기반 히트 종류 결정
+// ============================================================
+
+function resolveHitType(
+  range: number,
+): Exclude<AtBatResult, 'in_progress' | 'strikeout' | 'walk' | 'hit_by_pitch' | 'home_run' | 'out'> {
+  // range < 36m: 내야 → 단타
+  if (range < 36) return 'single'
+
+  // 36m ≤ range < 70m: 외야 얕은 타구
+  if (range < 70) {
+    return Math.random() < 0.70 ? 'single' : 'double'
   }
-  return items[items.length - 1]
+
+  // range ≥ 70m: 깊은 외야 (주루 스탯 반영은 #2 송구 판정 이후 고도화 예정)
+  const r = Math.random()
+  if (r < 0.30) return 'single'
+  if (r < 0.90) return 'double'
+  return 'triple'
 }
 
 // ============================================================
 // M7: 타구 결과 판정
-// 수비 엔진 구현 시 이 함수의 구현체만 교체 (시그니처 유지)
+// 수비수 위치 + Defence 스탯 + 타구 물리 기반
 // ============================================================
 
 export function resolveHitResult(
   exit_velocity: number,
-  launch_angle: number
+  launch_angle:  number,
+  batter:        Player,
+  fielders:      Player[],
 ): Exclude<AtBatResult, 'in_progress' | 'strikeout' | 'walk' | 'hit_by_pitch'> {
-  const { ev_tiers, la_tiers } = BATTED_BALL_CONFIG
+  // 1. 방향각 결정
+  const theta_h = selectDirectionAngle(batter)
 
-  // EV 구간 분류
-  const ev_tier: EVTier =
-    exit_velocity <= ev_tiers.soft   ? 'soft' :
-    exit_velocity <= ev_tiers.medium ? 'medium' :
-    exit_velocity <= ev_tiers.hard   ? 'hard' : 'very_hard'
+  // 2. 타구 물리 계산
+  const physics = calcBattedBallPhysics(exit_velocity, launch_angle, theta_h)
 
-  // LA 구간 분류
-  const la_tier: LATier =
-    launch_angle <= la_tiers.ground     ? 'ground' :
-    launch_angle <= la_tiers.line_drive ? 'line_drive' :
-    launch_angle <= la_tiers.fly        ? 'fly' : 'popup'
+  // 3. 홈런 판정
+  if (physics.range >= FENCE_DISTANCE) return 'home_run'
 
-  const weights = HIT_RESULT_TABLE[ev_tier][la_tier]
-  const outcomes = ['home_run', 'triple', 'double', 'single', 'out'] as const
+  // 4. 타구 종류 분류
+  const ballType = classifyBallType(launch_angle)
 
-  return weightedRandom([...outcomes], weights)
+  // 5. 담당 수비수 선택
+  const { fielder, dist } = findResponsibleFielder(physics.landing, fielders)
+
+  // 6. 포구 확률 계산
+  const p_out = calcCatchProbability(ballType, dist, physics.v_roll_0, fielder)
+
+  // 7. 아웃 판정
+  if (Math.random() < p_out) return 'out'
+
+  // 8. 히트 종류 결정 (거리 기반)
+  return resolveHitType(physics.range)
 }

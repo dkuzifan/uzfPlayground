@@ -1,7 +1,8 @@
 export interface Stadium {
-  id:       string
-  name:     string
-  location: string
+  id:               string
+  name:             string
+  location:         string
+  fence_distance?:  number  // m, 미설정 시 120m 기본값
 }
 
 export const STADIUMS: Stadium[] = [
