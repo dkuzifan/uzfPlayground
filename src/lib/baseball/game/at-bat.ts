@@ -182,6 +182,7 @@ export function runAtBat(
             batter,
             batting.hit_physics,
             stealStateForAdvance,
+            defenceLineup,
           )
 
           const atBatOut = batting.at_bat_result === 'strikeout' || batting.at_bat_result === 'out' ? 1 : 0
@@ -324,6 +325,8 @@ export function runAtBat(
         currentRunners,
         batter,
         batting.hit_physics,
+        undefined,
+        defenceLineup,
       )
 
       const atBatOut = batting.at_bat_result === 'strikeout' || batting.at_bat_result === 'out' ? 1 : 0

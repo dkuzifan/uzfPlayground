@@ -2,7 +2,16 @@ import type { Player } from '../types/player'
 import type { AtBatResult } from '../batting/types'
 import type { HitResultDetail } from '../defence/types'
 import type { Runners } from './types'
-import { BASE_POS, resolveThrow, calcRemainingTo2B } from '../defence/throw-judge'
+import {
+  BASE_POS,
+  euclidDist,
+  resolveThrow,
+  calcRemainingTo2B,
+  calcRelayPos,
+  selectRelayMan,
+  shouldUseRelay,
+  resolveRelayThrow,
+} from '../defence/throw-judge'
 import { FIELDER_DEFAULT_POS } from '../defence/fielder-positions'
 
 // ============================================================
@@ -35,13 +44,6 @@ export interface StealState {
 // ============================================================
 // 내부 유틸
 // ============================================================
-
-function euclidDist(
-  a: { x: number; y: number },
-  b: { x: number; y: number },
-): number {
-  return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
-}
 
 function getFielderPos(hp: HitResultDetail): { x: number; y: number } {
   return hp.fielder_pos ?? FIELDER_DEFAULT_POS[hp.fielder.position_1] ?? { x: 0, y: 88 }
@@ -84,47 +86,63 @@ function calcRunnerDist(
 // resolveLeadingRunner — leading runner 여분 진루 판정 (실제 송구)
 //
 // 수비수는 가장 앞선 주자 베이스로 송구.
-// 반환: { outResult: Runners 변경분, runsScored, moves, threw: boolean }
+// 직접 송구 가능 여부와 중계 플레이 비교 후 최적 경로 선택.
 // ============================================================
 
 function resolveLeadingRunner(
-  runners:    Runners,
-  result:     'single' | 'double',
-  hp:         HitResultDetail,
-  stealState?: StealState,
+  runners:        Runners,
+  result:         'single' | 'double',
+  hp:             HitResultDetail,
+  stealState?:    StealState,
+  defenceLineup?: Player[],
 ): { nextRunners: Runners; runsScored: number; outs_added: number; moves: RunnerMove[] } {
   const fielder_pos = getFielderPos(hp)
+  const lineup      = defenceLineup ?? []
   let nextRunners = { ...runners }
   let runsScored  = 0
   let outs_added  = 0
   const moves: RunnerMove[] = []
 
+  // ── 중계 판단 헬퍼 ──────────────────────────────────────────
+  function throwVerdict(
+    runner:      Player,
+    runner_dist: number,
+    targetKey:   keyof typeof BASE_POS,
+  ): 'safe' | 'out' {
+    const targetPos  = BASE_POS[targetKey]
+    const throw_dist = euclidDist(fielder_pos, targetPos)
+    const relayMan   = selectRelayMan(fielder_pos, lineup)
+    const relayPos   = calcRelayPos(fielder_pos, targetPos)
+    const useRelay   = shouldUseRelay(
+      hp.fielder, fielder_pos, targetPos, hp.t_fielding, relayMan, relayPos,
+    )
+    return useRelay
+      ? resolveRelayThrow(hp.fielder, fielder_pos, relayMan, targetPos, hp.t_fielding, runner, runner_dist)
+      : resolveThrow(hp.fielder, throw_dist, hp.t_fielding, runner, runner_dist)
+  }
+
   if (result === 'single') {
     // 2루 주자 → 홈 (우선)
     if (runners.second) {
       const runner      = runners.second
-      const throw_dist  = euclidDist(fielder_pos, BASE_POS['home'])
       const runner_dist = calcRunnerDist(runner, 2, 'home', stealState)
-      const verdict     = resolveThrow(hp.fielder, throw_dist, hp.t_fielding, runner, runner_dist)
+      const verdict     = throwVerdict(runner, runner_dist, 'home')
       if (verdict === 'safe') {
         runsScored++
         moves.push({ runner, from: 2, to: 'home' })
       } else {
-        // 홈에서 아웃 — 주자 제거, 아웃 카운트
         outs_added++
       }
       nextRunners.second = null
     } else if (runners.first) {
       // 1루 주자 → 3루 시도
       const runner      = runners.first
-      const throw_dist  = euclidDist(fielder_pos, BASE_POS['3B'])
       const runner_dist = calcRunnerDist(runner, 1, '3B', stealState)
-      const verdict     = resolveThrow(hp.fielder, throw_dist, hp.t_fielding, runner, runner_dist)
+      const verdict     = throwVerdict(runner, runner_dist, '3B')
       if (verdict === 'safe') {
         nextRunners.third = runner
         moves.push({ runner, from: 1, to: 3 })
       } else {
-        // 3루에서 아웃 — 주자 제거, 아웃 카운트
         outs_added++
       }
       nextRunners.first = null
@@ -133,14 +151,12 @@ function resolveLeadingRunner(
     // double: 1루 주자 → 홈
     if (runners.first) {
       const runner      = runners.first
-      const throw_dist  = euclidDist(fielder_pos, BASE_POS['home'])
       const runner_dist = calcRunnerDist(runner, 1, 'home', stealState)
-      const verdict     = resolveThrow(hp.fielder, throw_dist, hp.t_fielding, runner, runner_dist)
+      const verdict     = throwVerdict(runner, runner_dist, 'home')
       if (verdict === 'safe') {
         runsScored++
         moves.push({ runner, from: 1, to: 'home' })
       } else {
-        // 홈에서 아웃 — 주자 제거, 아웃 카운트
         outs_added++
       }
       nextRunners.first = null
@@ -178,11 +194,12 @@ function resolveBatterAdvance(
 // ============================================================
 
 export function advanceRunners(
-  result:      AtBatResult,
-  runners:     Runners,
-  batter:      Player,
-  hitPhysics?: HitResultDetail,
-  stealState?: StealState,
+  result:         AtBatResult,
+  runners:        Runners,
+  batter:         Player,
+  hitPhysics?:    HitResultDetail,
+  stealState?:    StealState,
+  defenceLineup?: Player[],
 ): AdvanceResult {
   if (result === 'walk' || result === 'hit_by_pitch') {
     return forceAdvance(runners, batter)
@@ -208,15 +225,27 @@ export function advanceRunners(
 
   if (result === 'single') {
     // leading runner 판정 (2루 or 1루 주자)
-    const leadResult = resolveLeadingRunner(runners, 'single', hitPhysics, stealState)
+    const leadResult = resolveLeadingRunner(
+      runners, 'single', hitPhysics, stealState, defenceLineup,
+    )
     runsScored  += leadResult.runsScored
     outs_added  += leadResult.outs_added
     moves.push(...leadResult.moves)
     next = { ...next, ...leadResult.nextRunners }
 
+    // [공짜 진루] 2루 주자가 leading runner였고 1루 주자도 있었으면
+    // → 1루 주자는 2루 FREE (수비수가 홈으로 던지는 사이 공이 오지 않음)
+    if (runners.second !== null && runners.first !== null) {
+      const freeRunner = runners.first
+      next.second = freeRunner
+      next.first  = null
+      moves.push({ runner: freeRunner, from: 1, to: 2 })
+    }
+
     // 타자 추가 진루 판정 (독립 평가)
+    // 2루가 이미 점유됐으면 1루로 fallback (선행 주자 우선)
     const batterBase = resolveBatterAdvance(batter, hitPhysics)
-    if (batterBase === 2) {
+    if (batterBase === 2 && next.second === null) {
       next.second = batter
       moves.push({ runner: batter, from: 'batter', to: 2 })
     } else {
@@ -232,7 +261,7 @@ export function advanceRunners(
     }
     // 1루 주자 판정
     const leadResult = resolveLeadingRunner(
-      { ...runners, second: null }, 'double', hitPhysics, stealState,
+      { ...runners, second: null }, 'double', hitPhysics, stealState, defenceLineup,
     )
     runsScored  += leadResult.runsScored
     outs_added  += leadResult.outs_added

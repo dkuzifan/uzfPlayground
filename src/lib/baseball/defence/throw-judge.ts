@@ -1,4 +1,4 @@
-import type { Player } from '../types/player'
+import type { Player, Position } from '../types/player'
 
 // ============================================================
 // 베이스 좌표 상수
@@ -16,8 +16,15 @@ export const BASE_POS = {
 export type BaseKey = keyof typeof BASE_POS
 
 // ============================================================
-// sigmoid 유틸
+// 공통 유틸
 // ============================================================
+
+export function euclidDist(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): number {
+  return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
+}
 
 function sigmoid(x: number, scale: number): number {
   return 1 / (1 + Math.exp(-x / scale))
@@ -52,6 +59,132 @@ export function resolveThrow(
   const p_safe = sigmoid(margin, 0.5)
 
   return Math.random() < p_safe ? 'safe' : 'out'
+}
+
+// ============================================================
+// maxDirectDist — Throw 스탯 기준 직접 송구 최대 유효 거리
+//
+// "직접 송구"는 바운드 포함 — 중계수를 거치지 않는 모든 송구.
+// 앵커: Throw 30 → 35m, Throw 100 → 85m (로그 감쇠)
+//   Throw 90  → 81m  (LF/RF→홈 직접 가능)
+//   Throw 110 → 89m  (CF→홈 직접 가능)
+// ============================================================
+
+export function maxDirectDist(throw_stat: number): number {
+  return 41.5 * Math.log(throw_stat) - 106
+}
+
+// ============================================================
+// calcRelayPos — 중계 위치 산출
+//
+// 외야수와 목표 베이스 사이 45% 지점 (중계수가 OF 방향으로 나가는 경험칙)
+// ============================================================
+
+export function calcRelayPos(
+  fielder_pos:     { x: number; y: number },
+  target_base_pos: { x: number; y: number },
+): { x: number; y: number } {
+  return {
+    x: fielder_pos.x + (target_base_pos.x - fielder_pos.x) * 0.45,
+    y: fielder_pos.y + (target_base_pos.y - fielder_pos.y) * 0.45,
+  }
+}
+
+// ============================================================
+// selectRelayMan — 중계수 선택
+//
+// fielder_pos.x > 0 (우측 외야: RF, 우중간 CF) → SS
+// fielder_pos.x ≤ 0 (좌측 외야: LF, 좌중간 CF) → 2B
+// lineup에 없으면 dummy (Throw 70) 반환
+// ============================================================
+
+export function selectRelayMan(
+  fielder_pos:   { x: number; y: number },
+  defenceLineup: Player[],
+): Player {
+  const targetPos: Position = fielder_pos.x > 0 ? 'SS' : '2B'
+  const found = defenceLineup.find(
+    p => p.position_1 === targetPos || p.position_2 === targetPos,
+  )
+  if (found) return found
+
+  return {
+    id: 'relay_dummy', team_id: '', name: 'Relay', number: 0,
+    age: 25, bats: 'R', throws: 'R',
+    position_1: targetPos, position_2: null, position_3: null,
+    stats: {
+      ball_power: 0, ball_control: 0, ball_break: 0, ball_speed: 0,
+      contact: 50, power: 50, defence: 50, throw: 70, running: 50, stamina: 100,
+    },
+    pitch_types: [], zone_bottom: 0.5, zone_top: 1.1, portrait_url: null,
+  }
+}
+
+// ============================================================
+// shouldUseRelay — 직접 송구 vs 중계 플레이 판단
+//
+// ① 도달 불가: dist > maxDirectDist(throw_stat) → relay
+// ② 도달 가능이더라도 중계가 더 빠르면 → relay
+// 동점 시(t_direct === t_relay) → 직접 송구 유지
+// ============================================================
+
+export function shouldUseRelay(
+  fielder:     Player,
+  fielder_pos: { x: number; y: number },
+  targetPos:   { x: number; y: number },
+  t_fielding:  number,
+  relayMan:    Player,
+  relayPos:    { x: number; y: number },
+): boolean {
+  const spd_OF    = (80 + fielder.stats.throw  * 0.7) / 3.6
+  const spd_relay = (80 + relayMan.stats.throw * 0.7) / 3.6
+  const dist_direct = euclidDist(fielder_pos, targetPos)
+
+  // ① 도달 불가
+  if (dist_direct > maxDirectDist(fielder.stats.throw)) return true
+
+  // ② 속도 비교 (중계가 더 빠른 경우에만 relay 사용)
+  const t_direct = t_fielding + dist_direct / spd_OF
+  const t_relay  = t_fielding
+                 + euclidDist(fielder_pos, relayPos) / spd_OF
+                 + 0.8
+                 + euclidDist(relayPos, targetPos)   / spd_relay
+
+  return t_relay < t_direct
+}
+
+// ============================================================
+// resolveRelayThrow — 중계 플레이 판정
+//
+// t_total = t_fielding
+//         + t_throw_to_relay   (OF 송구 → 중계 위치)
+//         + t_relay_reaction   (수신 + 방향전환 + 투구, 고정 0.8s)
+//         + t_throw_from_relay (중계수 → 목표 베이스)
+// ============================================================
+
+export function resolveRelayThrow(
+  fielder:      Player,
+  fielder_pos:  { x: number; y: number },
+  relayMan:     Player,
+  targetPos:    { x: number; y: number },
+  t_fielding:   number,
+  runner:       Player,
+  runner_dist:  number,
+): 'safe' | 'out' {
+  const spd_OF    = (80 + fielder.stats.throw  * 0.7) / 3.6
+  const spd_relay = (80 + relayMan.stats.throw * 0.7) / 3.6
+  const relay_pos = calcRelayPos(fielder_pos, targetPos)
+
+  const t_total = t_fielding
+                + euclidDist(fielder_pos, relay_pos) / spd_OF
+                + 0.8
+                + euclidDist(relay_pos, targetPos)   / spd_relay
+
+  const runner_speed = 5.0 + (runner.stats.running / 100) * 3.0
+  const t_runner     = runner_dist / runner_speed
+  const margin       = t_total - t_runner
+
+  return Math.random() < sigmoid(margin, 0.5) ? 'safe' : 'out'
 }
 
 // ============================================================
