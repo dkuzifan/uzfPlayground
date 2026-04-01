@@ -13,7 +13,7 @@ export const FIELDER_DEFAULT_POS: Partial<Record<Position, { x: number; y: numbe
   '2B': { x:  10, y:  33 },
   SS:   { x:  -8, y:  33 },
   '3B': { x: -11, y:  24 },
-  LF:   { x: -35, y:  80 },
-  CF:   { x:   0, y: 100 },
-  RF:   { x:  35, y:  80 },
+  LF:   { x: -33, y:  73 },  // 실측 기준 ~240ft 코너 외야
+  CF:   { x:   0, y:  88 },  // 실측 기준 ~290ft 중견수 중간 수비
+  RF:   { x:  33, y:  73 },
 }

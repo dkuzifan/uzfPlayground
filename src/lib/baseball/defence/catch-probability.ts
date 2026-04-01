@@ -1,12 +1,13 @@
 import type { Player } from '../types/player'
 import type { FieldCoords, BallType } from './types'
 import { FIELDER_DEFAULT_POS } from './fielder-positions'
+import { PHYSICS_CONFIG } from './config'
 
 // ============================================================
 // 포구 확률 계산
 // ============================================================
 
-const MU_GROUND = 0.4  // 잔디 마찰 계수 (Phase B)
+const MU_GROUND = 0.4  // 잔디 마찰 계수 (Phase B 땅볼용)
 
 function euclideanDist(a: FieldCoords, b: { x: number; y: number }): number {
   const dx = a.field_x - b.x
@@ -61,39 +62,48 @@ export function findResponsibleFielder(
 // ── 포구 확률 계산 ────────────────────────────────────────
 
 /**
- * 타구 종류 × 수비수-착지 거리 × 수비 스탯 → 아웃 확률
+ * 타구 종류 × 수비수-착지 거리 × Defence 스탯 → 아웃 확률
+ *
+ * fly / line_drive — 체공 시간 기반 (B 모델)
+ *   수비수가 t_bounce 동안 이동 가능한 거리(reachable_dist)와
+ *   실제 거리(d)를 비교해 포구 가능 여부 결정.
+ *   라인드라이브는 t_bounce가 짧아 자연스럽게 P_out이 낮아짐.
+ *
+ * grounder — Phase B 지수 감속 도달 시간 기반
+ *   공이 수비수 위치에 도달하는 시간 vs 수비수 반응+이동 시간 비교.
  */
 export function calcCatchProbability(
   ballType: BallType,
   d:        number,
   v_roll_0: number,
+  t_bounce: number,
   fielder:  Player,
 ): number {
   const defence = fielder.stats.defence
 
+  // 팝업: 항상 아웃
   if (ballType === 'popup') return 1.0
 
+  // 플라이 / 라인드라이브 — 체공 시간 기반
   if (ballType === 'fly' || ballType === 'line_drive') {
-    const coverage_radius = 6 + (defence / 100) * 6  // 6m ~ 12m
-    const excess = Math.max(d - coverage_radius, 0)
-    const base_p = ballType === 'line_drive' ? 0.35 : 0.95  // 라인드라이브는 base P_hit 높음
-    return clamp(base_p - 0.05 * excess, 0.05, 0.95)
+    const { outfielder_speed_min, outfielder_speed_max } = PHYSICS_CONFIG
+    const fielder_speed   = outfielder_speed_min + (defence / 100) * (outfielder_speed_max - outfielder_speed_min)
+    const reachable_dist  = fielder_speed * t_bounce
+    const excess          = Math.max(d - reachable_dist, 0)
+    // reachable 범위 안: 0.95, 초과할수록 감소 (1m당 −0.10)
+    return clamp(0.95 - 0.10 * excess, 0.05, 0.95)
   }
 
-  // grounder — Phase B 지수 감속 도달 시간
-  if (v_roll_0 <= 0) return 1.0  // 공이 홈 근처에서 멈춤 → 내야 안타 불가
+  // 내야 땅볼 — Phase B 지수 감속 도달 시간
+  if (v_roll_0 <= 0) return 1.0
 
   const val = d * MU_GROUND / v_roll_0
-  if (val >= 1) {
-    // 공이 수비수까지 도달하기 전에 멈춤 → 무조건 아웃
-    return 1.0
-  }
+  if (val >= 1) return 1.0  // 공이 수비수 앞에서 멈춤
 
-  // t_ball = −ln(1 − d×μ/v_roll_0) / μ
-  const t_ball = -Math.log(1 - val) / MU_GROUND
-
-  const fielder_speed = 3.5 + (defence / 100) * 1.5  // 3.5 ~ 5.0 m/s
-  const t_fielder     = 0.4 + d / fielder_speed       // 반응 시간 + 이동 시간
+  // t_ball: 공이 거리 d를 구르는 데 걸리는 시간
+  const t_ball    = -Math.log(1 - val) / MU_GROUND
+  const fielder_speed = 3.5 + (defence / 100) * 1.5   // 3.5~5.0 m/s (내야 처리 속도)
+  const t_fielder = 0.4 + d / fielder_speed            // 반응 시간 + 이동 시간
 
   return clamp(0.3 + (t_ball - t_fielder) * 0.15, 0.05, 0.90)
 }

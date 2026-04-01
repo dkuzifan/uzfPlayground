@@ -1,5 +1,6 @@
 import type { Player } from '../types/player'
 import type { FieldCoords, BallPhysicsResult, BallType } from './types'
+import { PHYSICS_CONFIG } from './config'
 
 // ============================================================
 // 타구 물리 모델
@@ -97,7 +98,7 @@ export function calcBattedBallPhysics(
 
   // Magnus carry_factor (백스핀 양력 근사)
   const contact_quality = Math.max(0, Math.min(1, (ev_kmh - 120) / 50))
-  const carry_factor    = 1.0 + contact_quality * 0.12
+  const carry_factor    = 1.0 + contact_quality * PHYSICS_CONFIG.carry_factor_max
   const range           = range_raw * carry_factor
 
   // 첫 바운드 수평 속도 (drag 감속 후)

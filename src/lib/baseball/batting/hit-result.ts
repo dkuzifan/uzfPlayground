@@ -11,10 +11,25 @@ import {
 } from '../defence/catch-probability'
 
 // ============================================================
-// 상수
+// 방향별 펜스 거리
 // ============================================================
 
-const FENCE_DISTANCE = 120  // m (구장별 override는 N1 피처에서 처리)
+/**
+ * 방향각(θ_deg)에 따른 펜스 거리 계산.
+ * KBO/MLB 구장 평균 기준 기본값: CF 122m, 코너 97m (선형 보간)
+ * 구장별 override: N1 피처에서 Stadium 타입으로 처리 예정.
+ *
+ * @param theta_deg  방향각 (-42~+42°, 0=중견수)
+ * @param fence_cf   중견수 펜스 거리 (기본 122m)
+ * @param fence_corner 코너 펜스 거리 (기본 97m)
+ */
+export function fenceDistance(
+  theta_deg:    number,
+  fence_cf      = 122,
+  fence_corner  = 97,
+): number {
+  return fence_cf - (fence_cf - fence_corner) * (Math.abs(theta_deg) / 42)
+}
 
 // ============================================================
 // 거리 기반 히트 종류 결정
@@ -55,8 +70,8 @@ export function resolveHitResult(
   // 2. 타구 물리 계산
   const physics = calcBattedBallPhysics(exit_velocity, launch_angle, theta_h)
 
-  // 3. 홈런 판정
-  if (physics.range >= FENCE_DISTANCE) return 'home_run'
+  // 3. 홈런 판정 (방향별 펜스 거리 적용)
+  if (physics.range >= fenceDistance(theta_h)) return 'home_run'
 
   // 4. 타구 종류 분류
   const ballType = classifyBallType(launch_angle)
@@ -65,7 +80,7 @@ export function resolveHitResult(
   const { fielder, dist } = findResponsibleFielder(physics.landing, fielders)
 
   // 6. 포구 확률 계산
-  const p_out = calcCatchProbability(ballType, dist, physics.v_roll_0, fielder)
+  const p_out = calcCatchProbability(ballType, dist, physics.v_roll_0, physics.t_bounce, fielder)
 
   // 7. 아웃 판정
   if (Math.random() < p_out) return 'out'
