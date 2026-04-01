@@ -1,5 +1,6 @@
 import type { Player }                                        from '../types/player'
 import type { Runners, AtBatContext, AtBatOutcome, GameEvent } from './types'
+import type { StealState } from './runner-advance'
 import { throwPitch }      from '../engine/throw-pitch'
 import { hitBall }         from '../batting/hit-ball'
 import { advanceRunners }  from './runner-advance'
@@ -133,7 +134,7 @@ export function runAtBat(
           payload: { runner: stealRunner, from: stealBase },
         })
 
-        // ④ hitBall (헛스윙 여부 필요)
+        // ④ hitBall — 타격 결과를 먼저 확인 (타격 우선 원칙)
         const battingState = {
           pitcher,
           batter,
@@ -146,12 +147,64 @@ export function runAtBat(
         const batting = hitBall(battingState, pitch, defenceLineup)
         const isSwingAndMiss = batting.swing && batting.contact === false
 
-        // ⑤ 포수 송구 결정
+        // ⑤ 타격 발생 시 → 도루 판정 스킵, 도루 중 위치를 stealState로 전달
+        if (batting.at_bat_over) {
+          count = batting.next_count
+
+          events.push({
+            type: 'pitch',
+            inning,
+            isTop,
+            payload: {
+              pitch,
+              swing:      batting.swing,
+              contact:    batting.contact,
+              is_foul:    batting.is_foul,
+              next_count: batting.next_count,
+            },
+          })
+          events.push({
+            type: 'at_bat_result',
+            inning,
+            isTop,
+            payload: { batter, result: batting.at_bat_result },
+          })
+
+          const stealStateForAdvance: StealState = {
+            runner:      stealRunner,
+            base:        stealBase,
+            t_steal_run: 1.8,
+          }
+
+          const { nextRunners, runsScored, moves, outs_added: runnerOuts } = advanceRunners(
+            batting.at_bat_result,
+            currentRunners,
+            batter,
+            batting.hit_physics,
+            stealStateForAdvance,
+          )
+
+          const atBatOut = batting.at_bat_result === 'strikeout' || batting.at_bat_result === 'out' ? 1 : 0
+          const outs_added = atBatOut + runnerOuts
+
+          return {
+            result:              batting.at_bat_result,
+            outs_added,
+            runs_scored:         runsScored,
+            next_runners:        nextRunners,
+            moves,
+            next_stamina:        stamina,
+            next_familiarity:    familiarity,
+            next_recent_pitches: recent_pitches,
+            events,
+          }
+        }
+
+        // ⑥ 타격 없음 → 기존 도루 성공/실패 판정
         const throwDecision = decideCatcherThrow(currentRunners, catcher, pitcher, pitch)
         const to = stealBase === 1 ? 2 : 3
 
         if (throwDecision.throwBase !== null && throwDecision.targetRunner) {
-          // 포수가 선행 주자에게 송구
           const stealResult = resolveStealResult(
             stealRunner, to, pitch, catcher, isSwingAndMiss, pickoutCount,
           )
@@ -183,13 +236,12 @@ export function runAtBat(
               events,
             }
           } else {
-            // 도루 성공 → 주자 진루
             currentRunners = advanceStealRunner(currentRunners, stealBase)
 
             // 1+3루 상황에서 포수가 2루 송구 선택 → 3루 주자 홈 쇄도 독립 판정
             if (throwDecision.throwBase === 2 && currentRunners.third) {
-              const thirdRunner   = currentRunners.third
-              const homeResult    = resolveStealResult(
+              const thirdRunner = currentRunners.third
+              const homeResult  = resolveStealResult(
                 thirdRunner, 'home', pitch, catcher, isSwingAndMiss, pickoutCount,
               )
               events.push({
@@ -198,19 +250,11 @@ export function runAtBat(
                 isTop,
                 payload: { runner: thirdRunner, from: 3, to: 'home', success: homeResult === 'success' },
               })
-              if (homeResult === 'success') {
-                currentRunners = { ...currentRunners, third: null }
-                // 득점은 타석 종료 후 advanceRunners에서 처리되므로
-                // 여기서는 주자만 제거 (runs_scored는 0 — 이 홈 쇄도 득점은 별도 카운트 필요)
-                // TODO: 홈 쇄도 득점 처리 개선 필요 (현재 MVP에서는 미반영)
-              } else {
-                currentRunners = { ...currentRunners, third: null }
-              }
+              // 성공/실패 모두 3루 주자 제거 (홈 쇄도 시도)
+              currentRunners = { ...currentRunners, third: null }
             }
           }
         } else {
-          // 포수 송구 포기 (1+3루에서 홈 쇄도 성공률 > 0.5)
-          // 1루 주자는 2루 세이프
           currentRunners = advanceStealRunner(currentRunners, stealBase)
           events.push({
             type: 'steal_result',
@@ -235,36 +279,6 @@ export function runAtBat(
             next_count: batting.next_count,
           },
         })
-
-        if (batting.at_bat_over) {
-          events.push({
-            type: 'at_bat_result',
-            inning,
-            isTop,
-            payload: { batter, result: batting.at_bat_result },
-          })
-
-          const { nextRunners, runsScored, moves } = advanceRunners(
-            batting.at_bat_result,
-            currentRunners,
-            batter,
-          )
-
-          const outs_added =
-            batting.at_bat_result === 'strikeout' || batting.at_bat_result === 'out' ? 1 : 0
-
-          return {
-            result:              batting.at_bat_result,
-            outs_added,
-            runs_scored:         runsScored,
-            next_runners:        nextRunners,
-            moves,
-            next_stamina:        stamina,
-            next_familiarity:    familiarity,
-            next_recent_pitches: recent_pitches,
-            events,
-          }
-        }
 
         continue
       }
@@ -305,14 +319,15 @@ export function runAtBat(
         payload: { batter, result: batting.at_bat_result },
       })
 
-      const { nextRunners, runsScored, moves } = advanceRunners(
+      const { nextRunners, runsScored, moves, outs_added: runnerOuts } = advanceRunners(
         batting.at_bat_result,
         currentRunners,
         batter,
+        batting.hit_physics,
       )
 
-      const outs_added =
-        batting.at_bat_result === 'strikeout' || batting.at_bat_result === 'out' ? 1 : 0
+      const atBatOut = batting.at_bat_result === 'strikeout' || batting.at_bat_result === 'out' ? 1 : 0
+      const outs_added = atBatOut + runnerOuts
 
       return {
         result:              batting.at_bat_result,

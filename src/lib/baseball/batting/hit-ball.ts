@@ -93,7 +93,7 @@ export function hitBall(
   const { exit_velocity, launch_angle } = calcBattedBall(pitch.zone_type, batter)
 
   // 6. 타구 결과
-  const hit_type = resolveHitResult(exit_velocity, launch_angle, batter, defenceLineup ?? [])
+  const hitDetail = resolveHitResult(exit_velocity, launch_angle, batter, defenceLineup ?? [])
 
   return {
     swing: true,
@@ -101,7 +101,8 @@ export function hitBall(
     is_foul: false,
     exit_velocity,
     launch_angle,
-    at_bat_result: hit_type,
+    at_bat_result: hitDetail.result,
+    hit_physics:   hitDetail,
     next_count: count,
     at_bat_over: true,
   }

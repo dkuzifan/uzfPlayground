@@ -1,5 +1,6 @@
 import type { Player } from '../types/player'
 import type { FamiliarityMap } from '../engine/types'
+import type { HitResultDetail } from '../defence/types'
 
 // ============================================================
 // At-Bat Result
@@ -47,4 +48,5 @@ export interface BattingResult {
   at_bat_result: AtBatResult
   next_count: { balls: number; strikes: number }
   at_bat_over: boolean            // 게임 루프의 타석 종료 신호
+  hit_physics?: HitResultDetail   // 페어 타구 시만 존재 — advanceRunners에 전달
 }

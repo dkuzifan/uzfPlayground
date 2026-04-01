@@ -1,5 +1,6 @@
-import type { Player }      from '../types/player'
-import type { AtBatResult } from './types'
+import type { Player }         from '../types/player'
+import type { AtBatResult }    from './types'
+import type { HitResultDetail } from '../defence/types'
 import {
   selectDirectionAngle,
   calcBattedBallPhysics,
@@ -63,28 +64,37 @@ export function resolveHitResult(
   launch_angle:  number,
   batter:        Player,
   fielders:      Player[],
-): Exclude<AtBatResult, 'in_progress' | 'strikeout' | 'walk' | 'hit_by_pitch'> {
+): HitResultDetail {
   // 1. 방향각 결정
   const theta_h = selectDirectionAngle(batter)
 
   // 2. 타구 물리 계산
   const physics = calcBattedBallPhysics(exit_velocity, launch_angle, theta_h)
 
-  // 3. 홈런 판정 (방향별 펜스 거리 적용)
-  if (physics.range >= fenceDistance(theta_h)) return 'home_run'
+  // 3. 담당 수비수 선택 (홈런 포함 항상 계산 — fielder/pos 반환에 필요)
+  const { fielder, pos: fielder_pos, dist } = findResponsibleFielder(physics.landing, fielders)
 
-  // 4. 타구 종류 분류
+  const t_ball_travel = physics.t_bounce
+  const t_fielding    = t_ball_travel + 0.3
+  const is_infield    = physics.range < 36
+
+  // 4. 홈런 판정
+  if (physics.range >= fenceDistance(theta_h)) {
+    return { result: 'home_run', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield: false }
+  }
+
+  // 5. 타구 종류 분류
   const ballType = classifyBallType(launch_angle)
-
-  // 5. 담당 수비수 선택
-  const { fielder, dist } = findResponsibleFielder(physics.landing, fielders)
 
   // 6. 포구 확률 계산
   const p_out = calcCatchProbability(ballType, dist, physics.v_roll_0, physics.t_bounce, fielder)
 
   // 7. 아웃 판정
-  if (Math.random() < p_out) return 'out'
+  if (Math.random() < p_out) {
+    return { result: 'out', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield }
+  }
 
   // 8. 히트 종류 결정 (거리 기반)
-  return resolveHitType(physics.range)
+  const result = resolveHitType(physics.range)
+  return { result, fielder, fielder_pos, t_fielding, t_ball_travel, is_infield }
 }

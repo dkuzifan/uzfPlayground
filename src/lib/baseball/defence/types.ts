@@ -16,3 +16,20 @@ export interface BallPhysicsResult {
 
 // LA 기준 타구 분류 — 포구 확률 로직 분기에 사용
 export type BallType = 'popup' | 'fly' | 'line_drive' | 'grounder'
+
+// ============================================================
+// HitResultDetail — resolveHitResult 반환 / advanceRunners 입력
+// t_ball_travel = BallPhysicsResult.t_bounce (공 비행 시간)
+// ============================================================
+
+import type { Player } from '../types/player'
+import type { AtBatResult } from '../batting/types'
+
+export interface HitResultDetail {
+  result:        AtBatResult
+  fielder:       Player
+  fielder_pos:   { x: number; y: number }
+  t_fielding:    number        // t_ball_travel + 0.3s
+  t_ball_travel: number        // = t_bounce
+  is_infield:    boolean       // range < 36m
+}
