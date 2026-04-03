@@ -166,8 +166,16 @@ function findRunnerTarget(
   for (let i = startIdx + 1; i < BASE_ORDER.length; i++) {
     const nextKey = BASE_ORDER[i]
 
-    // 충돌 방지: home은 항상 허용 (복수 주자 동시 홈 진입 가능)
-    if (nextKey !== 'home' && (occupiedBases.has(nextKey) || attemptedBases.has(nextKey))) {
+    // forceMinBase 구간 내에서는 충돌 체크를 건너뜀
+    // (포스 플레이 등으로 해당 베이스까지는 강제 진루가 필요한 경우)
+    const belowForceMin =
+      forceMinBase !== undefined &&
+      BASE_ORDER.indexOf(nextKey) <= BASE_ORDER.indexOf(forceMinBase) &&
+      (last_confirmed === null ||
+       BASE_ORDER.indexOf(last_confirmed.targetBase) < BASE_ORDER.indexOf(forceMinBase))
+
+    // 충돌 방지: home은 항상 허용, 강제 구간은 건너뜀
+    if (!belowForceMin && nextKey !== 'home' && (occupiedBases.has(nextKey) || attemptedBases.has(nextKey))) {
       break
     }
 
@@ -188,11 +196,12 @@ function findRunnerTarget(
     // 진루 여부 결정
     const willChallenge = decideChallengeAdvance(runner, runner_dist, adjusted_bs, nextKey, lineup)
 
-    // 최소 진루 강제: forceMinBase까지 도달 전이고 아직 아무것도 확정 안 됐다면 강제 진루
+    // 최소 진루 강제: forceMinBase에 아직 도달하지 않은 구간이면 강제 진루
     const isForced =
       forceMinBase !== undefined &&
-      last_confirmed === null &&
-      BASE_ORDER.indexOf(nextKey) <= BASE_ORDER.indexOf(forceMinBase)
+      BASE_ORDER.indexOf(nextKey) <= BASE_ORDER.indexOf(forceMinBase) &&
+      (last_confirmed === null ||
+       BASE_ORDER.indexOf(last_confirmed.targetBase) < BASE_ORDER.indexOf(forceMinBase))
 
     if (willChallenge || isForced) {
       accumulated_t += t_to_next
@@ -242,11 +251,6 @@ function resolveRunnerAdvances(
   // 도전 주자 목표 베이스 집합 (home 제외)
   const attemptedBases = new Set<BaseKey>()
 
-  // 2루타: 타자가 2루에 올 예정 → 기존 주자는 2루에 정지 불가
-  if (result === 'double') {
-    occupiedBases.add('2B')
-  }
-
   type RunnerAttempt = {
     runner:      Player
     fromBase:    1 | 2 | 3
@@ -268,12 +272,11 @@ function resolveRunnerAdvances(
     if (!runner) continue
 
     // 최소 진루 강제 설정
+    // 단타: 1루 주자는 포스 플레이 — 타자가 1루를 차지하므로 반드시 2루로 이동
+    // 2루타: 물리 모델에 맡김 (외야 타구 특성상 decideChallengeAdvance가 자연스럽게 진루 결정)
     let forceMinBase: BaseKey | undefined
     if (result === 'single' && fromBase === 1) {
-      forceMinBase = '2B'   // 단타: 1루 주자는 최소 2루 (타자가 1루 점유)
-    } else if (result === 'double') {
-      if (fromBase === 1) forceMinBase = '3B'   // 2루타: 1루 주자 최소 3루
-      if (fromBase === 2) forceMinBase = '3B'   // 2루타: 2루 주자 최소 3루 (타자가 2루 점유)
+      forceMinBase = '2B'
     }
 
     const found = findRunnerTarget(
@@ -637,9 +640,15 @@ export function advanceRunners(
     allEvents.push(...adv.events)
     next = { ...next, ...adv.nextRunners }
 
-    // 타자 2루 고정
-    next.second = batter
-    moves.push({ runner: batter, from: 'batter', to: 2 })
+    // 타자 배치: 2루가 비어 있으면 2루, 점유됐으면 1루
+    // (앞 주자가 2루에 머문 경우 — 극히 드물지만 앞 주자가 베이스 권리를 가짐)
+    if (next.second === null) {
+      next.second = batter
+      moves.push({ runner: batter, from: 'batter', to: 2 })
+    } else {
+      next.first = batter
+      moves.push({ runner: batter, from: 'batter', to: 1 })
+    }
   }
 
   return { nextRunners: next, runsScored, outs_added, moves, events: allEvents }
