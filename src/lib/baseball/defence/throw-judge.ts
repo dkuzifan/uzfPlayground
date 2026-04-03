@@ -1,6 +1,28 @@
 import type { Player, Position } from '../types/player'
 
 // ============================================================
+// Vec2 — 2D 좌표 타입
+// ============================================================
+
+export type Vec2 = { x: number; y: number }
+
+// ============================================================
+// BallState — 공의 현재 상태와 남은 시간
+//
+// t_remaining: 이 결정 시점에서 해당 phase가 완료될 때까지 남은 시간 (s)
+// 호출자(resolveRunnerAdvances)가 runner 이동 시간을 반영해 t_remaining을 조정해 전달
+// ============================================================
+
+export type BallState =
+  | { phase: 'in_air';          t_remaining: number; catch_probability: number;
+      fielder_pos: Vec2; fielder: Player }    // ※ 타입 예약 — 실제 구현은 #5 tag-up
+  | { phase: 'fielding';        t_remaining: number;
+      fielder_pos: Vec2; fielder: Player }
+  | { phase: 'throw_in_flight'; t_remaining: number;
+      target: BaseKey; receiver_pos: Vec2; receiver: Player }
+  | { phase: 'held';            fielder: Player; fielder_pos: Vec2 }
+
+// ============================================================
 // 베이스 좌표 상수
 // 원점 = 홈 플레이트, +y = 중견수 방향, +x = 1루 방향
 // 1루~홈 = 27.43m, 대각선 = 27.43 × √2 = 38.8m

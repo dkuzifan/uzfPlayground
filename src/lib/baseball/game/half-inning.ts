@@ -73,6 +73,8 @@ export function runHalfInning(
       stamina,
       recent_pitches,
       catcher,
+      battingScore: isTop ? scoreAway : scoreHome,
+      defenseScore: isTop ? scoreHome : scoreAway,
     }, defenceLineup)
 
     events.push(...outcome.events)

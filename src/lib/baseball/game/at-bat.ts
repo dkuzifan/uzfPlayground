@@ -176,14 +176,20 @@ export function runAtBat(
             t_steal_run: 1.8,
           }
 
-          const { nextRunners, runsScored, moves, outs_added: runnerOuts } = advanceRunners(
+          const { nextRunners, runsScored, moves, outs_added: runnerOuts, events: runnerEvents } = advanceRunners(
             batting.at_bat_result,
             currentRunners,
             batter,
             batting.hit_physics,
             stealStateForAdvance,
             defenceLineup,
+            { battingScore: ctx.battingScore, defenseScore: ctx.defenseScore },
           )
+
+          // secondary_throw 등 추가 이벤트에 inning/isTop 패치
+          for (const evt of runnerEvents) {
+            events.push({ ...evt, inning, isTop })
+          }
 
           const atBatOut = batting.at_bat_result === 'strikeout' || batting.at_bat_result === 'out' ? 1 : 0
           const outs_added = atBatOut + runnerOuts
@@ -320,14 +326,20 @@ export function runAtBat(
         payload: { batter, result: batting.at_bat_result },
       })
 
-      const { nextRunners, runsScored, moves, outs_added: runnerOuts } = advanceRunners(
+      const { nextRunners, runsScored, moves, outs_added: runnerOuts, events: runnerEvents } = advanceRunners(
         batting.at_bat_result,
         currentRunners,
         batter,
         batting.hit_physics,
         undefined,
         defenceLineup,
+        { battingScore: ctx.battingScore, defenseScore: ctx.defenseScore },
       )
+
+      // secondary_throw 등 추가 이벤트에 inning/isTop 패치
+      for (const evt of runnerEvents) {
+        events.push({ ...evt, inning, isTop })
+      }
 
       const atBatOut = batting.at_bat_result === 'strikeout' || batting.at_bat_result === 'out' ? 1 : 0
       const outs_added = atBatOut + runnerOuts

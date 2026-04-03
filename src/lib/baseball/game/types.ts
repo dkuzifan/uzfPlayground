@@ -4,6 +4,7 @@ import type { ZoneId, FamiliarityMap } from '../engine/types'
 import type { AtBatResult } from '../batting/types'
 import type { RunnerMove } from './runner-advance'
 import type { GameStats } from './stats-types'
+import type { Vec2, BaseKey } from '../defence/throw-judge'
 
 // ============================================================
 // Runners
@@ -30,6 +31,8 @@ export interface AtBatContext {
   stamina:        number
   recent_pitches: Array<{ type: PitchType; zone: ZoneId }>
   catcher:        Player  // 도루/견제 판정용
+  battingScore:   number  // 현재 공격 팀 점수 (isCritical 판단용)
+  defenseScore:   number  // 현재 수비 팀 점수
 }
 
 export interface AtBatOutcome {
@@ -61,6 +64,7 @@ export type GameEventType =
   | 'pickoff_attempt' // { pitcher: Player; runner: Player; base: 1|2 }
   | 'pickoff_result'  // { runner: Player; base: 1|2; out: boolean }
   | 'game_end'
+  | 'secondary_throw'  // { receiver: Player; receiver_pos: Vec2; target: BaseKey; challenger: Player; out: boolean }
   // 향후 추가: 'error' | 'double_play' | 'tag_up'
 
 export interface GameEvent {

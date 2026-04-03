@@ -52,6 +52,7 @@ export interface PlayerStats {
   running: number
   // 공통 (투수/타자 모두)
   stamina: number
+  judgment?: number   // 주루/수비 판단력. 미설정 시 defence 스탯을 proxy로 사용
 }
 
 export interface Player {

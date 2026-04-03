@@ -26,10 +26,11 @@ import type { Player } from '../types/player'
 import type { AtBatResult } from '../batting/types'
 
 export interface HitResultDetail {
-  result:        AtBatResult
-  fielder:       Player
-  fielder_pos:   { x: number; y: number }
-  t_fielding:    number        // t_ball_travel + 0.3s
-  t_ball_travel: number        // = t_bounce
-  is_infield:    boolean       // range < 36m
+  result:           AtBatResult
+  fielder:          Player
+  fielder_pos:      { x: number; y: number }
+  t_fielding:       number        // t_ball_travel + 0.3s
+  t_ball_travel:    number        // = t_bounce
+  is_infield:       boolean       // range < 36m
+  catch_setup_time?: number       // 예약: 포구 난이도별 준비 시간 (#5에서 계산 로직 추가)
 }
