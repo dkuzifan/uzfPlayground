@@ -18,7 +18,7 @@ interface TeamState {
 }
 
 function makeBatterStats(player: Player): BatterGameStats {
-  return { player, AB: 0, H: 0, '2B': 0, '3B': 0, HR: 0, BB: 0, SO: 0, RBI: 0, SB: 0, CS: 0 }
+  return { player, AB: 0, H: 0, '2B': 0, '3B': 0, HR: 0, BB: 0, SO: 0, RBI: 0, SB: 0, CS: 0, SF: 0 }
 }
 
 function makePitcherStats(player: Player): PitcherGameStats {
@@ -144,6 +144,14 @@ export function calcGameStats(
         getCurrentPitcher(defState).ER += runs
         // 팀 스코어 업데이트 (W/L 판정용)
         offState.score += runs
+        break
+      }
+
+      case 'sac_fly': {
+        const batter = event.payload.batter as Player
+        // SAC F는 타수(AB)에 포함되지 않음
+        getBatter(offState, batter).SF++
+        pendingBatter = { state: offState, id: batter.id }  // RBI는 runner_advance 이벤트에서 처리
         break
       }
 

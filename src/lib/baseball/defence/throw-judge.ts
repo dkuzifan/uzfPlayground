@@ -15,7 +15,7 @@ export type Vec2 = { x: number; y: number }
 
 export type BallState =
   | { phase: 'in_air';          t_remaining: number; catch_probability: number;
-      fielder_pos: Vec2; fielder: Player }    // ※ 타입 예약 — 실제 구현은 #5 tag-up
+      fielder_pos: Vec2; fielder: Player }
   | { phase: 'fielding';        t_remaining: number;
       fielder_pos: Vec2; fielder: Player }
   | { phase: 'throw_in_flight'; t_remaining: number;

@@ -21,7 +21,7 @@ import {
   resolveSecondaryThrow,
   getReceiverAtBase,
 } from '../defence/runner-decision'
-import { GAME_CONFIG } from './config'
+import { GAME_CONFIG, LINE_DRIVE_THRESHOLD } from './config'
 import type { FieldersChoiceRule } from './config'
 
 // ============================================================
@@ -62,6 +62,14 @@ function getFielderPos(hp: HitResultDetail): { x: number; y: number } {
 }
 
 // ============================================================
+// calcRunnerSpeed — 주자 속도 (m/s)
+// ============================================================
+
+function calcRunnerSpeed(runner: Player): number {
+  return 5.0 + (runner.stats.running / 100) * 3.0
+}
+
+// ============================================================
 // calcPitchLead / calcRunnerDist — 주자 목표 베이스까지 남은 거리
 // ============================================================
 
@@ -80,7 +88,7 @@ function calcRunnerDist(
   const full_dist = euclidDist(BASE_POS[fromKey], BASE_POS[targetKey])
 
   if (stealState && stealState.runner.id === runner.id && stealState.base === fromBase) {
-    const runner_speed   = 5.0 + (runner.stats.running / 100) * 3.0
+    const runner_speed   = calcRunnerSpeed(runner)
     const steal_progress = runner_speed * stealState.t_steal_run
     return Math.max(0, full_dist - steal_progress)
   }
@@ -160,7 +168,7 @@ function findRunnerTarget(
 ): { targetBase: BaseKey; runner_dist: number; t_arrival: number } | null {
   const fromKey = baseNumToKey(fromBase)
   const startIdx = BASE_ORDER.indexOf(fromKey)
-  const runner_speed = 5.0 + (runner.stats.running / 100) * 3.0
+  const runner_speed = calcRunnerSpeed(runner)
 
   let accumulated_t = 0
   let last_confirmed: { targetBase: BaseKey; runner_dist: number; t_arrival: number } | null = null
@@ -214,6 +222,181 @@ function findRunnerTarget(
   }
 
   return last_confirmed
+}
+
+// ============================================================
+// resolveLDDoublePlay — 라인 드라이브 직접 포구 시 귀루 아웃 판정
+//
+// 발동 조건: result='out', !is_infield, t_ball_travel < LINE_DRIVE_THRESHOLD
+// 타자 아웃(atBatOut=1)은 at-bat.ts가 담당 — 여기서는 주자 귀루 아웃만 처리
+// ============================================================
+
+function resolveLDDoublePlay(
+  runners:        Runners,
+  batter:         Player,
+  hp:             HitResultDetail,
+  defenceLineup:  Player[],
+  inningCtx?:     { inning: number; isTop: boolean },
+): AdvanceResult {
+  const fielder_pos   = getFielderPos(hp)
+  const reaction_delay = hp.catch_setup_time ?? 0.2
+  const spd_OF        = (80 + hp.fielder.stats.throw * 0.7) / 3.6
+
+  let nextRunners: Runners = { ...runners }
+  let outs_added  = 0
+  const moves:  RunnerMove[]  = []
+  const events: GameEvent[]   = []
+
+  const runnerEntries: Array<[1 | 2 | 3, Player | null, BaseKey]> = [
+    [3, runners.third,  '3B'],
+    [2, runners.second, '2B'],
+    [1, runners.first,  '1B'],
+  ]
+
+  for (const [fromBase, runner, baseKey] of runnerEntries) {
+    if (!runner) continue
+
+    const lead_dist   = calcPitchLead(runner)
+    const runner_speed = calcRunnerSpeed(runner)
+    const return_time  = lead_dist / runner_speed
+
+    // 수비수 → 루 결정론적 송구 시간 (난수 없음)
+    const throw_dist  = euclidDist(fielder_pos, BASE_POS[baseKey])
+    const throw_time  = reaction_delay + throw_dist / spd_OF
+
+    if (return_time > throw_time) {
+      // 귀루 아웃
+      outs_added++
+      if (fromBase === 1) nextRunners.first  = null
+      if (fromBase === 2) nextRunners.second = null
+      if (fromBase === 3) nextRunners.third  = null
+      moves.push({ runner, from: fromBase, to: fromBase })
+    }
+    // 귀루 성공 → 현재 베이스 유지 (nextRunners 변경 없음)
+  }
+
+  // 타자는 아웃이므로 1루에 배치하지 않음
+  return { nextRunners, runsScored: 0, outs_added, moves, events }
+}
+
+// ============================================================
+// resolveOutfieldFlyOut — 외야 플라이아웃 태그업 판정
+//
+// 발동 조건: result='out', !is_infield, t_ball_travel >= LINE_DRIVE_THRESHOLD, outs < 2
+// 2아웃은 타구 즉시 진루 원칙이므로 호출하지 않음 (advanceRunners에서 필터링)
+// ============================================================
+
+function resolveOutfieldFlyOut(
+  runners:        Runners,
+  batter:         Player,
+  hp:             HitResultDetail,
+  defenceLineup:  Player[],
+  scoreContext?:  { battingScore: number; defenseScore: number },
+  inningCtx?:     { inning: number; isTop: boolean },
+  outs?:          number,
+): AdvanceResult {
+  const lineup       = defenceLineup
+  const fielder_pos  = getFielderPos(hp)
+  const reaction_delay = hp.catch_setup_time ?? 0.2
+
+  // 포구 완료 상태 — 외야수가 공을 쥐고 있음
+  const ball_state: BallState = {
+    phase:       'held',
+    fielder:     hp.fielder,
+    fielder_pos,
+  }
+  // 포구 후 준비 시간만큼 경과한 BallState
+  const adjusted_bs = adjustBallState(ball_state, reaction_delay)
+
+  let nextRunners: Runners = { ...runners }
+  let runsScored  = 0
+  let outs_added  = 0
+  const moves:  RunnerMove[]  = []
+  const events: GameEvent[]   = []
+
+  // 앞 주자 우선 처리 (3루 → 2루 → 1루)
+  const runnerEntries: Array<[1 | 2 | 3, Player | null]> = [
+    [3, runners.third],
+    [2, runners.second],
+    [1, runners.first],
+  ]
+
+  for (const [fromBase, runner] of runnerEntries) {
+    if (!runner) continue
+
+    const fromKey   = baseNumToKey(fromBase)
+    const nextKey   = getNextBase(fromKey)
+    if (!nextKey) continue
+
+    const toNum: 1 | 2 | 3 | 'home' =
+      nextKey === '1B' ? 1 :
+      nextKey === '2B' ? 2 :
+      nextKey === '3B' ? 3 : 'home'
+
+    const lead_dist   = calcPitchLead(runner)
+    const full_dist   = euclidDist(BASE_POS[fromKey], BASE_POS[nextKey])
+    // 귀루 거리를 더해 decideChallengeAdvance에서 자연스럽게 불리하게 작용
+    const runner_dist = full_dist + lead_dist
+
+    const willChallenge = decideChallengeAdvance(runner, runner_dist, adjusted_bs, nextKey, lineup)
+
+    const inning = inningCtx?.inning ?? 0
+    const isTop  = inningCtx?.isTop  ?? false
+
+    if (!willChallenge) {
+      // 태그업 포기 — 현재 베이스 유지 (nextRunners 변경 없음)
+      continue
+    }
+
+    // 태그업 시도 → 송구 판정
+    const throw_dist = euclidDist(fielder_pos, BASE_POS[nextKey])
+    const verdict    = resolveThrow(hp.fielder, throw_dist, reaction_delay, runner, runner_dist)
+
+    events.push({
+      type: 'tag_up',
+      inning,
+      isTop,
+      payload: { runner, from: fromBase, to: toNum, safe: verdict === 'safe' },
+    })
+
+    if (verdict === 'safe') {
+      if (fromBase === 1) nextRunners.first  = null
+      if (fromBase === 2) nextRunners.second = null
+      if (fromBase === 3) nextRunners.third  = null
+
+      if (nextKey === 'home') {
+        runsScored++
+      } else {
+        if (nextKey === '1B') nextRunners.first  = runner
+        if (nextKey === '2B') nextRunners.second = runner
+        if (nextKey === '3B') nextRunners.third  = runner
+      }
+      moves.push({ runner, from: fromBase, to: toNum })
+    } else {
+      // 태그업 아웃
+      if (fromBase === 1) nextRunners.first  = null
+      if (fromBase === 2) nextRunners.second = null
+      if (fromBase === 3) nextRunners.third  = null
+      outs_added++
+      moves.push({ runner, from: fromBase, to: toNum })
+
+      // outs === 1 이고 이 귀루 아웃이 3번째 아웃 → 이후 진루 처리 중단
+      if ((outs ?? 0) === 1) break
+    }
+  }
+
+  // 희생플라이: 득점 발생 시 타자에게 SAC F 기록
+  if (runsScored > 0) {
+    events.push({
+      type:    'sac_fly',
+      inning:  inningCtx?.inning ?? 0,
+      isTop:   inningCtx?.isTop  ?? false,
+      payload: { batter },
+    })
+  }
+
+  // 타자는 아웃이므로 1루에 배치하지 않음
+  return { nextRunners, runsScored, outs_added, moves, events }
 }
 
 // ============================================================
@@ -548,6 +731,20 @@ export function advanceRunners(
       defenceLineup, inningCtx,
       GAME_CONFIG.fielders_choice_rule,
     )
+  }
+
+  // 외야 아웃 분기 (태그업 / 라인 드라이브 귀루 아웃)
+  if (result === 'out' && hitPhysics && !hitPhysics.is_infield) {
+    const lineup = defenceLineup ?? []
+    if (hitPhysics.t_ball_travel < LINE_DRIVE_THRESHOLD) {
+      // 라인 드라이브 직접 포구: 귀루 시간 vs 송구 시간 비교
+      return resolveLDDoublePlay(runners, batter, hitPhysics, lineup, inningCtx)
+    } else if ((outs ?? 0) < 2) {
+      // 0~1아웃 외야 플라이아웃: 태그업
+      // 2아웃은 타구 즉시 주자가 달리므로 태그업 없음 → fixedAdvance로 fall-through
+      return resolveOutfieldFlyOut(runners, batter, hitPhysics, lineup, scoreContext, inningCtx, outs)
+    }
+    // 2아웃 외야 플라이아웃 → fixedAdvance로 fall-through (3번째 아웃, 주자 정리)
   }
 
   if (!hitPhysics || result === 'strikeout' || result === 'out' ||

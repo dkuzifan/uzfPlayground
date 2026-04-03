@@ -91,7 +91,9 @@ export function resolveHitResult(
 
   // 7. 아웃 판정
   if (Math.random() < p_out) {
-    return { result: 'out', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield }
+    // 포구 난이도별 준비 시간: 어려운 포구(p_out < 0.5)는 다이빙 캐치 등으로 0.4s
+    const catch_setup_time = p_out >= 0.5 ? 0.2 : 0.4
+    return { result: 'out', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield, catch_setup_time }
   }
 
   // 8. 히트 종류 결정 (거리 기반)

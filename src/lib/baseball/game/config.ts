@@ -8,3 +8,6 @@ export const GAME_CONFIG = {
   extra_innings_rule:    'unlimited' as ExtraInningsRule,
   fielders_choice_rule:  'mlb' as FieldersChoiceRule,
 }
+
+// 라인 드라이브 판정 기준: 이 미만이면 귀루 아웃 체크 (태그업 없음)
+export const LINE_DRIVE_THRESHOLD = 0.8  // s

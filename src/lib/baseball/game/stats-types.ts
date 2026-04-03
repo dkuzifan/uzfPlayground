@@ -16,6 +16,7 @@ export interface BatterGameStats {
   RBI: number   // 타점
   SB:  number   // 도루 성공
   CS:  number   // 도루 실패
+  SF:  number   // 희생플라이
 }
 
 // ============================================================
