@@ -504,68 +504,6 @@ function resolveRunnerAdvances(
 }
 
 // ============================================================
-// _resolveLeadingRunner — 기존 구현 보존 (롤백 대비)
-//
-// 기존 "선행 주자 1명에게 항상 송구" 방식.
-// resolveRunnerAdvances로 대체되었으나 코드 보존.
-// ============================================================
-
-function _resolveLeadingRunner(
-  runners:        Runners,
-  result:         'single' | 'double',
-  hp:             HitResultDetail,
-  stealState?:    StealState,
-  defenceLineup?: Player[],
-): { nextRunners: Runners; runsScored: number; outs_added: number; moves: RunnerMove[] } {
-  const fielder_pos = getFielderPos(hp)
-  const lineup      = defenceLineup ?? []
-  let nextRunners = { ...runners }
-  let runsScored  = 0
-  let outs_added  = 0
-  const moves: RunnerMove[] = []
-
-  function throwVerdict(runner: Player, runner_dist: number, targetKey: keyof typeof BASE_POS): 'safe' | 'out' {
-    const targetPos  = BASE_POS[targetKey]
-    const throw_dist = euclidDist(fielder_pos, targetPos)
-    const relayMan   = selectRelayMan(fielder_pos, lineup)
-    const relayPos   = calcRelayPos(fielder_pos, targetPos)
-    const useRelay   = shouldUseRelay(hp.fielder, fielder_pos, targetPos, hp.t_fielding, relayMan, relayPos)
-    return useRelay
-      ? resolveRelayThrow(hp.fielder, fielder_pos, relayMan, targetPos, hp.t_fielding, runner, runner_dist)
-      : resolveThrow(hp.fielder, throw_dist, hp.t_fielding, runner, runner_dist)
-  }
-
-  if (result === 'single') {
-    if (runners.second) {
-      const runner      = runners.second
-      const runner_dist = calcRunnerDist(runner, 2, 'home', stealState)
-      const verdict     = throwVerdict(runner, runner_dist, 'home')
-      if (verdict === 'safe') { runsScored++; moves.push({ runner, from: 2, to: 'home' }) }
-      else outs_added++
-      nextRunners.second = null
-    } else if (runners.first) {
-      const runner      = runners.first
-      const runner_dist = calcRunnerDist(runner, 1, '3B', stealState)
-      const verdict     = throwVerdict(runner, runner_dist, '3B')
-      if (verdict === 'safe') { nextRunners.third = runner; moves.push({ runner, from: 1, to: 3 }) }
-      else outs_added++
-      nextRunners.first = null
-    }
-  } else {
-    if (runners.first) {
-      const runner      = runners.first
-      const runner_dist = calcRunnerDist(runner, 1, 'home', stealState)
-      const verdict     = throwVerdict(runner, runner_dist, 'home')
-      if (verdict === 'safe') { runsScored++; moves.push({ runner, from: 1, to: 'home' }) }
-      else outs_added++
-      nextRunners.first = null
-    }
-  }
-
-  return { nextRunners, runsScored, outs_added, moves }
-}
-
-// ============================================================
 // resolveBatterAdvance — 타자 추가 진루 독립 판정 (가상 2루 송구)
 // ============================================================
 
