@@ -597,14 +597,12 @@ export function advanceRunners(
   inningCtx?:     { inning: number; isTop: boolean },
 ): AdvanceResult {
   if (result === 'walk' || result === 'hit_by_pitch') {
-    const r = forceAdvance(runners, batter)
-    return { ...r, events: [] }
+    return forceAdvance(runners, batter)
   }
 
   if (!hitPhysics || result === 'strikeout' || result === 'out' ||
       result === 'home_run' || result === 'triple') {
-    const r = fixedAdvance(result, runners, batter)
-    return { ...r, events: [] }
+    return fixedAdvance(result, runners, batter)
   }
 
   const moves: RunnerMove[] = []
@@ -663,7 +661,7 @@ function fixedAdvance(
   result:  AtBatResult,
   runners: Runners,
   batter:  Player,
-): Omit<AdvanceResult, 'events'> {
+): AdvanceResult {
   const moves: RunnerMove[] = []
   let runsScored = 0
   let next: Runners = { first: null, second: null, third: null }
@@ -720,14 +718,14 @@ function fixedAdvance(
       break
   }
 
-  return { nextRunners: next, runsScored, outs_added: 0, moves }
+  return { nextRunners: next, runsScored, outs_added: 0, moves, events: [] }
 }
 
 // ============================================================
 // forceAdvance — 볼넷/사구 강제 진루
 // ============================================================
 
-export function forceAdvance(runners: Runners, batter: Player): Omit<AdvanceResult, 'events'> {
+function forceAdvance(runners: Runners, batter: Player): AdvanceResult {
   const moves: RunnerMove[] = []
   let runsScored = 0
 
@@ -759,5 +757,6 @@ export function forceAdvance(runners: Runners, batter: Player): Omit<AdvanceResu
     runsScored,
     outs_added: 0,
     moves,
+    events: [],
   }
 }
