@@ -65,7 +65,8 @@ export type GameEventType =
   | 'pickoff_result'  // { runner: Player; base: 1|2; out: boolean }
   | 'game_end'
   | 'secondary_throw'  // { receiver: Player; receiver_pos: Vec2; target: BaseKey; challenger: Player; out: boolean }
-  // 향후 추가: 'error' | 'double_play' | 'tag_up'
+  | 'force_out'        // { runner: Player; from: 1|2|3; to: 2|3|'home' }
+  // 향후 추가: 'error' | 'tag_up'
 
 export interface GameEvent {
   type:    GameEventType

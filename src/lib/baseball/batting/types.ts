@@ -16,6 +16,8 @@ export type AtBatResult =
   | 'triple'          // 3루타
   | 'home_run'        // 홈런
   | 'out'             // 인플레이 아웃
+  | 'double_play'     // 병살 (포스아웃 + 타자 1루 아웃)
+  | 'fielders_choice' // 야수 선택 (포스아웃 + 타자 1루 세이프)
   | 'pickoff_out'     // 견제 성공 (타석 중단)
   | 'caught_stealing' // 도루 실패 (타석 중단)
 

@@ -21,6 +21,8 @@ import {
   resolveSecondaryThrow,
   getReceiverAtBase,
 } from '../defence/runner-decision'
+import { GAME_CONFIG } from './config'
+import type { FieldersChoiceRule } from './config'
 
 // ============================================================
 // RunnerMove — 주자 이동 내역 (GameEvent runner_advance payload용)
@@ -533,9 +535,19 @@ export function advanceRunners(
   defenceLineup?: Player[],
   scoreContext?:  { battingScore: number; defenseScore: number },
   inningCtx?:     { inning: number; isTop: boolean },
+  outs?:          number,
 ): AdvanceResult {
   if (result === 'walk' || result === 'hit_by_pitch') {
     return forceAdvance(runners, batter)
+  }
+
+  // 내야 그라운더 아웃 → 병살/야수선택/포스아웃 처리
+  if (result === 'out' && hitPhysics?.is_infield) {
+    return resolveInfieldOut(
+      runners, batter, hitPhysics, outs ?? 0,
+      defenceLineup, inningCtx,
+      GAME_CONFIG.fielders_choice_rule,
+    )
   }
 
   if (!hitPhysics || result === 'strikeout' || result === 'out' ||
@@ -657,6 +669,142 @@ function fixedAdvance(
   }
 
   return { nextRunners: next, runsScored, outs_added: 0, moves, events: [] }
+}
+
+// ============================================================
+// resolveInfieldOut — 내야 그라운더 아웃 처리
+//
+// 1. 포스 상황 감지 → 포스 주자 전원 아웃
+// 2. 3루 주자(비포스) 홈 도전 판단
+// 3. 병살 판정 (피벗 맨 → 1루 송구 vs 타자 도달 시간)
+// ============================================================
+
+type PivotInfo = {
+  forceRunners: Array<{ runner: Player; from: 1 | 2 | 3; to: 2 | 3 | 'home' }>
+  pivotBase:    2 | 3 | 'home'
+}
+
+function detectPivotBase(runners: Runners): PivotInfo | null {
+  // 포스 발생 조건: 1루 주자가 있어야 함 (타자가 1루를 차지하므로)
+  if (!runners.first) return null
+
+  const forceRunners: PivotInfo['forceRunners'] = []
+
+  // 포스 주자 목록 구성 (1루→2루는 항상, 연쇄 포스 처리)
+  forceRunners.push({ runner: runners.first, from: 1, to: 2 })
+  if (runners.second) {
+    forceRunners.push({ runner: runners.second, from: 2, to: 3 })
+    if (runners.third) {
+      forceRunners.push({ runner: runners.third, from: 3, to: 'home' })
+    }
+  }
+
+  // pivotBase: 병살에 가장 유리한 베이스 (2루 우선 — 2루→1루가 가장 짧은 DP 경로)
+  return { forceRunners, pivotBase: 2 }
+}
+
+function decide3BRunnerHome(
+  runner:        Player,
+  initial_bs:    BallState,
+  outs:          number,
+  forceOutCount: number,
+  defenceLineup: Player[],
+): boolean {
+  // 포스아웃 후 실질 2아웃이면 무조건 홈 도전
+  if (outs + forceOutCount >= 2) return true
+
+  const dist = euclidDist(BASE_POS['3B'], BASE_POS['home'])
+  return decideChallengeAdvance(runner, dist, initial_bs, 'home', defenceLineup)
+}
+
+function resolveInfieldOut(
+  runners:       Runners,
+  batter:        Player,
+  hp:            HitResultDetail,
+  outs:          number,
+  defenceLineup: Player[] | undefined,
+  inningCtx:     { inning: number; isTop: boolean } | undefined,
+  fcRule:        FieldersChoiceRule,
+): AdvanceResult {
+  const lineup  = defenceLineup ?? []
+  const moves:  RunnerMove[] = []
+  const events: GameEvent[]  = []
+  let next:     Runners      = { first: null, second: null, third: null }
+  let outs_added = 0
+  let runsScored = 0
+
+  // 1. 포스 감지
+  const pivot = detectPivotBase(runners)
+
+  if (!pivot) {
+    // 포스 없음 → 타자만 아웃, 주자 이동 없음 (기존 동작 유지)
+    next = { ...runners }
+    return { nextRunners: next, runsScored: 0, outs_added: 0, moves, events }
+  }
+
+  // 2. 포스 주자 전원 아웃 처리
+  const isForceRunner = (fromBase: 1 | 2 | 3) =>
+    pivot.forceRunners.some(f => f.from === fromBase)
+
+  for (const fo of pivot.forceRunners) {
+    outs_added++
+    moves.push({ runner: fo.runner, from: fo.from, to: fo.to === 'home' ? 'home' : fo.to })
+    events.push({
+      type:    'force_out',
+      inning:  inningCtx?.inning ?? 0,
+      isTop:   inningCtx?.isTop  ?? false,
+      payload: { runner: fo.runner, from: fo.from, to: fo.to },
+    })
+    if (fo.to === 'home') runsScored++
+  }
+
+  // 3. 비포스 주자 처리
+  // 3루 주자가 포스 대상이 아닌 경우 홈 도전 판단
+  if (!isForceRunner(3) && runners.third) {
+    const initial_bs: BallState = {
+      phase:       'fielding',
+      t_remaining: hp.t_fielding,
+      fielder_pos: hp.fielder_pos,
+      fielder:     hp.fielder,
+    }
+    const goHome = decide3BRunnerHome(runners.third, initial_bs, outs, outs_added, lineup)
+    if (goHome) {
+      runsScored++
+      moves.push({ runner: runners.third, from: 3, to: 'home' })
+    } else {
+      next.third = runners.third
+    }
+  }
+  // 2루 주자가 비포스인 경우 제자리
+  if (!isForceRunner(2) && runners.second) {
+    next.second = runners.second
+  }
+
+  // 4. 병살 판정 (피벗 맨 → 1루 송구 vs 타자 도달 시간)
+  const pivotKey = pivot.pivotBase === 2 ? '2B' : pivot.pivotBase === 3 ? '3B' : 'home'
+  const pivotMan = getReceiverAtBase(pivotKey, lineup).player
+
+  const pivot_pos        = BASE_POS[pivotKey]
+  const throw_speed      = (80 + pivotMan.stats.throw * 0.7) / 3.6
+  const throw_dist       = euclidDist(pivot_pos, BASE_POS['1B'])
+  const pivot_throw_time = 0.3 + throw_dist / throw_speed
+
+  const batter_run_speed = 5.0 + (batter.stats.running / 100) * 3.0
+  const t_batter_to_1B   = 27.43 / batter_run_speed
+
+  const isDP = t_batter_to_1B > pivot_throw_time
+
+  if (isDP) {
+    // 병살 성공: 타자도 아웃
+    outs_added++
+    moves.push({ runner: batter, from: 'batter', to: 1 })
+  } else {
+    // 타자 1루 세이프 (야수 선택)
+    next.first = batter
+    moves.push({ runner: batter, from: 'batter', to: 1 })
+  }
+
+  return { nextRunners: next, runsScored, outs_added, moves, events }
 }
 
 // ============================================================

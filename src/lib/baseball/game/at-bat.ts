@@ -185,11 +185,15 @@ export function runAtBat(
             defenceLineup,
             { battingScore: ctx.battingScore, defenseScore: ctx.defenseScore },
             { inning, isTop },
+            ctx.outs,
           )
 
           events.push(...runnerEvents)
 
-          const atBatOut = batting.at_bat_result === 'strikeout' || batting.at_bat_result === 'out' ? 1 : 0
+          const atBatOut =
+            batting.at_bat_result === 'strikeout' ? 1 :
+            batting.at_bat_result === 'out'       ? 1 :
+            0  // double_play / fielders_choice → outs_added는 resolveInfieldOut에 위임
           const outs_added = atBatOut + runnerOuts
 
           return {
@@ -333,11 +337,15 @@ export function runAtBat(
         defenceLineup,
         { battingScore: ctx.battingScore, defenseScore: ctx.defenseScore },
         { inning, isTop },
+        ctx.outs,
       )
 
       events.push(...runnerEvents)
 
-      const atBatOut = batting.at_bat_result === 'strikeout' || batting.at_bat_result === 'out' ? 1 : 0
+      const atBatOut =
+        batting.at_bat_result === 'strikeout' ? 1 :
+        batting.at_bat_result === 'out'       ? 1 :
+        0  // double_play / fielders_choice は resolveInfieldOut の outs_added に委譲
       const outs_added = atBatOut + runnerOuts
 
       return {
