@@ -233,6 +233,7 @@ function resolveRunnerAdvances(
   stealState?:    StealState,
   defenceLineup?: Player[],
   scoreContext?:  { battingScore: number; defenseScore: number },
+  inningCtx?:     { inning: number; isTop: boolean },
 ): { nextRunners: Runners; runsScored: number; outs_added: number; moves: RunnerMove[]; events: GameEvent[] } {
   const lineup      = defenceLineup ?? []
   const fielder_pos = getFielderPos(hp)
@@ -452,11 +453,10 @@ function resolveRunnerAdvances(
           nextTarget === '2B' ? 2 :
           nextTarget === '3B' ? 3 : 'home'
 
-        // secondary_throw 이벤트 기록 (inning/isTop은 at-bat.ts에서 패치)
         events.push({
           type:    'secondary_throw',
-          inning:  0,
-          isTop:   false,
+          inning:  inningCtx?.inning  ?? 0,
+          isTop:   inningCtx?.isTop   ?? false,
           payload: {
             receiver:     recv,
             receiver_pos: recv_pos,
@@ -594,6 +594,7 @@ export function advanceRunners(
   stealState?:    StealState,
   defenceLineup?: Player[],
   scoreContext?:  { battingScore: number; defenseScore: number },
+  inningCtx?:     { inning: number; isTop: boolean },
 ): AdvanceResult {
   if (result === 'walk' || result === 'hit_by_pitch') {
     const r = forceAdvance(runners, batter)
@@ -614,7 +615,7 @@ export function advanceRunners(
 
   if (result === 'single') {
     // resolveRunnerAdvances로 기존 주자 전원 처리
-    const adv = resolveRunnerAdvances('single', runners, hitPhysics, stealState, defenceLineup, scoreContext)
+    const adv = resolveRunnerAdvances('single', runners, hitPhysics, stealState, defenceLineup, scoreContext, inningCtx)
     runsScored += adv.runsScored
     outs_added += adv.outs_added
     moves.push(...adv.moves)
@@ -633,7 +634,7 @@ export function advanceRunners(
 
   } else if (result === 'double') {
     // resolveRunnerAdvances로 기존 주자 전원 처리
-    const adv = resolveRunnerAdvances('double', runners, hitPhysics, stealState, defenceLineup, scoreContext)
+    const adv = resolveRunnerAdvances('double', runners, hitPhysics, stealState, defenceLineup, scoreContext, inningCtx)
     runsScored += adv.runsScored
     outs_added += adv.outs_added
     moves.push(...adv.moves)

@@ -184,12 +184,10 @@ export function runAtBat(
             stealStateForAdvance,
             defenceLineup,
             { battingScore: ctx.battingScore, defenseScore: ctx.defenseScore },
+            { inning, isTop },
           )
 
-          // secondary_throw 등 추가 이벤트에 inning/isTop 패치
-          for (const evt of runnerEvents) {
-            events.push({ ...evt, inning, isTop })
-          }
+          events.push(...runnerEvents)
 
           const atBatOut = batting.at_bat_result === 'strikeout' || batting.at_bat_result === 'out' ? 1 : 0
           const outs_added = atBatOut + runnerOuts
@@ -334,12 +332,10 @@ export function runAtBat(
         undefined,
         defenceLineup,
         { battingScore: ctx.battingScore, defenseScore: ctx.defenseScore },
+        { inning, isTop },
       )
 
-      // secondary_throw 등 추가 이벤트에 inning/isTop 패치
-      for (const evt of runnerEvents) {
-        events.push({ ...evt, inning, isTop })
-      }
+      events.push(...runnerEvents)
 
       const atBatOut = batting.at_bat_result === 'strikeout' || batting.at_bat_result === 'out' ? 1 : 0
       const outs_added = atBatOut + runnerOuts
