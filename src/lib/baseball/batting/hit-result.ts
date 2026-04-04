@@ -97,7 +97,7 @@ export function resolveHitResult(
   if (roll < p_out) {
     // 포구 성공 → 아웃
     const catch_setup_time = p_out >= 0.5 ? 0.2 : 0.4
-    return { result: 'out', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield, catch_setup_time }
+    return { result: 'out', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield, ball_type: ballType, catch_setup_time }
   }
   if (roll < p_out + p_error) {
     // 잡을 수 있었지만 실수 → 실책 출루

@@ -686,7 +686,7 @@ function resolveRunnerAdvances(
         // 2차 도전!
         const { player: recv, pos: recv_pos } = getReceiverAtBase(chosenTarget, lineup)
         const secondaryVerdict = resolveSecondaryThrow(
-          recv, recv_pos, nextTarget, t_first_throw, runner, dist_to_next,
+          recv, recv_pos, nextTarget, Math.max(0, t_first_throw - t_arrival), runner, dist_to_next,
         )
 
         const nextToNum: 1 | 2 | 3 | 'home' =

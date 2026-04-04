@@ -12,6 +12,8 @@ import type { GameResult } from '@/lib/baseball/game/types'
 import type { Player } from '@/lib/baseball/types/player'
 import type { TeamWithStats as TW } from '@/lib/baseball/data/teams'
 import type { RunnerAnimEvent } from '@/lib/baseball/game/derive-state'
+import type { AtBatResult } from '@/lib/baseball/batting/types'
+import type { BallType } from '@/lib/baseball/defence/types'
 
 // ============================================================
 // 색상 상수
@@ -205,7 +207,7 @@ function ScoreBanner({
   homeTeam: TW
   awayTeam: TW
 }) {
-  const inningLabel = `${isTop ? '초' : '말'} ${inning}회`
+  const inningLabel = `${inning}회 ${isTop ? '초' : '말'}`
 
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
@@ -244,20 +246,26 @@ function LiveTab({ pb, homeTeam, awayTeam }: {
     <div className="flex flex-1 flex-col sm:flex-row mx-auto w-full max-w-[960px] px-0 sm:px-6 sm:py-4 sm:gap-4">
       {/* 좌: 게임뷰 */}
       <div className="flex flex-col gap-3 p-4 sm:flex-[6] sm:p-0">
-        {/* 상태 헤더 (이닝 + 아웃 + 투구수 표시) */}
+        {/* 상태 헤더 (이닝 + 아웃 + 팀 컬러 밴드) */}
         <ZoneStatus
           inning={liveState.inning}
           isTop={liveState.isTop}
           outs={liveState.outs}
+          battingColor={liveState.isTop ? awayTeam.primary_color : homeTeam.primary_color}
         />
         {/* 스트라이크존 히어로 */}
-        <ZoneVisual pitchDots={liveState.pitchDots} />
+        <ZoneVisual
+          pitchDots={liveState.pitchDots}
+          lastAtBatResult={liveState.lastAtBatResult}
+          lastAtBatBallType={liveState.lastAtBatBallType}
+        />
         {/* 러너 애니메이션 다이아몬드 */}
         <RunnerDiamond
           lastAnimEvent={liveState.lastAnimEvent}
           animSeq={liveState.animSeq}
           inning={liveState.inning}
           isTop={liveState.isTop}
+          dotColor={liveState.isTop ? awayTeam.primary_color : homeTeam.primary_color}
         />
         {/* 볼카운트 */}
         <CountBar count={liveState.count} />
@@ -291,15 +299,31 @@ function LiveTab({ pb, homeTeam, awayTeam }: {
 // ZoneStatus
 // ============================================================
 
-function ZoneStatus({ inning, isTop, outs }: {
-  inning: number
-  isTop:  boolean
-  outs:   number
+function hexToLuminance(hex: string): number {
+  const h = hex.replace('#', '')
+  const r = parseInt(h.slice(0, 2), 16)
+  const g = parseInt(h.slice(2, 4), 16)
+  const b = parseInt(h.slice(4, 6), 16)
+  return 0.299 * r + 0.587 * g + 0.114 * b
+}
+
+function ZoneStatus({ inning, isTop, outs, battingColor }: {
+  inning:       number
+  isTop:        boolean
+  outs:         number
+  battingColor: string
 }) {
+  const textColor = hexToLuminance(battingColor) > 140 ? '#000000cc' : '#ffffffcc'
   return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="font-semibold text-white/80">
-        {isTop ? '초' : '말'} {inning}회
+    <div
+      className="flex items-center justify-between text-sm rounded-md px-3 py-1.5"
+      style={{
+        backgroundColor: `${battingColor}22`,
+        borderLeft: `3px solid ${battingColor}`,
+      }}
+    >
+      <span className="font-semibold" style={{ color: textColor }}>
+        {inning}회 {isTop ? '초' : '말'}
       </span>
       <div className="flex items-center gap-1.5">
         <span className="text-white/40 text-xs mr-1">OUT</span>
@@ -322,7 +346,44 @@ function ZoneStatus({ inning, isTop, outs }: {
 // ZoneVisual — 스트라이크존 히어로
 // ============================================================
 
-function ZoneVisual({ pitchDots }: { pitchDots: ReturnType<typeof useGamePlayback>['liveState']['pitchDots'] }) {
+const AT_BAT_OVERLAY: Record<AtBatResult, { title: string; sub?: string; color: string }> = {
+  in_progress:     { title: '',           color: 'transparent' },
+  strikeout:       { title: '삼진 아웃',   sub: '삼진',           color: '#ef444488' },
+  walk:            { title: '볼넷',        sub: '볼넷 출루',        color: '#3b82f688' },
+  hit_by_pitch:    { title: '사구',        sub: '사구 출루',        color: '#3b82f688' },
+  single:          { title: '안타',        sub: '1루타',            color: '#10b98188' },
+  double:          { title: '2루타',       sub: '2루타',            color: '#10b98188' },
+  triple:          { title: '3루타',       sub: '3루타',            color: '#10b98188' },
+  home_run:        { title: '홈런',        sub: '홈런',             color: '#f59e0b88' },
+  out:             { title: '아웃',        sub: '인플레이 아웃',     color: '#ef444488' },
+  double_play:     { title: '병살타',      sub: '병살',             color: '#ef444488' },
+  fielders_choice: { title: '야수 선택',   sub: '야수 선택',         color: '#f97316aa' },
+  reach_on_error:  { title: '실책',        sub: '실책 출루',         color: '#eab30888' },
+  pickoff_out:     { title: '견제 아웃',   sub: '견제 성공',         color: '#ef444488' },
+  caught_stealing: { title: '도루 실패',   sub: '도루 아웃',         color: '#ef444488' },
+}
+
+const BALL_TYPE_OUT_SUB_OVERLAY: Record<BallType, string> = {
+  grounder:   '땅볼 아웃',
+  fly:        '플라이 아웃',
+  popup:      '팝업 아웃',
+  line_drive: '라인드라이브 아웃',
+}
+
+function ZoneVisual({
+  pitchDots,
+  lastAtBatResult,
+  lastAtBatBallType,
+}: {
+  pitchDots:         ReturnType<typeof useGamePlayback>['liveState']['pitchDots']
+  lastAtBatResult:   AtBatResult | null
+  lastAtBatBallType: BallType | null
+}) {
+  const overlay = lastAtBatResult ? AT_BAT_OVERLAY[lastAtBatResult] : null
+  const outSub  = lastAtBatResult === 'out' && lastAtBatBallType
+    ? BALL_TYPE_OUT_SUB_OVERLAY[lastAtBatBallType]
+    : overlay?.sub
+
   return (
     <div className="flex justify-center">
       <div
@@ -368,6 +429,17 @@ function ZoneVisual({ pitchDots }: { pitchDots: ReturnType<typeof useGamePlaybac
             {dot.num}
           </div>
         ))}
+
+        {/* 타석 결과 오버레이 */}
+        {overlay && overlay.title && (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center rounded-lg backdrop-blur-[2px] transition-opacity duration-300"
+            style={{ backgroundColor: overlay.color }}
+          >
+            <span className="text-white font-bold text-xl leading-tight drop-shadow">{overlay.title}</span>
+            {outSub && <span className="text-white/80 text-xs mt-0.5">{outSub}</span>}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -410,11 +482,13 @@ function RunnerDiamond({
   animSeq,
   inning,
   isTop,
+  dotColor,
 }: {
   lastAnimEvent: RunnerAnimEvent | null
   animSeq:       number
   inning:        number
   isTop:         boolean
+  dotColor:      string
 }) {
   const dotsRef    = useRef<RunnerDot[]>([])
   const keyCounter = useRef(0)
@@ -574,17 +648,19 @@ function RunnerDiamond({
           return (
             <div
               key={dot.key}
-              className="absolute rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.45)] z-10 flex items-center justify-center"
+              className="absolute rounded-full z-10"
               style={{
-                width:      20,
-                height:     20,
-                left:       `${pos.l}%`,
-                top:        `${pos.t}%`,
-                transform:  'translate(-50%,-50%)',
-                opacity:    dot.opacity,
-                transition: `left 0.42s cubic-bezier(0.4,0,0.2,1),
-                             top  0.42s cubic-bezier(0.4,0,0.2,1),
-                             opacity 0.3s ease`,
+                width:           20,
+                height:          20,
+                left:            `${pos.l}%`,
+                top:             `${pos.t}%`,
+                transform:       'translate(-50%,-50%)',
+                opacity:         dot.opacity,
+                backgroundColor: dotColor,
+                boxShadow:       `0 0 8px ${dotColor}99`,
+                transition:      `left 0.42s cubic-bezier(0.4,0,0.2,1),
+                                  top  0.42s cubic-bezier(0.4,0,0.2,1),
+                                  opacity 0.3s ease`,
               }}
             />
           )

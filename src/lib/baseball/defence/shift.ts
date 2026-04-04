@@ -103,7 +103,7 @@ export function applyShift(
   const shifted_positions: ShiftedPosition[] = []
   const shiftedLineup: Player[] = lineup.map(player => {
     const pos       = player.position_1
-    const defaultXY = player.defence_pos ?? FIELDER_DEFAULT_POS[pos]
+    const defaultXY = FIELDER_DEFAULT_POS[pos] ?? player.defence_pos
     if (!defaultXY) return { ...player }
 
     const infield  = INFIELD_SCALE[pos]

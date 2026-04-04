@@ -1,5 +1,7 @@
 import type { GameEvent } from './types'
 import type { Player } from '../types/player'
+import type { AtBatResult } from '../batting/types'
+import type { BallType } from '../defence/types'
 
 // ============================================================
 // Types
@@ -25,12 +27,14 @@ export interface LiveGameState {
   outs:           number
   runners:        { first: boolean; second: boolean; third: boolean }
   count:          { balls: number; strikes: number }
-  currentPitcher: Player
-  currentBatter:  Player
-  onDeck:         Player
-  pitchDots:      PitchDot[]
-  lastAnimEvent:  RunnerAnimEvent | null
-  animSeq:        number
+  currentPitcher:    Player
+  currentBatter:     Player
+  onDeck:            Player
+  pitchDots:         PitchDot[]
+  lastAnimEvent:     RunnerAnimEvent | null
+  animSeq:           number
+  lastAtBatResult:   AtBatResult | null
+  lastAtBatBallType: BallType | null
 }
 
 // ============================================================
@@ -73,8 +77,10 @@ export function deriveState(
   let count           = { balls: 0, strikes: 0 }
   let pitchDots:      PitchDot[] = []
   let pitchNum        = 0
-  let lastAnimEvent:  RunnerAnimEvent | null = null
-  let animSeq         = 0
+  let lastAnimEvent:     RunnerAnimEvent | null = null
+  let animSeq            = 0
+  let lastAtBatResult:   AtBatResult | null = null
+  let lastAtBatBallType: BallType | null    = null
 
   // 투수 — 교체 발생 시 갱신
   let currentHomePitcher = homePitcher
@@ -95,10 +101,14 @@ export function deriveState(
         count    = { balls: 0, strikes: 0 }
         pitchDots = []
         pitchNum  = 0
+        lastAtBatResult   = null
+        lastAtBatBallType = null
         break
       }
 
       case 'pitch': {
+        lastAtBatResult   = null
+        lastAtBatBallType = null
         const p = ev.payload as {
           pitch:      { actual_x: number; actual_z: number; is_strike: boolean }
           swing:      boolean
@@ -130,10 +140,12 @@ export function deriveState(
       }
 
       case 'at_bat_result': {
-        const p = ev.payload as { result: string }
+        const p = ev.payload as { result: AtBatResult; ball_type?: BallType }
         if (['strikeout', 'out', 'pickoff_out', 'caught_stealing'].includes(p.result)) {
           outs++
         }
+        lastAtBatResult   = p.result
+        lastAtBatBallType = p.ball_type ?? null
         // 타자 인덱스 진행
         if (ev.isTop) awayBatterIdx = (awayBatterIdx + 1) % 9
         else          homeBatterIdx = (homeBatterIdx + 1) % 9
@@ -223,5 +235,7 @@ export function deriveState(
     pitchDots,
     lastAnimEvent,
     animSeq,
+    lastAtBatResult,
+    lastAtBatBallType,
   }
 }

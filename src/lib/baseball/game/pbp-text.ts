@@ -1,6 +1,7 @@
 import type { GameEvent } from './types'
 import type { PitchType } from '../types/player'
 import type { AtBatResult } from '../batting/types'
+import type { BallType } from '../defence/types'
 
 // ============================================================
 // 구종 한국어
@@ -75,7 +76,7 @@ const AT_BAT_RESULT_KO: Record<AtBatResult, { title: string; sub?: string }> = {
   double:          { title: '2루타',         sub: '2루타'         },
   triple:          { title: '3루타',         sub: '3루타'         },
   home_run:        { title: '홈런',          sub: '홈런'          },
-  out:             { title: '아웃',          sub: '인플레이 아웃' },
+  out:             { title: '아웃',          sub: '인플레이 아웃' },  // fallback; see atBatResultToText
   double_play:     { title: '병살타',        sub: '병살 (2아웃)'  },
   fielders_choice: { title: '야수 선택',     sub: '야수 선택'     },
   reach_on_error:  { title: '실책',          sub: '실책 출루'     },
@@ -83,8 +84,18 @@ const AT_BAT_RESULT_KO: Record<AtBatResult, { title: string; sub?: string }> = {
   caught_stealing: { title: '도루 실패',     sub: '도루 실패'     },
 }
 
+const BALL_TYPE_OUT_SUB: Record<BallType, string> = {
+  grounder:   '땅볼 아웃',
+  fly:        '플라이 아웃',
+  popup:      '팝업 아웃',
+  line_drive: '라인드라이브 아웃',
+}
+
 export function atBatResultToText(ev: GameEvent): { title: string; sub?: string } {
-  const p      = ev.payload as { result: AtBatResult }
+  const p = ev.payload as { result: AtBatResult; ball_type?: BallType }
+  if (p.result === 'out' && p.ball_type) {
+    return { title: '아웃', sub: BALL_TYPE_OUT_SUB[p.ball_type] }
+  }
   return AT_BAT_RESULT_KO[p.result] ?? { title: p.result }
 }
 

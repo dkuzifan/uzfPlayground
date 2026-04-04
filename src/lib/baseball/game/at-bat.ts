@@ -167,7 +167,7 @@ export function runAtBat(
             type: 'at_bat_result',
             inning,
             isTop,
-            payload: { batter, result: batting.at_bat_result },
+            payload: { batter, result: batting.at_bat_result, ball_type: batting.hit_physics?.ball_type },
           })
           if (batting.at_bat_result === 'reach_on_error' && batting.hit_physics) {
             events.push({
@@ -333,7 +333,7 @@ export function runAtBat(
         type: 'at_bat_result',
         inning,
         isTop,
-        payload: { batter, result: batting.at_bat_result },
+        payload: { batter, result: batting.at_bat_result, ball_type: batting.hit_physics?.ball_type },
       })
       if (batting.at_bat_result === 'reach_on_error' && batting.hit_physics) {
         events.push({
