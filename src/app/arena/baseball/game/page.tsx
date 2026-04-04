@@ -256,6 +256,8 @@ function LiveTab({ pb, homeTeam, awayTeam }: {
         <RunnerDiamond
           lastAnimEvent={liveState.lastAnimEvent}
           animSeq={liveState.animSeq}
+          inning={liveState.inning}
+          isTop={liveState.isTop}
         />
         {/* 볼카운트 */}
         <CountBar count={liveState.count} />
@@ -406,9 +408,13 @@ interface RunnerDot {
 function RunnerDiamond({
   lastAnimEvent,
   animSeq,
+  inning,
+  isTop,
 }: {
   lastAnimEvent: RunnerAnimEvent | null
   animSeq:       number
+  inning:        number
+  isTop:         boolean
 }) {
   const dotsRef    = useRef<RunnerDot[]>([])
   const keyCounter = useRef(0)
@@ -444,11 +450,20 @@ function RunnerDiamond({
     }, 350)
   }, [updateDots])
 
+  // 이닝 변경 시 도트 전체 초기화
+  useEffect(() => {
+    dotsRef.current = []
+    repaint()
+  }, [inning, isTop])  // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (animSeq === prevSeqRef.current || !lastAnimEvent) return
     prevSeqRef.current = animSeq
 
     if (lastAnimEvent.type === 'runner_advance') {
+      // 루프 처리 전 스냅샷: 여러 이동이 동시 처리될 때 posKey 갱신으로 인한 잘못된 lookup 방지
+      const snapshot = [...dotsRef.current]
+
       for (const move of lastAnimEvent.moves) {
         const fromKey = String(move.from)
         const toKey   = String(move.to) === 'home' ? 'home' : String(move.to)
@@ -459,7 +474,6 @@ function RunnerDiamond({
           // 타자: 새 도트 생성 후 이동
           const k = keyCounter.current++
           updateDots(prev => [...prev, { key: k, posKey: 'batter', opacity: 1 }])
-          // rAF으로 배치 후 transition 시작
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
               animatePath(k, wps, total, () => {
@@ -468,8 +482,8 @@ function RunnerDiamond({
             })
           })
         } else {
-          // 기존 주자: fromKey 위치의 도트를 이동
-          const dot = dotsRef.current.find(d => d.posKey === fromKey)
+          // 기존 주자: 스냅샷 기준으로 fromKey 도트 탐색
+          const dot = snapshot.find(d => d.posKey === fromKey)
           if (!dot) continue
           const k = dot.key
           animatePath(k, wps, total, () => {
