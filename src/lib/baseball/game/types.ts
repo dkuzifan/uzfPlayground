@@ -70,6 +70,7 @@ export type GameEventType =
   | 'sac_fly'          // { batter: Player }
   | 'fielding_error'   // { fielder: Player; batter: Player }
   | 'throwing_error'   // { thrower: Player; runner: Player; to: BaseKey; extra_base: BaseKey }
+  | 'shift'            // { direction: 'left'|'right'; pull_tendency: number; shifted_positions: Array<{position,from,to}> }
 
 export interface GameEvent {
   type:    GameEventType

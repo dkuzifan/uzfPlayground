@@ -5,6 +5,7 @@ import { decayFamiliarity } from '../engine/familiarity'
 import { shouldAutoRelieve } from '../engine/stamina'
 import { runAtBat }          from './at-bat'
 import { findCatcher }       from './util'
+import { applyShift }        from '../defence/shift'
 
 // ============================================================
 // runHalfInning
@@ -63,7 +64,14 @@ export function runHalfInning(
       })
     }
 
-    const batter  = lineup[currentIdx]
+    const batter = lineup[currentIdx]
+
+    // 타석 단위 수비 시프트 적용 (원본 defenceLineup 불변)
+    const { shiftedLineup, event: shiftEvent } = applyShift(
+      defenceLineup ?? [], batter, currentPitcher,
+    )
+    events.push({ type: 'shift', inning, isTop, payload: shiftEvent as unknown as Record<string, unknown> })
+
     const outcome = runAtBat(currentPitcher, batter, {
       outs,
       runners,
@@ -75,7 +83,7 @@ export function runHalfInning(
       catcher,
       battingScore: isTop ? scoreAway : scoreHome,
       defenseScore: isTop ? scoreHome : scoreAway,
-    }, defenceLineup)
+    }, shiftedLineup)
 
     events.push(...outcome.events)
 
