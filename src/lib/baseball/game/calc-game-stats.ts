@@ -1,6 +1,6 @@
 import type { Player } from '../types/player'
 import type { GameEvent } from './types'
-import type { BatterGameStats, PitcherGameStats, GameStats } from './stats-types'
+import type { BatterGameStats, PitcherGameStats, FielderGameStats, GameStats } from './stats-types'
 
 // ============================================================
 // calcGameStats — GameEvent[] → GameStats 리듀서
@@ -11,10 +11,12 @@ type TeamInfo = { lineup: Player[]; pitcher: Player; bullpen?: Player[] }
 interface TeamState {
   batters:        Map<string, BatterGameStats>
   pitchers:       Map<string, PitcherGameStats>
+  fielders:       Map<string, FielderGameStats>
   batterOrder:    string[]   // 첫 등장 순서
   pitcherOrder:   string[]   // 등판 순서
   currentPitcher: string     // 현재 마운드 투수 id
   score:          number
+  errorRunners:   Set<string>   // 이닝 내 실책으로 출루한 주자 id (비자책 판단용)
 }
 
 function makeBatterStats(player: Player): BatterGameStats {
@@ -22,7 +24,7 @@ function makeBatterStats(player: Player): BatterGameStats {
 }
 
 function makePitcherStats(player: Player): PitcherGameStats {
-  return { player, outs: 0, H: 0, ER: 0, BB: 0, SO: 0, W: false, L: false, SV: false }
+  return { player, outs: 0, H: 0, R: 0, ER: 0, BB: 0, SO: 0, W: false, L: false, SV: false }
 }
 
 function initTeamState(team: TeamInfo): TeamState {
@@ -32,10 +34,12 @@ function initTeamState(team: TeamInfo): TeamState {
   return {
     batters:        new Map(),
     pitchers,
+    fielders:       new Map(),
     batterOrder:    [],
     pitcherOrder:   [team.pitcher.id],
     currentPitcher: team.pitcher.id,
     score:          0,
+    errorRunners:   new Set(),
   }
 }
 
@@ -45,6 +49,13 @@ function getBatter(state: TeamState, player: Player): BatterGameStats {
     state.batterOrder.push(player.id)
   }
   return state.batters.get(player.id)!
+}
+
+function getFielder(state: TeamState, player: Player): FielderGameStats {
+  if (!state.fielders.has(player.id)) {
+    state.fielders.set(player.id, { player, E: 0 })
+  }
+  return state.fielders.get(player.id)!
 }
 
 function getCurrentPitcher(state: TeamState): PitcherGameStats {
@@ -117,6 +128,11 @@ export function calcGameStats(
             p.BB++
             pendingBatter = { state: offState, id: batter.id }  // 만루 볼넷 RBI 가능
             break
+          case 'reach_on_error':
+            b.AB++
+            // 실책 출루: 안타 없음, 타점 없음
+            pendingBatter = null
+            break
           case 'pickoff_out':
           case 'caught_stealing':
             p.outs++
@@ -126,13 +142,43 @@ export function calcGameStats(
         break
       }
 
+      case 'fielding_error': {
+        // 수비팀 필더의 실책 기록 + 출루 타자를 error_runners에 추가
+        const fielder = event.payload.fielder as Player
+        const batter  = event.payload.batter  as Player
+        getFielder(defState, fielder).E++
+        offState.errorRunners.add(batter.id)
+        break
+      }
+
+      case 'throwing_error': {
+        // 폭투 실책 기록 + 진루 혜택 주자를 error_runners에 추가
+        const thrower = event.payload.thrower as Player
+        const runner  = event.payload.runner  as Player
+        getFielder(defState, thrower).E++
+        offState.errorRunners.add(runner.id)
+        break
+      }
+
       case 'runner_advance': {
         const moves = event.payload.moves as Array<{ runner: Player; from: unknown; to: unknown }>
-        const runsScored = moves.filter(m => m.to === 'home').length
+        const scoringMoves = moves.filter(m => m.to === 'home')
 
-        if (runsScored > 0 && pendingBatter) {
-          const b = pendingBatter.state.batters.get(pendingBatter.id)
-          if (b) b.RBI += runsScored
+        if (scoringMoves.length > 0) {
+          const earnedRuns = scoringMoves.filter(
+            m => !offState.errorRunners.has((m.runner as Player).id)
+          ).length
+
+          // 자책점: 에러 주자가 아닌 득점만 ER에 산입
+          if (earnedRuns > 0) {
+            getCurrentPitcher(defState).ER += earnedRuns
+          }
+
+          // RBI: pendingBatter 존재하고 자책점이 있는 경우만
+          if (pendingBatter && earnedRuns > 0) {
+            const b = pendingBatter.state.batters.get(pendingBatter.id)
+            if (b) b.RBI += earnedRuns
+          }
         }
         pendingBatter = null
         break
@@ -140,8 +186,9 @@ export function calcGameStats(
 
       case 'score': {
         const runs = event.payload.runs_scored as number
-        // 수비팀 투수의 자책점
-        getCurrentPitcher(defState).ER += runs
+        const p = getCurrentPitcher(defState)
+        // 총 실점 (R) 누적
+        p.R += runs
         // 팀 스코어 업데이트 (W/L 판정용)
         offState.score += runs
         break
@@ -152,6 +199,13 @@ export function calcGameStats(
         // SAC F는 타수(AB)에 포함되지 않음
         getBatter(offState, batter).SF++
         pendingBatter = { state: offState, id: batter.id }  // RBI는 runner_advance 이벤트에서 처리
+        break
+      }
+
+      case 'inning_end': {
+        // 이닝 종료: 에러 주자 집합 초기화 (비자책 추적은 이닝 단위)
+        home.errorRunners.clear()
+        away.errorRunners.clear()
         break
       }
 
@@ -189,10 +243,12 @@ export function calcGameStats(
     home: {
       batters:  home.batterOrder.map(id => home.batters.get(id)!),
       pitchers: home.pitcherOrder.map(id => home.pitchers.get(id)!),
+      fielders: Array.from(home.fielders.values()).filter(f => f.E > 0),
     },
     away: {
       batters:  away.batterOrder.map(id => away.batters.get(id)!),
       pitchers: away.pitcherOrder.map(id => away.pitchers.get(id)!),
+      fielders: Array.from(away.fielders.values()).filter(f => f.E > 0),
     },
   }
 }

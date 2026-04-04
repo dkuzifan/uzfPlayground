@@ -274,7 +274,7 @@ export function resolveSecondaryThrow(
   t_first_throw:         number,   // 1차 송구 총 소요 시간 (t_fielding + 1차 throw 비행 시간)
   challenger:            Player,
   original_runner_dist:  number,   // 도전 시작 시점의 목표 베이스까지 거리
-): 'safe' | 'out' {
+): 'safe' | 'out' | 'wild_throw' {
   const runner_speed          = 5.0 + (challenger.stats.running / 100) * 3.0
   const challenger_remaining  = Math.max(0, original_runner_dist - runner_speed * t_first_throw)
 

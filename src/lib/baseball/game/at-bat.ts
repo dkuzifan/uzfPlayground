@@ -169,6 +169,14 @@ export function runAtBat(
             isTop,
             payload: { batter, result: batting.at_bat_result },
           })
+          if (batting.at_bat_result === 'reach_on_error' && batting.hit_physics) {
+            events.push({
+              type: 'fielding_error',
+              inning,
+              isTop,
+              payload: { fielder: batting.hit_physics.fielder, batter },
+            })
+          }
 
           const stealStateForAdvance: StealState = {
             runner:      stealRunner,
@@ -327,6 +335,14 @@ export function runAtBat(
         isTop,
         payload: { batter, result: batting.at_bat_result },
       })
+      if (batting.at_bat_result === 'reach_on_error' && batting.hit_physics) {
+        events.push({
+          type: 'fielding_error',
+          inning,
+          isTop,
+          payload: { fielder: batting.hit_physics.fielder, batter },
+        })
+      }
 
       const { nextRunners, runsScored, moves, outs_added: runnerOuts, events: runnerEvents } = advanceRunners(
         batting.at_bat_result,

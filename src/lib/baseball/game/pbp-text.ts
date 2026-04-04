@@ -78,6 +78,7 @@ const AT_BAT_RESULT_KO: Record<AtBatResult, { title: string; sub?: string }> = {
   out:             { title: '아웃',          sub: '인플레이 아웃' },
   double_play:     { title: '병살타',        sub: '병살 (2아웃)'  },
   fielders_choice: { title: '야수 선택',     sub: '야수 선택'     },
+  reach_on_error:  { title: '실책',          sub: '실책 출루'     },
   pickoff_out:     { title: '견제 아웃',     sub: '견제 성공'     },
   caught_stealing: { title: '도루 실패',     sub: '도루 실패'     },
 }

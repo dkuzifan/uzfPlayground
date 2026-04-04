@@ -10,6 +10,7 @@ import {
   findResponsibleFielder,
   calcCatchProbability,
 } from '../defence/catch-probability'
+import { ERROR_COEFF } from '../game/config'
 
 // ============================================================
 // 방향별 펜스 거리
@@ -89,11 +90,18 @@ export function resolveHitResult(
   // 6. 포구 확률 계산
   const p_out = calcCatchProbability(ballType, dist, physics.v_roll_0, physics.t_bounce, fielder)
 
-  // 7. 아웃 판정
-  if (Math.random() < p_out) {
-    // 포구 난이도별 준비 시간: 어려운 포구(p_out < 0.5)는 다이빙 캐치 등으로 0.4s
+  // 7. 아웃/실책/안타 3분법 판정
+  const p_error = p_out * ERROR_COEFF
+  const roll    = Math.random()
+
+  if (roll < p_out) {
+    // 포구 성공 → 아웃
     const catch_setup_time = p_out >= 0.5 ? 0.2 : 0.4
     return { result: 'out', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield, catch_setup_time }
+  }
+  if (roll < p_out + p_error) {
+    // 잡을 수 있었지만 실수 → 실책 출루
+    return { result: 'reach_on_error', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield, is_error: true }
   }
 
   // 8. 히트 종류 결정 (거리 기반)

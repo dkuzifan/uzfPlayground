@@ -356,7 +356,7 @@ function resolveOutfieldFlyOut(
       type: 'tag_up',
       inning,
       isTop,
-      payload: { runner, from: fromBase, to: toNum, safe: verdict === 'safe' },
+      payload: { runner, from: fromBase, to: toNum, safe: verdict !== 'out' },
     })
 
     if (verdict === 'safe') {
@@ -372,6 +372,32 @@ function resolveOutfieldFlyOut(
         if (nextKey === '3B') nextRunners.third  = runner
       }
       moves.push({ runner, from: fromBase, to: toNum })
+    } else if (verdict === 'wild_throw') {
+      // 폭투: nextKey 통과 + extra 1베이스
+      if (fromBase === 1) nextRunners.first  = null
+      if (fromBase === 2) nextRunners.second = null
+      if (fromBase === 3) nextRunners.third  = null
+
+      const extraBase  = getNextBase(nextKey)
+      const finalBase  = extraBase ?? 'home'
+      const finalToNum: 1 | 2 | 3 | 'home' =
+        finalBase === '1B' ? 1 : finalBase === '2B' ? 2 : finalBase === '3B' ? 3 : 'home'
+
+      events.push({
+        type:    'throwing_error',
+        inning,
+        isTop,
+        payload: { thrower: hp.fielder, runner, to: nextKey, extra_base: finalBase },
+      })
+
+      if (finalBase === 'home') {
+        runsScored++
+      } else {
+        if (finalBase === '1B') nextRunners.first  = runner
+        if (finalBase === '2B') nextRunners.second = runner
+        if (finalBase === '3B') nextRunners.third  = runner
+      }
+      moves.push({ runner, from: fromBase, to: finalToNum })
     } else {
       // 태그업 아웃
       if (fromBase === 1) nextRunners.first  = null
@@ -543,7 +569,7 @@ function resolveRunnerAdvances(
   }
 
   // 주 타깃 주자 처리용 내부 throwVerdict
-  function throwVerdictForTarget(runner: Player, runner_dist: number, targetBase: BaseKey): 'safe' | 'out' {
+  function throwVerdictForTarget(runner: Player, runner_dist: number, targetBase: BaseKey): 'safe' | 'out' | 'wild_throw' {
     const targetPos  = BASE_POS[targetBase]
     const throw_dist = euclidDist(fielder_pos, targetPos)
     const relayMan   = selectRelayMan(fielder_pos, lineup)
@@ -553,6 +579,34 @@ function resolveRunnerAdvances(
     return useRelay
       ? resolveRelayThrow(fielder, fielder_pos, relayMan, targetPos, hp.t_fielding, runner, runner_dist)
       : resolveThrow(fielder, throw_dist, hp.t_fielding, runner, runner_dist)
+  }
+
+  // wild_throw 처리 헬퍼 — 주자를 목표 베이스 + 1로 이동
+  function applyWildThrow(
+    runner:     Player,
+    fromNum:    1 | 2 | 3 | 'batter',
+    targetBase: BaseKey,
+  ): void {
+    const extraBase  = getNextBase(targetBase)
+    const finalBase  = extraBase ?? 'home'
+    const finalToNum: 1 | 2 | 3 | 'home' =
+      finalBase === '1B' ? 1 : finalBase === '2B' ? 2 : finalBase === '3B' ? 3 : 'home'
+
+    events.push({
+      type:    'throwing_error',
+      inning:  inningCtx?.inning ?? 0,
+      isTop:   inningCtx?.isTop  ?? false,
+      payload: { thrower: fielder, runner, to: targetBase, extra_base: finalBase },
+    })
+
+    if (finalBase === 'home') {
+      runsScored++
+    } else {
+      if (finalBase === '1B') nextRunners.first  = runner
+      if (finalBase === '2B') nextRunners.second = runner
+      if (finalBase === '3B') nextRunners.third  = runner
+    }
+    moves.push({ runner, from: fromNum, to: finalToNum })
   }
 
   // 도전 주자 처리
@@ -570,8 +624,10 @@ function resolveRunnerAdvances(
 
       if (verdict === 'out') {
         outs_added++
-        // moves에 아웃으로 기록 (to는 시도한 베이스)
         moves.push({ runner, from: fromNum, to: toNum })
+      } else if (verdict === 'wild_throw') {
+        // 폭투: 목표 베이스 안착 + extra 1베이스
+        applyWildThrow(runner, fromNum, targetBase)
       } else {
         // Safe!
         if (targetBase === 'home') {
@@ -653,14 +709,37 @@ function resolveRunnerAdvances(
 
         if (secondaryVerdict === 'out') {
           outs_added++
-          // nextRunners에서 제거 (원래 목표 베이스에서 아웃)
           if (targetBase === '1B') nextRunners.first  = null
           if (targetBase === '2B') nextRunners.second = null
           if (targetBase === '3B') nextRunners.third  = null
-          // moves에서 이 주자의 이전 이동 제거 (아웃이므로)
           const mi = moves.findIndex(m => m.runner.id === runner.id && m.to === toNum)
           if (mi >= 0) moves.splice(mi, 1)
           moves.push({ runner, from: fromNum, to: nextToNum })
+        } else if (secondaryVerdict === 'wild_throw') {
+          // 2차 폭투: nextTarget + extra 1베이스
+          if (targetBase === '1B') nextRunners.first  = null
+          if (targetBase === '2B') nextRunners.second = null
+          if (targetBase === '3B') nextRunners.third  = null
+          const mi = moves.findIndex(m => m.runner.id === runner.id && m.to === toNum)
+          if (mi >= 0) moves.splice(mi, 1)
+          const extra    = getNextBase(nextTarget)
+          const finalBase = extra ?? 'home'
+          const finalToNum2: 1|2|3|'home' =
+            finalBase === '1B' ? 1 : finalBase === '2B' ? 2 : finalBase === '3B' ? 3 : 'home'
+          events.push({
+            type:    'throwing_error',
+            inning:  inningCtx?.inning ?? 0,
+            isTop:   inningCtx?.isTop  ?? false,
+            payload: { thrower: recv, runner, to: nextTarget, extra_base: finalBase },
+          })
+          if (finalBase === 'home') {
+            runsScored++
+          } else {
+            if (finalBase === '1B') nextRunners.first  = runner
+            if (finalBase === '2B') nextRunners.second = runner
+            if (finalBase === '3B') nextRunners.third  = runner
+          }
+          moves.push({ runner, from: fromNum, to: finalToNum2 })
         } else {
           // 2차 도전 성공! 다음 베이스로 이동
           if (targetBase === '1B') nextRunners.first  = null
@@ -699,7 +778,7 @@ function resolveBatterAdvance(batter: Player, hp: HitResultDetail): 1 | 2 {
   const throw_dist   = euclidDist(fielder_pos, BASE_POS['2B'])
   const runner_dist  = calcRemainingTo2B(hp.t_ball_travel, batter)
   const verdict      = resolveThrow(hp.fielder, throw_dist, hp.t_fielding, batter, runner_dist)
-  return verdict === 'safe' ? 2 : 1
+  return (verdict === 'safe' || verdict === 'wild_throw') ? 2 : 1
 }
 
 // ============================================================
@@ -722,6 +801,12 @@ export function advanceRunners(
 ): AdvanceResult {
   if (result === 'walk' || result === 'hit_by_pitch') {
     return forceAdvance(runners, batter)
+  }
+
+  // 실책 출루 → single과 동일 경로 (기존 주자 진루 + 타자 1루)
+  if (result === 'reach_on_error') {
+    return advanceRunners('single', runners, batter, hitPhysics, stealState,
+      defenceLineup, scoreContext, inningCtx, outs)
   }
 
   // 내야 그라운더 아웃 → 병살/야수선택/포스아웃 처리

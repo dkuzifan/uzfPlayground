@@ -27,12 +27,22 @@ export interface PitcherGameStats {
   player: Player
   outs:   number   // 내부 이닝 표현 (아웃 수 정수). 표시 시 formatIP() 사용
   H:      number   // 피안타
-  ER:     number   // 자책점 (수비 에러 미구현 → 모든 실점을 자책점으로 처리)
+  R:      number   // 총 실점 (자책 + 비자책)
+  ER:     number   // 자책점
   BB:     number   // 볼넷 허용 (HBP 포함)
   SO:     number   // 탈삼진
   W:      boolean  // 승
   L:      boolean  // 패
   SV:     boolean  // 세이브
+}
+
+// ============================================================
+// 수비수 성적
+// ============================================================
+
+export interface FielderGameStats {
+  player: Player
+  E:      number   // 실책 수
 }
 
 // ============================================================
@@ -42,6 +52,7 @@ export interface PitcherGameStats {
 export interface TeamGameStats {
   batters:  BatterGameStats[]   // 타순 순서
   pitchers: PitcherGameStats[]  // 등판 순서
+  fielders: FielderGameStats[]  // 실책 기록 수비수 (E > 0인 경우)
 }
 
 export interface GameStats {

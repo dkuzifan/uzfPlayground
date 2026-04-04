@@ -68,7 +68,8 @@ export type GameEventType =
   | 'force_out'        // { runner: Player; from: 1|2|3; to: 2|3|'home' }
   | 'tag_up'           // { runner: Player; from: 1|2|3; to: 1|2|3|'home'; safe: boolean }
   | 'sac_fly'          // { batter: Player }
-  // 향후 추가: 'error'
+  | 'fielding_error'   // { fielder: Player; batter: Player }
+  | 'throwing_error'   // { thrower: Player; runner: Player; to: BaseKey; extra_base: BaseKey }
 
 export interface GameEvent {
   type:    GameEventType

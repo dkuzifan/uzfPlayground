@@ -1,4 +1,5 @@
 import type { Player, Position } from '../types/player'
+import { THROW_ERROR_COEFF } from '../game/config'
 
 // ============================================================
 // Vec2 — 2D 좌표 타입
@@ -68,7 +69,7 @@ export function resolveThrow(
   t_fielding:  number,
   runner:      Player,
   runner_dist: number,
-): 'safe' | 'out' {
+): 'safe' | 'out' | 'wild_throw' {
   const throw_speed  = (80 + thrower.stats.throw * 0.7) / 3.6   // m/s
   const runner_speed = 5.0 + (runner.stats.running / 100) * 3.0  // m/s
 
@@ -80,7 +81,17 @@ export function resolveThrow(
   const margin = t_total - t_runner
   const p_safe = sigmoid(margin, 0.5)
 
-  return Math.random() < p_safe ? 'safe' : 'out'
+  const verdict = Math.random() < p_safe ? 'safe' : 'out'
+
+  // 아웃 직전에만 폭투 가능 (safe는 이미 주자 유리)
+  if (verdict === 'out') {
+    const p_throw_error = THROW_ERROR_COEFF
+      * (1 - thrower.stats.throw / 100)
+      * Math.max(0.3, Math.min(1.0, throw_dist / 60))
+    if (Math.random() < p_throw_error) return 'wild_throw'
+  }
+
+  return verdict
 }
 
 // ============================================================
@@ -192,7 +203,7 @@ export function resolveRelayThrow(
   t_fielding:   number,
   runner:       Player,
   runner_dist:  number,
-): 'safe' | 'out' {
+): 'safe' | 'out' | 'wild_throw' {
   const spd_OF    = (80 + fielder.stats.throw  * 0.7) / 3.6
   const spd_relay = (80 + relayMan.stats.throw * 0.7) / 3.6
   const relay_pos = calcRelayPos(fielder_pos, targetPos)
@@ -206,7 +217,17 @@ export function resolveRelayThrow(
   const t_runner     = runner_dist / runner_speed
   const margin       = t_total - t_runner
 
-  return Math.random() < sigmoid(margin, 0.5) ? 'safe' : 'out'
+  const verdict = Math.random() < sigmoid(margin, 0.5) ? 'safe' : 'out'
+
+  if (verdict === 'out') {
+    const throw_dist    = euclidDist(relay_pos, targetPos)
+    const p_throw_error = THROW_ERROR_COEFF
+      * (1 - relayMan.stats.throw / 100)
+      * Math.max(0.3, Math.min(1.0, throw_dist / 60))
+    if (Math.random() < p_throw_error) return 'wild_throw'
+  }
+
+  return verdict
 }
 
 // ============================================================
