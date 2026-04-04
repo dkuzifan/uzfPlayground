@@ -13,6 +13,11 @@ export interface PitchDot {
   isLatest: boolean
 }
 
+export type RunnerAnimEvent =
+  | { type: 'runner_advance'; moves: Array<{ from: 1|2|3|'batter'; to: 1|2|3|'home' }> }
+  | { type: 'steal_result';   from: 1|2; to: 2|3|'home'; success: boolean }
+  | { type: 'tag_up';         from: 1|2|3; to: 1|2|3|'home'; safe: boolean }
+
 export interface LiveGameState {
   score:          { home: number; away: number }
   inning:         number
@@ -24,6 +29,8 @@ export interface LiveGameState {
   currentBatter:  Player
   onDeck:         Player
   pitchDots:      PitchDot[]
+  lastAnimEvent:  RunnerAnimEvent | null
+  animSeq:        number
 }
 
 // ============================================================
@@ -66,6 +73,8 @@ export function deriveState(
   let count           = { balls: 0, strikes: 0 }
   let pitchDots:      PitchDot[] = []
   let pitchNum        = 0
+  let lastAnimEvent:  RunnerAnimEvent | null = null
+  let animSeq         = 0
 
   // 투수 — 교체 발생 시 갱신
   let currentHomePitcher = homePitcher
@@ -137,22 +146,25 @@ export function deriveState(
 
       case 'runner_advance': {
         const p = ev.payload as {
-          moves: Array<{ from: 1 | 2 | 3 | 'batter'; to: 1 | 2 | 3 | 'home' }>
+          moves: Array<{ runner: Player; from: 1|2|3|'batter'; to: 1|2|3|'home' }>
         }
         const r = { ...runners }
-        // 출발 베이스 비우기
         for (const move of p.moves) {
           if (move.from === 1) r.first  = false
           if (move.from === 2) r.second = false
           if (move.from === 3) r.third  = false
         }
-        // 도착 베이스 채우기
         for (const move of p.moves) {
           if (move.to === 1) r.first  = true
           if (move.to === 2) r.second = true
           if (move.to === 3) r.third  = true
         }
         runners = r
+        lastAnimEvent = {
+          type:  'runner_advance',
+          moves: p.moves.map(m => ({ from: m.from, to: m.to })),
+        }
+        animSeq++
         break
       }
 
@@ -164,21 +176,29 @@ export function deriveState(
 
       case 'pitching_change': {
         const p = ev.payload as { incoming: Player }
-        // isTop: away 공격 → home 투수 교체
         if (ev.isTop) currentHomePitcher = p.incoming
         else          currentAwayPitcher = p.incoming
         break
       }
 
       case 'steal_result': {
-        const p = ev.payload as { success: boolean }
+        const p = ev.payload as { runner: Player; from: 1|2; to: 2|3|'home'; success: boolean }
         if (!p.success) outs++
+        lastAnimEvent = { type: 'steal_result', from: p.from, to: p.to, success: p.success }
+        animSeq++
         break
       }
 
       case 'pickoff_result': {
         const p = ev.payload as { out: boolean }
         if (p.out) outs++
+        break
+      }
+
+      case 'tag_up': {
+        const p = ev.payload as { runner: Player; from: 1|2|3; to: 1|2|3|'home'; safe: boolean }
+        lastAnimEvent = { type: 'tag_up', from: p.from, to: p.to, safe: p.safe }
+        animSeq++
         break
       }
     }
@@ -201,5 +221,7 @@ export function deriveState(
     currentBatter,
     onDeck,
     pitchDots,
+    lastAnimEvent,
+    animSeq,
   }
 }

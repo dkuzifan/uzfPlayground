@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useReducer, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { loadGameConfig } from '@/lib/baseball/data/game-config'
 import { getTeamById, type TeamWithStats } from '@/lib/baseball/data/teams'
@@ -11,6 +11,7 @@ import { useGamePlayback, type PBPGroup, type AtBatGroup, type Speed } from '@/h
 import type { GameResult } from '@/lib/baseball/game/types'
 import type { Player } from '@/lib/baseball/types/player'
 import type { TeamWithStats as TW } from '@/lib/baseball/data/teams'
+import type { RunnerAnimEvent } from '@/lib/baseball/game/derive-state'
 
 // ============================================================
 // 색상 상수
@@ -251,8 +252,13 @@ function LiveTab({ pb, homeTeam, awayTeam }: {
         />
         {/* 스트라이크존 히어로 */}
         <ZoneVisual pitchDots={liveState.pitchDots} />
-        {/* 주자 + 볼카운트 */}
-        <ZoneFooter runners={liveState.runners} count={liveState.count} />
+        {/* 러너 애니메이션 다이아몬드 */}
+        <RunnerDiamond
+          lastAnimEvent={liveState.lastAnimEvent}
+          animSeq={liveState.animSeq}
+        />
+        {/* 볼카운트 */}
+        <CountBar count={liveState.count} />
         {/* 매치업 */}
         <MatchupBar
           pitcher={liveState.currentPitcher}
@@ -366,48 +372,224 @@ function ZoneVisual({ pitchDots }: { pitchDots: ReturnType<typeof useGamePlaybac
 }
 
 // ============================================================
-// ZoneFooter — 주자 + 볼카운트
+// RunnerDiamond — 애니메이션 다이아몬드
 // ============================================================
 
-function ZoneFooter({
-  runners, count,
-}: {
-  runners: { first: boolean; second: boolean; third: boolean }
-  count:   { balls: number; strikes: number }
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      {/* 다이아몬드 */}
-      <div className="relative" style={{ width: 64, height: 52 }}>
-        {/* 2루 */}
-        <Base active={runners.second} style={{ top: 2, left: '50%', transform: 'translateX(-50%) rotate(45deg)' }} />
-        {/* 3루 */}
-        <Base active={runners.third} style={{ top: '50%', left: 4, transform: 'translateY(-50%) rotate(45deg)' }} />
-        {/* 1루 */}
-        <Base active={runners.first} style={{ top: '50%', right: 4, transform: 'translateY(-50%) rotate(45deg)' }} />
-        {/* 홈 */}
-        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-white/20 rounded-sm" />
-      </div>
+// 베이스 좌표 (컨테이너 % 기준, 230×210 비율)
+const DIAMOND_POS: Record<string, { l: number; t: number }> = {
+  batter: { l: 50,   t: 95.5 },
+  home:   { l: 50,   t: 88   },
+  '1':    { l: 87,   t: 52.4 },
+  '2':    { l: 50,   t: 14.3 },
+  '3':    { l: 13,   t: 52.4 },
+}
 
-      {/* 볼카운트 */}
-      <div className="flex items-center gap-3 text-sm">
-        <CountRow label="B" count={count.balls}   total={4} dotClass="bg-blue-500"   />
-        <CountRow label="S" count={count.strikes} total={3} dotClass="bg-red-500"    />
+const BASE_PATH_ORDER = ['batter', '1', '2', '3', 'home'] as const
+
+function getWaypoints(from: string, to: string): string[] {
+  const fi = BASE_PATH_ORDER.indexOf(from as typeof BASE_PATH_ORDER[number])
+  const ti = BASE_PATH_ORDER.indexOf(to   as typeof BASE_PATH_ORDER[number])
+  if (fi === -1 || ti === -1 || ti <= fi) return [to]
+  return [...BASE_PATH_ORDER.slice(fi + 1, ti + 1)]
+}
+
+function hopMs(totalHops: number): number {
+  return totalHops <= 1 ? 480 : totalHops === 2 ? 380 : 300
+}
+
+interface RunnerDot {
+  key:    number
+  posKey: string
+  opacity: number
+}
+
+function RunnerDiamond({
+  lastAnimEvent,
+  animSeq,
+}: {
+  lastAnimEvent: RunnerAnimEvent | null
+  animSeq:       number
+}) {
+  const dotsRef    = useRef<RunnerDot[]>([])
+  const keyCounter = useRef(0)
+  const prevSeqRef = useRef(-1)
+  const [, repaint] = useReducer((x: number) => x + 1, 0)
+
+  const updateDots = useCallback((updater: (prev: RunnerDot[]) => RunnerDot[]) => {
+    dotsRef.current = updater(dotsRef.current)
+    repaint()
+  }, [])
+
+  // 주어진 key의 도트를 waypoints 순서대로 이동, 완료 시 onDone 호출
+  const animatePath = useCallback((
+    dotKey:    number,
+    waypoints: string[],
+    total:     number,
+    onDone?:   () => void,
+  ) => {
+    if (waypoints.length === 0) { onDone?.(); return }
+    const [next, ...rest] = waypoints
+    updateDots(prev => prev.map(d =>
+      d.key === dotKey ? { ...d, posKey: next } : d
+    ))
+    setTimeout(() => animatePath(dotKey, rest, total, onDone), hopMs(total))
+  }, [updateDots])
+
+  const fadeOut = useCallback((dotKey: number) => {
+    updateDots(prev => prev.map(d =>
+      d.key === dotKey ? { ...d, opacity: 0 } : d
+    ))
+    setTimeout(() => {
+      updateDots(prev => prev.filter(d => d.key !== dotKey))
+    }, 350)
+  }, [updateDots])
+
+  useEffect(() => {
+    if (animSeq === prevSeqRef.current || !lastAnimEvent) return
+    prevSeqRef.current = animSeq
+
+    if (lastAnimEvent.type === 'runner_advance') {
+      for (const move of lastAnimEvent.moves) {
+        const fromKey = String(move.from)
+        const toKey   = String(move.to) === 'home' ? 'home' : String(move.to)
+        const wps     = getWaypoints(fromKey, toKey)
+        const total   = wps.length
+
+        if (fromKey === 'batter') {
+          // 타자: 새 도트 생성 후 이동
+          const k = keyCounter.current++
+          updateDots(prev => [...prev, { key: k, posKey: 'batter', opacity: 1 }])
+          // rAF으로 배치 후 transition 시작
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              animatePath(k, wps, total, () => {
+                if (toKey === 'home') fadeOut(k)
+              })
+            })
+          })
+        } else {
+          // 기존 주자: fromKey 위치의 도트를 이동
+          const dot = dotsRef.current.find(d => d.posKey === fromKey)
+          if (!dot) continue
+          const k = dot.key
+          animatePath(k, wps, total, () => {
+            if (toKey === 'home') fadeOut(k)
+          })
+        }
+      }
+    }
+
+    if (lastAnimEvent.type === 'steal_result') {
+      const fromKey = String(lastAnimEvent.from)
+      const toKey   = String(lastAnimEvent.to) === 'home' ? 'home' : String(lastAnimEvent.to)
+      const wps     = getWaypoints(fromKey, toKey)
+      const total   = wps.length
+      const dot     = dotsRef.current.find(d => d.posKey === fromKey)
+      if (dot) {
+        animatePath(dot.key, wps, total, () => {
+          if (!lastAnimEvent.success || toKey === 'home') fadeOut(dot.key)
+        })
+      }
+    }
+
+    if (lastAnimEvent.type === 'tag_up') {
+      const fromKey = String(lastAnimEvent.from)
+      const toKey   = String(lastAnimEvent.to) === 'home' ? 'home' : String(lastAnimEvent.to)
+      const dot     = dotsRef.current.find(d => d.posKey === fromKey)
+      if (dot) {
+        if (!lastAnimEvent.safe) {
+          fadeOut(dot.key)
+        } else {
+          const wps   = getWaypoints(fromKey, toKey)
+          const total = wps.length
+          animatePath(dot.key, wps, total, () => {
+            if (toKey === 'home') fadeOut(dot.key)
+          })
+        }
+      }
+    }
+  }, [animSeq, lastAnimEvent, animatePath, fadeOut, updateDots])
+
+  const dots = dotsRef.current
+
+  return (
+    <div className="flex justify-center py-1">
+      <div
+        className="relative"
+        style={{ width: 'min(230px, 72vw)', aspectRatio: '230 / 210' }}
+      >
+        {/* SVG 베이스 경로 */}
+        <svg
+          viewBox="0 0 230 210"
+          className="absolute inset-0 w-full h-full overflow-visible"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          <polyline
+            points="115,185 200,110 115,30 30,110 115,185"
+            fill="none"
+            stroke="rgba(255,255,255,0.13)"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+        </svg>
+
+        {/* 홈플레이트 */}
+        <div
+          className="absolute bg-white/10 border border-white/22 rounded-sm"
+          style={{ left: '50%', top: '88%', width: 15, height: 9, transform: 'translate(-50%,-50%)' }}
+        />
+        {/* 1루 */}
+        <div
+          className="absolute border-[1.5px] border-white/30 rounded-sm"
+          style={{ left: '87%', top: '52.4%', width: 13, height: 13, transform: 'translate(-50%,-50%) rotate(45deg)' }}
+        />
+        {/* 2루 */}
+        <div
+          className="absolute border-[1.5px] border-white/30 rounded-sm"
+          style={{ left: '50%', top: '14.3%', width: 13, height: 13, transform: 'translate(-50%,-50%) rotate(45deg)' }}
+        />
+        {/* 3루 */}
+        <div
+          className="absolute border-[1.5px] border-white/30 rounded-sm"
+          style={{ left: '13%', top: '52.4%', width: 13, height: 13, transform: 'translate(-50%,-50%) rotate(45deg)' }}
+        />
+
+        {/* 주자 도트 */}
+        {dots.map(dot => {
+          const pos = DIAMOND_POS[dot.posKey] ?? DIAMOND_POS.home
+          return (
+            <div
+              key={dot.key}
+              className="absolute rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.45)] z-10 flex items-center justify-center"
+              style={{
+                width:      20,
+                height:     20,
+                left:       `${pos.l}%`,
+                top:        `${pos.t}%`,
+                transform:  'translate(-50%,-50%)',
+                opacity:    dot.opacity,
+                transition: `left 0.42s cubic-bezier(0.4,0,0.2,1),
+                             top  0.42s cubic-bezier(0.4,0,0.2,1),
+                             opacity 0.3s ease`,
+              }}
+            />
+          )
+        })}
       </div>
     </div>
   )
 }
 
-function Base({ active, style }: { active: boolean; style: React.CSSProperties }) {
+// ============================================================
+// CountBar — 볼카운트 (ZoneFooter에서 분리)
+// ============================================================
+
+function CountBar({ count }: { count: { balls: number; strikes: number } }) {
   return (
-    <div
-      className={`absolute w-4 h-4 rounded-sm border ${
-        active
-          ? 'bg-yellow-400 border-yellow-300'
-          : 'bg-white/10 border-white/20'
-      }`}
-      style={style}
-    />
+    <div className="flex items-center justify-center gap-6 text-sm">
+      <CountRow label="B" count={count.balls}   total={4} dotClass="bg-blue-500"   />
+      <CountRow label="S" count={count.strikes} total={3} dotClass="bg-red-500"    />
+    </div>
   )
 }
 

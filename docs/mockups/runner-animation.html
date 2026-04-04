@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>러너 애니메이션 목업</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0a0f;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+    gap: 20px;
+  }
+
+  h2 {
+    font-size: 13px;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .game-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: min(300px, 90vw);
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  /* 스트라이크존 */
+  .strike-zone {
+    position: relative;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    height: 110px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sz-inner {
+    width: 76px; height: 76px;
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 2px;
+    display: grid;
+    grid-template-columns: repeat(3,1fr);
+    grid-template-rows: repeat(3,1fr);
+  }
+  .sz-cell { border: 1px solid rgba(255,255,255,0.08); }
+  .sz-label {
+    position: absolute;
+    font-size: 9px; color: rgba(255,255,255,0.1);
+    letter-spacing: 0.15em;
+  }
+  .pitch-dot {
+    position: absolute;
+    width: 14px; height: 14px;
+    border-radius: 50%; border: 1px solid;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px; font-weight: bold; color: #fff;
+    transform: translate(-50%,-50%);
+  }
+  .dot-ball   { background: rgba(59,130,246,0.8); border-color: #60a5fa; }
+  .dot-strike { background: rgba(239,68,68,0.8);  border-color: #f87171; }
+
+  .divider { height: 1px; background: rgba(255,255,255,0.06); }
+
+  /* RunnerDiamond */
+  .runner-diamond-wrap {
+    display: flex; justify-content: center;
+    padding: 4px 0;
+  }
+  .diamond-container {
+    position: relative;
+    width: min(230px, 72vw);
+    aspect-ratio: 230 / 210;
+  }
+  .diamond-svg {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    overflow: visible;
+  }
+
+  /* 베이스 마커 */
+  .base {
+    position: absolute;
+    width: 13px; height: 13px;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    border-radius: 2px;
+    transform: translate(-50%,-50%) rotate(45deg);
+    background: transparent;
+    transition: background 0.2s, border-color 0.2s;
+    pointer-events: none;
+  }
+  .base.occupied {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.55);
+  }
+  .home-plate {
+    position: absolute;
+    width: 15px; height: 9px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 2px;
+    transform: translate(-50%,-50%);
+    pointer-events: none;
+  }
+
+  /* 주자 도트 */
+  .runner-dot {
+    position: absolute;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px rgba(255,255,255,0.45);
+    transform: translate(-50%,-50%);
+    /* transition은 JS에서 동적으로 설정 */
+    z-index: 10;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px; font-weight: 700; color: #0a0a0f;
+  }
+
+  /* 볼카운트 */
+  .count-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 2px;
+  }
+  .count-group { display: flex; align-items: center; gap: 5px; }
+  .count-label { font-size: 11px; color: rgba(255,255,255,0.3); width: 14px; }
+  .pip {
+    width: 9px; height: 9px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.07);
+    transition: background 0.15s;
+  }
+  .pip.ball   { background: #3b82f6; border-color: transparent; }
+  .pip.strike { background: #ef4444; border-color: transparent; }
+  .pip.out    { background: #facc15; border-color: transparent; }
+
+  /* 컨트롤 */
+  .controls {
+    display: flex; flex-direction: column; gap: 8px;
+    width: min(300px, 90vw);
+  }
+  .ctl-label { font-size: 11px; color: rgba(255,255,255,0.28); }
+  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .btn {
+    padding: 9px 10px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.65); font-size: 12px;
+    cursor: pointer; text-align: left;
+    transition: background 0.15s;
+  }
+  .btn:hover  { background: rgba(255,255,255,0.09); color: #fff; }
+  .btn:active { background: rgba(255,255,255,0.14); }
+  .btn small  { display: block; font-size: 9px; color: rgba(255,255,255,0.25); margin-bottom: 2px; }
+  .btn-wide   { grid-column: 1/-1; text-align: center; color: rgba(255,255,255,0.28); font-size: 11px; }
+
+  .event-log {
+    width: min(300px, 90vw);
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 10px 12px;
+    min-height: 56px; max-height: 96px;
+    overflow-y: auto;
+  }
+  .log-entry { font-size: 11px; color: rgba(255,255,255,0.45); padding: 2px 0; }
+  .log-entry .ev { color: rgba(255,255,255,0.18); margin-right: 6px; font-size: 10px; }
+</style>
+</head>
+<body>
+
+<h2>Runner Animation — 목업</h2>
+
+<div class="game-panel">
+
+  <!-- 스트라이크존 -->
+  <div class="strike-zone">
+    <span class="sz-label">STRIKE ZONE</span>
+    <div class="sz-inner">
+      <div class="sz-cell"></div><div class="sz-cell"></div><div class="sz-cell"></div>
+      <div class="sz-cell"></div><div class="sz-cell"></div><div class="sz-cell"></div>
+      <div class="sz-cell"></div><div class="sz-cell"></div><div class="sz-cell"></div>
+    </div>
+    <div class="pitch-dot dot-ball"   style="left:37%;top:66%">1</div>
+    <div class="pitch-dot dot-strike" style="left:54%;top:41%">2</div>
+    <div class="pitch-dot dot-ball"   style="left:29%;top:34%">3</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- RunnerDiamond -->
+  <div class="runner-diamond-wrap">
+    <div class="diamond-container" id="diamond">
+
+      <svg class="diamond-svg" viewBox="0 0 230 210" preserveAspectRatio="xMidYMid meet">
+        <polyline
+          points="115,185 200,110 115,30 30,110 115,185"
+          fill="none"
+          stroke="rgba(255,255,255,0.13)"
+          stroke-width="1.5"
+          stroke-linejoin="round"
+        />
+      </svg>
+
+      <!-- 홈플레이트 -->
+      <div class="home-plate" style="left:50%;top:88%"></div>
+      <!-- 1루 -->
+      <div class="base" id="b1" style="left:87%;top:52.4%"></div>
+      <!-- 2루 -->
+      <div class="base" id="b2" style="left:50%;top:14.3%"></div>
+      <!-- 3루 -->
+      <div class="base" id="b3" style="left:13%;top:52.4%"></div>
+
+      <!-- 도트는 JS로 추가 -->
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 볼카운트 + 아웃 -->
+  <div class="count-row">
+    <div style="display:flex;gap:10px">
+      <div class="count-group">
+        <span class="count-label">B</span>
+        <div class="pip" id="b0"></div><div class="pip" id="b01"></div>
+        <div class="pip" id="b02"></div><div class="pip" id="b03"></div>
+      </div>
+      <div class="count-group">
+        <span class="count-label">S</span>
+        <div class="pip" id="s0"></div><div class="pip" id="s1"></div><div class="pip" id="s2"></div>
+      </div>
+    </div>
+    <div class="count-group">
+      <span class="count-label">OUT</span>
+      <div class="pip" id="o0"></div><div class="pip" id="o1"></div><div class="pip" id="o2"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 시나리오 버튼 -->
+<div class="controls">
+  <div class="ctl-label">▸ 시나리오 재생</div>
+  <div class="btn-grid">
+
+    <button class="btn" onclick="play_single()">
+      <small>runner_advance</small>
+      단타 (타자→1루)
+    </button>
+
+    <button class="btn" onclick="play_double()">
+      <small>runner_advance</small>
+      2루타 (1루→3루 / 타자→2루)
+    </button>
+
+    <button class="btn" onclick="play_steal_ok()">
+      <small>steal ✓</small>
+      도루 성공 (1→2루)
+    </button>
+
+    <button class="btn" onclick="play_steal_fail()">
+      <small>steal ✗</small>
+      도루 실패 → 2루서 아웃
+    </button>
+
+    <button class="btn" onclick="play_tagup()">
+      <small>tag_up safe</small>
+      태그업 (3루→홈)
+    </button>
+
+    <button class="btn" onclick="play_homerun()">
+      <small>runner_advance (만루)</small>
+      만루 홈런
+    </button>
+
+    <button class="btn btn-wide" onclick="resetAll()">↺ 초기화</button>
+  </div>
+</div>
+
+<div class="event-log" id="log">
+  <div class="log-entry"><span class="ev">—</span>시나리오를 선택하세요</div>
+</div>
+
+<script>
+// ============================================================
+// 베이스 좌표 (diamond-container % 기준)
+// ============================================================
+const POS = {
+  batter: { l: 50,   t: 95.5 },   // 타자 출발 (홈 아래)
+  home:   { l: 50,   t: 88   },   // 홈플레이트
+  '1':    { l: 87,   t: 52.4 },
+  '2':    { l: 50,   t: 14.3 },
+  '3':    { l: 13,   t: 52.4 },
+}
+
+// 순환 순서: batter → 1 → 2 → 3 → home
+const BASE_ORDER = ['batter', '1', '2', '3', 'home']
+
+// from → to 사이의 경유 베이스(포함) 배열
+function getWaypoints(from, to) {
+  const fi = BASE_ORDER.indexOf(String(from))
+  const ti = BASE_ORDER.indexOf(String(to) === 'home' ? 'home' : String(to))
+  if (fi === -1 || ti === -1 || ti <= fi) return [String(to)]
+  return BASE_ORDER.slice(fi + 1, ti + 1)
+}
+
+// ============================================================
+// 상태
+// ============================================================
+let slots = { '1': null, '2': null, '3': null }  // { id, el }
+let uid   = 1
+let balls = 2, strikes = 1, outs = 0
+
+// ============================================================
+// 도트 생성 / 이동 / 페이드
+// ============================================================
+const diamond = document.getElementById('diamond')
+
+function mkDot(id, posKey) {
+  const el = document.createElement('div')
+  el.className = 'runner-dot'
+  el.id = 'rd' + id
+  el.textContent = id
+  const p = POS[posKey] || POS.batter
+  el.style.left    = p.l + '%'
+  el.style.top     = p.t + '%'
+  el.style.opacity = '1'
+  el.style.transition = 'none'
+  diamond.appendChild(el)
+  return el
+}
+
+function HOP_MS(n) {
+  // 베이스 수가 많을수록 홉당 시간 살짝 감소 (전체 체감 속도 유지)
+  return n <= 1 ? 480 : n === 2 ? 380 : 300
+}
+
+// 경유 베이스 순서대로 순차 이동
+// onDone: 마지막 이동 완료 후 콜백
+function animatePath(el, waypoints, onDone) {
+  if (!waypoints || waypoints.length === 0) {
+    onDone && onDone()
+    return
+  }
+  const ms = HOP_MS(waypoints.length)
+  const [next, ...rest] = waypoints
+  const p = POS[next]
+  if (!p) { animatePath(el, rest, onDone); return }
+
+  // transition 설정 후 이동
+  el.style.transition = `left ${ms}ms cubic-bezier(0.4,0,0.2,1), top ${ms}ms cubic-bezier(0.4,0,0.2,1)`
+  // 짧은 delay로 transition 적용 보장
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      el.style.left = p.l + '%'
+      el.style.top  = p.t + '%'
+      setTimeout(() => animatePath(el, rest, onDone), ms)
+    })
+  })
+}
+
+function fadeOut(el, delay = 0) {
+  setTimeout(() => {
+    el.style.transition = 'opacity 0.3s ease'
+    el.style.opacity = '0'
+    setTimeout(() => el.remove(), 350)
+  }, delay)
+}
+
+function setBase(key, runner) {
+  slots[key] = runner
+  const b = document.getElementById('b' + key)
+  if (b) b.className = 'base' + (runner ? ' occupied' : '')
+}
+
+// ============================================================
+// 카운트 표시
+// ============================================================
+function updateCount() {
+  ;[0,1,2,3].forEach(i => {
+    const el = document.getElementById('b0' + i) || document.getElementById('b' + i)
+    // b0, b01, b02, b03 아이디 매핑
+    const ids = ['b0','b01','b02','b03']
+    const e = document.getElementById(ids[i])
+    if (e) e.className = 'pip' + (i < balls ? ' ball' : '')
+  })
+  ;[0,1,2].forEach(i => {
+    const e = document.getElementById('s' + i)
+    if (e) e.className = 'pip' + (i < strikes ? ' strike' : '')
+    const o = document.getElementById('o' + i)
+    if (o) o.className = 'pip' + (i < outs ? ' out' : '')
+  })
+}
+
+// ============================================================
+// 이벤트 로그
+// ============================================================
+function addLog(ev, msg) {
+  const box = document.getElementById('log')
+  const d = document.createElement('div')
+  d.className = 'log-entry'
+  d.innerHTML = `<span class="ev">${ev}</span>${msg}`
+  box.appendChild(d)
+  box.scrollTop = box.scrollHeight
+}
+
+// ============================================================
+// 시나리오
+// ============================================================
+
+function play_single() {
+  addLog('runner_advance', '단타 — 타자 → 1루')
+  const id = uid++
+  const el = mkDot(id, 'batter')
+  const wp = getWaypoints('batter', '1')   // ['1']
+  animatePath(el, wp, () => setBase('1', { id, el }))
+  balls = 0; strikes = 0; updateCount()
+}
+
+function play_double() {
+  addLog('runner_advance', '2루타 — 1루주자→3루, 타자→2루')
+
+  // 1루 주자 → 3루 (1→2→3 경유)
+  if (slots['1']) {
+    const r = slots['1']
+    setBase('1', null)
+    const wp = getWaypoints('1', '3')   // ['2','3']
+    animatePath(r.el, wp, () => setBase('3', r))
+  }
+
+  // 타자 → 2루 (batter→1→2 경유)
+  const id = uid++
+  const el = mkDot(id, 'batter')
+  const wp = getWaypoints('batter', '2')  // ['1','2']
+  animatePath(el, wp, () => setBase('2', { id, el }))
+
+  balls = 0; strikes = 0; updateCount()
+}
+
+function play_steal_ok() {
+  if (!slots['1']) { addLog('—', '1루 주자 없음 — 먼저 단타를 실행하세요'); return }
+  addLog('steal_attempt', '도루 시도 — 1루 → 2루')
+  const r = slots['1']
+  setBase('1', null)
+  const wp = getWaypoints('1', '2')   // ['2']
+  animatePath(r.el, wp, () => {
+    addLog('steal_result ✓', '도루 성공')
+    setBase('2', r)
+  })
+}
+
+function play_steal_fail() {
+  if (!slots['1']) { addLog('—', '1루 주자 없음 — 먼저 단타를 실행하세요'); return }
+  addLog('steal_attempt', '도루 시도 — 1루 → 2루')
+  const r = slots['1']
+  setBase('1', null)
+  const wp = getWaypoints('1', '2')   // ['2']
+  // 2루까지 이동 완료 후 페이드아웃
+  animatePath(r.el, wp, () => {
+    addLog('steal_result ✗', '도루 실패 — 2루서 아웃')
+    fadeOut(r.el)
+    outs = Math.min(3, outs + 1)
+    updateCount()
+  })
+}
+
+function play_tagup() {
+  if (!slots['3']) { addLog('—', '3루 주자 없음'); return }
+  addLog('tag_up safe', '태그업 — 3루 → 홈인')
+  const r = slots['3']
+  setBase('3', null)
+  const wp = getWaypoints('3', 'home')  // ['home']
+  animatePath(r.el, wp, () => {
+    addLog('score', '득점!')
+    fadeOut(r.el)
+  })
+}
+
+function play_homerun() {
+  addLog('runner_advance', '만루 홈런 — 전원 홈인')
+
+  // 기존 주자 홈으로 순차 출발 (3루→2루→1루 순)
+  const order = ['3','2','1']
+  let delay = 0
+  order.forEach(base => {
+    if (!slots[base]) return
+    const r = slots[base]
+    setBase(base, null)
+    setTimeout(() => {
+      const wp = getWaypoints(base, 'home')
+      animatePath(r.el, wp, () => fadeOut(r.el))
+    }, delay)
+    delay += 120
+  })
+
+  // 타자: batter→1→2→3→home
+  const id = uid++
+  const el = mkDot(id, 'batter')
+  setTimeout(() => {
+    const wp = getWaypoints('batter', 'home')  // ['1','2','3','home']
+    animatePath(el, wp, () => fadeOut(el))
+  }, delay)
+
+  balls = 0; strikes = 0; updateCount()
+}
+
+function resetAll() {
+  document.querySelectorAll('.runner-dot').forEach(e => e.remove())
+  slots = { '1': null, '2': null, '3': null }
+  ;['1','2','3'].forEach(k => {
+    const b = document.getElementById('b' + k)
+    if (b) b.className = 'base'
+  })
+  uid = 1; balls = 2; strikes = 1; outs = 0
+  updateCount()
+  const box = document.getElementById('log')
+  box.innerHTML = '<div class="log-entry"><span class="ev">—</span>초기화됨</div>'
+}
+
+updateCount()
+</script>
+</body>
+</html>

@@ -78,8 +78,15 @@ export interface PlaybackActions {
 
 function nextUnitEnd(events: GameEvent[], from: number, unit: ProgressUnit): number {
   if (unit === 'pitch') return from + 1
-  // at_bat: from 이후 첫 at_bat_result 위치까지
+  // at_bat: at_bat_result까지 한 번에 공개.
+  // 단, 타석 중 steal_attempt가 있으면 steal_result 직후를 먼저 중간 경계로 반환.
   for (let i = from; i < events.length; i++) {
+    if (events[i].type === 'steal_attempt') {
+      for (let j = i + 1; j < events.length; j++) {
+        if (events[j].type === 'steal_result')   return j + 1
+        if (events[j].type === 'at_bat_result')  break  // steal_result 없이 at_bat_result 도달
+      }
+    }
     if (events[i].type === 'at_bat_result') return i + 1
   }
   return events.length
