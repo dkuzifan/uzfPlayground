@@ -188,7 +188,13 @@ function GameScreen({
       {activeTab === 'live' ? (
         <LiveTab pb={pb} homeTeam={homeTeam} awayTeam={awayTeam} />
       ) : (
-        <BoxTab gameResult={gameResult} homeTeam={homeTeam} awayTeam={awayTeam} />
+        <BoxTab
+          stats={pb.liveStats}
+          linescore={pb.liveLinescore}
+          score={pb.liveState.score}
+          homeTeam={homeTeam}
+          awayTeam={awayTeam}
+        />
       )}
     </div>
   )
@@ -919,13 +925,13 @@ function AtBatBlock({ ab }: { ab: AtBatGroup }) {
 // BoxTab
 // ============================================================
 
-function BoxTab({ gameResult, homeTeam, awayTeam }: {
-  gameResult: GameResult
+function BoxTab({ stats, linescore, score, homeTeam, awayTeam }: {
+  stats:      ReturnType<typeof useGamePlayback>['liveStats']
+  linescore:  { away: number[]; home: number[] }
+  score:      { home: number; away: number }
   homeTeam:   TW
   awayTeam:   TW
 }) {
-  const { stats, linescore } = gameResult
-
   return (
     <div className="mx-auto w-full max-w-[960px] px-4 py-4 space-y-6">
       {/* 라인스코어 */}
@@ -933,7 +939,7 @@ function BoxTab({ gameResult, homeTeam, awayTeam }: {
         linescore={linescore}
         homeTeam={homeTeam}
         awayTeam={awayTeam}
-        finalScore={gameResult.score}
+        finalScore={score}
       />
       {/* 타자 스탯 */}
       <BatterTable stats={stats.away.batters}  teamName={awayTeam.name}  color={awayTeam.primary_color} />
@@ -987,7 +993,7 @@ function Linescore({ linescore, homeTeam, awayTeam, finalScore }: {
 }
 
 function BatterTable({ stats, teamName, color }: {
-  stats:    ReturnType<typeof useGamePlayback>['result'] extends GameResult | null ? GameResult['stats']['home']['batters'] : never
+  stats:    ReturnType<typeof useGamePlayback>['liveStats']['home']['batters']
   teamName: string
   color:    string
 }) {
@@ -1028,7 +1034,7 @@ function BatterTable({ stats, teamName, color }: {
 }
 
 function PitcherTable({ stats, teamName, color }: {
-  stats:    GameResult['stats']['home']['pitchers']
+  stats:    ReturnType<typeof useGamePlayback>['liveStats']['home']['pitchers']
   teamName: string
   color:    string
 }) {

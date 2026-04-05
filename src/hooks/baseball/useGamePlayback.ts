@@ -6,6 +6,8 @@ import type { GameEvent, GameResult } from '@/lib/baseball/game/types'
 import type { AtBatResult } from '@/lib/baseball/batting/types'
 import type { ProgressUnit } from '@/lib/baseball/data/game-config'
 import { deriveState, type LiveGameState } from '@/lib/baseball/game/derive-state'
+import { calcGameStats } from '@/lib/baseball/game/calc-game-stats'
+import type { GameStats } from '@/lib/baseball/game/stats-types'
 import {
   pitchToText,
   pitchToLabel,
@@ -65,6 +67,8 @@ export interface PlaybackState {
   speed:         Speed
   liveState:     LiveGameState
   pbpGroups:     PBPGroup[]
+  liveStats:     GameStats
+  liveLinescore: { away: number[]; home: number[] }
   result:        GameResult | null
 }
 
@@ -238,6 +242,39 @@ function buildPBPGroups(
 }
 
 // ============================================================
+// buildLiveLinescore — 공개된 이벤트에서 이닝별 득점 추출
+// ============================================================
+
+function buildLiveLinescore(events: GameEvent[]): { away: number[]; home: number[] } {
+  const away: number[] = []
+  const home: number[] = []
+  let currentInning = 1
+  let currentIsTop  = true
+
+  for (const ev of events) {
+    if (ev.type === 'inning_start') {
+      currentInning = ev.inning
+      currentIsTop  = ev.isTop
+    }
+    if (ev.type === 'inning_end') {
+      const p = ev.payload as { runs_this_half: number }
+      const idx = currentInning - 1
+      if (currentIsTop) {
+        while (away.length <= idx) away.push(0)
+        away[idx] = p.runs_this_half
+      } else {
+        while (home.length <= idx) home.push(0)
+        home[idx] = p.runs_this_half
+      }
+    }
+  }
+
+  // 현재 진행 중인 이닝은 linescore에 포함하지 않음 (inning_end 미발생)
+  // away/home 길이를 맞춤 (홈팀 말이 아직 끝나지 않으면 home이 away보다 짧을 수 있음)
+  return { away, home }
+}
+
+// ============================================================
 // useGamePlayback
 // ============================================================
 
@@ -308,6 +345,14 @@ export function useGamePlayback(
 
   const pbpGroups = buildPBPGroups(revealedEvents, awayLineup, homeLineup)
 
+  const liveStats = calcGameStats(
+    revealedEvents,
+    { lineup: homeLineup, pitcher: homePitcher },
+    { lineup: awayLineup, pitcher: awayPitcher },
+  )
+
+  const liveLinescore = buildLiveLinescore(revealedEvents)
+
   const result = status === 'ended' ? gameResult : null
 
   return {
@@ -316,6 +361,8 @@ export function useGamePlayback(
     speed,
     liveState,
     pbpGroups,
+    liveStats,
+    liveLinescore,
     result,
     pause:    () => setStatus('paused'),
     resume:   () => {
