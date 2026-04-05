@@ -871,6 +871,9 @@ export function advanceRunners(
   let outs_added = 0
   let next: Runners = { first: null, second: null, third: null }
 
+  const inning_ = inningCtx?.inning ?? 0
+  const isTop_  = inningCtx?.isTop  ?? false
+
   if (result === 'single') {
     // resolveRunnerAdvances로 기존 주자 전원 처리
     const adv = resolveRunnerAdvances('single', runners, hitPhysics, stealState, defenceLineup, scoreContext, inningCtx)
@@ -880,12 +883,22 @@ export function advanceRunners(
     allEvents.push(...adv.events)
     next = { ...next, ...adv.nextRunners }
 
+    // 단타 시 주목할 진루: 2루 주자 홈인, 1루 주자 3루까지
+    for (const m of adv.moves) {
+      if (m.wasOut) continue
+      if (m.from === 2 && m.to === 'home') {
+        allEvents.push({ type: 'runner_note', inning: inning_, isTop: isTop_, payload: { text: `${m.runner.name} 2루→홈 생환`, is_batter: false } })
+      } else if (m.from === 1 && m.to === 3) {
+        allEvents.push({ type: 'runner_note', inning: inning_, isTop: isTop_, payload: { text: `${m.runner.name} 1→3루 진루`, is_batter: false } })
+      }
+    }
+
     // 타자 추가 진루 판정
-    // 수비수가 2루 이외 방향으로 송구했거나 송구 없음 → 2루 무혈 진루 가능
-    // 수비수가 2루로 직접 송구 → 실제 경쟁 판정
+    // 수비수가 2루 이외 방향으로 명확히 송구했을 때만 무혈 2루 허용
+    // chosenTarget === null (주자 없음, 송구 없음) → 여전히 실제 판정 필요
     let batterBase: 1 | 2
-    if (adv.chosenTarget !== '2B') {
-      // 2루 송구가 없었으므로 타자는 2루까지 자유 진루
+    if (adv.chosenTarget !== null && adv.chosenTarget !== '2B') {
+      // 수비수가 홈 또는 다른 베이스로 송구 → 타자는 2루 무혈 진루
       batterBase = 2
     } else {
       batterBase = resolveBatterAdvance(batter, hitPhysics)
@@ -893,6 +906,7 @@ export function advanceRunners(
     if (batterBase === 2 && next.second === null) {
       next.second = batter
       moves.push({ runner: batter, from: 'batter', to: 2 })
+      allEvents.push({ type: 'runner_note', inning: inning_, isTop: isTop_, payload: { text: `${batter.name} 2루까지 진루`, is_batter: true } })
     } else {
       next.first = batter
       moves.push({ runner: batter, from: 'batter', to: 1 })
@@ -906,6 +920,13 @@ export function advanceRunners(
     moves.push(...adv.moves)
     allEvents.push(...adv.events)
     next = { ...next, ...adv.nextRunners }
+
+    // 2루타 시 주목할 진루: 1루 주자 홈인
+    for (const m of adv.moves) {
+      if (!m.wasOut && m.from === 1 && m.to === 'home') {
+        allEvents.push({ type: 'runner_note', inning: inning_, isTop: isTop_, payload: { text: `${m.runner.name} 1루→홈 생환`, is_batter: false } })
+      }
+    }
 
     // 타자는 2루타이므로 반드시 2루에 배치
     // forceMinBase로 인해 2루가 점유된 경우, 카스케이드 밀어냄:

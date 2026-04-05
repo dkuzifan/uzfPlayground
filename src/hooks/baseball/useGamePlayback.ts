@@ -219,6 +219,16 @@ function buildPBPGroups(
         break
       }
 
+      case 'runner_note': {
+        // 주목할 만한 진루 메모 — 직전 완료 타석에 추가
+        const p = ev.payload as { text: string; is_batter: boolean }
+        const target = lastAtBat ?? currentAtBat
+        if (target) {
+          target.notes.push(p.text)
+        }
+        break
+      }
+
       case 'inning_end': {
         if (!currentGroup) break
         const p = ev.payload as { runs_this_half: number }

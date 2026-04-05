@@ -351,6 +351,35 @@ function ZoneStatus({ inning, isTop, outs, battingColor }: {
 }
 
 // ============================================================
+// BatterSilhouette — 타자 실루엣 SVG
+// ============================================================
+
+function BatterSilhouette({ mirrored }: { mirrored: boolean }) {
+  return (
+    <svg
+      width="24" height="52"
+      viewBox="0 0 24 52"
+      className="opacity-[0.18]"
+      style={{ transform: mirrored ? 'scaleX(-1)' : 'none' }}
+    >
+      {/* 머리 */}
+      <circle cx="12" cy="6" r="5.5" fill="white" />
+      {/* 몸통 */}
+      <rect x="8.5" y="13" width="7" height="13" rx="2" fill="white" />
+      {/* 왼 다리 */}
+      <line x1="11" y1="26" x2="6" y2="51" stroke="white" strokeWidth="3" strokeLinecap="round" />
+      {/* 오른 다리 */}
+      <line x1="13" y1="26" x2="18" y2="51" stroke="white" strokeWidth="3" strokeLinecap="round" />
+      {/* 왼팔 (아래로) */}
+      <line x1="9" y1="15" x2="5" y2="24" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+      {/* 오른팔 + 배트 */}
+      <line x1="15" y1="15" x2="20" y2="10" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="20" y1="10" x2="24" y2="2" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// ============================================================
 // ZoneVisual — 스트라이크존 히어로
 // ============================================================
 
@@ -405,13 +434,19 @@ function ZoneVisual({
           <span className="text-[10px] text-white/10 font-medium tracking-widest">STRIKE ZONE</span>
         </div>
 
-        {/* 타자 방향 표시 */}
-        <div className="absolute top-1.5 right-2 flex items-center gap-0.5">
-          <span className="text-[9px] text-white/25 leading-none">타자</span>
-          <span className={`text-[10px] font-bold leading-none ${batterHand === 'L' ? 'text-blue-400' : batterHand === 'R' ? 'text-red-400' : 'text-yellow-400'}`}>
-            {batterHand}
-          </span>
-        </div>
+        {/* 우타자 실루엣 (좌측) */}
+        {(batterHand === 'R' || batterHand === 'S') && (
+          <div className="absolute left-[4%] top-1/2 -translate-y-[55%]">
+            <BatterSilhouette mirrored={false} />
+          </div>
+        )}
+
+        {/* 좌타자 실루엣 (우측) */}
+        {(batterHand === 'L' || batterHand === 'S') && (
+          <div className="absolute right-[4%] top-1/2 -translate-y-[55%]">
+            <BatterSilhouette mirrored={true} />
+          </div>
+        )}
 
         {/* 스트라이크존 사각형 */}
         <div
