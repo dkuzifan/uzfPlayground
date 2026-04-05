@@ -264,6 +264,7 @@ function LiveTab({ pb, homeTeam, awayTeam }: {
           pitchDots={liveState.pitchDots}
           lastAtBatResult={liveState.lastAtBatResult}
           lastAtBatBallType={liveState.lastAtBatBallType}
+          batterHand={liveState.currentBatter.bats}
         />
         {/* 러너 애니메이션 다이아몬드 */}
         <RunnerDiamond
@@ -381,10 +382,12 @@ function ZoneVisual({
   pitchDots,
   lastAtBatResult,
   lastAtBatBallType,
+  batterHand,
 }: {
   pitchDots:         ReturnType<typeof useGamePlayback>['liveState']['pitchDots']
   lastAtBatResult:   AtBatResult | null
   lastAtBatBallType: BallType | null
+  batterHand:        'L' | 'R' | 'S'
 }) {
   const overlay = lastAtBatResult ? AT_BAT_OVERLAY[lastAtBatResult] : null
   const outSub  = lastAtBatResult === 'out' && lastAtBatBallType
@@ -400,6 +403,14 @@ function ZoneVisual({
         {/* 배경 라벨 */}
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-[10px] text-white/10 font-medium tracking-widest">STRIKE ZONE</span>
+        </div>
+
+        {/* 타자 방향 표시 */}
+        <div className="absolute top-1.5 right-2 flex items-center gap-0.5">
+          <span className="text-[9px] text-white/25 leading-none">타자</span>
+          <span className={`text-[10px] font-bold leading-none ${batterHand === 'L' ? 'text-blue-400' : batterHand === 'R' ? 'text-red-400' : 'text-yellow-400'}`}>
+            {batterHand}
+          </span>
         </div>
 
         {/* 스트라이크존 사각형 */}
@@ -932,6 +943,11 @@ function BoxTab({ stats, linescore, score, homeTeam, awayTeam }: {
   homeTeam:   TW
   awayTeam:   TW
 }) {
+  const awayH = stats.away.batters.reduce((s, b) => s + b.H, 0)
+  const homeH = stats.home.batters.reduce((s, b) => s + b.H, 0)
+  const awayE = stats.away.fielders.reduce((s, f) => s + f.E, 0)
+  const homeE = stats.home.fielders.reduce((s, f) => s + f.E, 0)
+
   return (
     <div className="mx-auto w-full max-w-[960px] px-4 py-4 space-y-6">
       {/* 라인스코어 */}
@@ -940,6 +956,10 @@ function BoxTab({ stats, linescore, score, homeTeam, awayTeam }: {
         homeTeam={homeTeam}
         awayTeam={awayTeam}
         finalScore={score}
+        awayH={awayH}
+        homeH={homeH}
+        awayE={awayE}
+        homeE={homeE}
       />
       {/* 타자 스탯 */}
       <BatterTable stats={stats.away.batters}  teamName={awayTeam.name}  color={awayTeam.primary_color} />
@@ -951,11 +971,15 @@ function BoxTab({ stats, linescore, score, homeTeam, awayTeam }: {
   )
 }
 
-function Linescore({ linescore, homeTeam, awayTeam, finalScore }: {
+function Linescore({ linescore, homeTeam, awayTeam, finalScore, awayH, homeH, awayE, homeE }: {
   linescore:  { away: (number | null)[]; home: (number | null)[] }
   homeTeam:   TW
   awayTeam:   TW
   finalScore: { home: number; away: number }
+  awayH?:     number
+  homeH?:     number
+  awayE?:     number
+  homeE?:     number
 }) {
   const innings = linescore.away.length
 
@@ -969,6 +993,8 @@ function Linescore({ linescore, homeTeam, awayTeam, finalScore }: {
               <th key={i} className="py-1 w-7">{i + 1}</th>
             ))}
             <th className="py-1 w-10 font-bold">R</th>
+            <th className="py-1 w-8 font-bold">H</th>
+            <th className="py-1 w-8 font-bold">E</th>
           </tr>
         </thead>
         <tbody>
@@ -980,6 +1006,8 @@ function Linescore({ linescore, homeTeam, awayTeam, finalScore }: {
               </td>
             ))}
             <td className="py-1 font-bold text-white">{finalScore.away}</td>
+            <td className="py-1 text-white/70">{awayH ?? '-'}</td>
+            <td className="py-1 text-white/70">{awayE ?? '-'}</td>
           </tr>
           <tr>
             <td className="py-1 text-left font-semibold" style={{ color: homeTeam.primary_color }}>{homeTeam.short_name}</td>
@@ -989,6 +1017,8 @@ function Linescore({ linescore, homeTeam, awayTeam, finalScore }: {
               </td>
             ))}
             <td className="py-1 font-bold text-white">{finalScore.home}</td>
+            <td className="py-1 text-white/70">{homeH ?? '-'}</td>
+            <td className="py-1 text-white/70">{homeE ?? '-'}</td>
           </tr>
         </tbody>
       </table>
@@ -1136,6 +1166,10 @@ function ResultScreen({
           homeTeam={homeTeam}
           awayTeam={awayTeam}
           finalScore={result.score}
+          awayH={result.stats.away.batters.reduce((s, b) => s + b.H, 0)}
+          homeH={result.stats.home.batters.reduce((s, b) => s + b.H, 0)}
+          awayE={result.stats.away.fielders.reduce((s, f) => s + f.E, 0)}
+          homeE={result.stats.home.fielders.reduce((s, f) => s + f.E, 0)}
         />
 
         {/* 투수 스탯 */}

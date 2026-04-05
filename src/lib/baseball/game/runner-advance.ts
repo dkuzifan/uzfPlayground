@@ -446,7 +446,7 @@ function resolveRunnerAdvances(
   defenceLineup?: Player[],
   scoreContext?:  { battingScore: number; defenseScore: number },
   inningCtx?:     { inning: number; isTop: boolean },
-): { nextRunners: Runners; runsScored: number; outs_added: number; moves: RunnerMove[]; events: GameEvent[] } {
+): { nextRunners: Runners; runsScored: number; outs_added: number; moves: RunnerMove[]; events: GameEvent[]; chosenTarget: BaseKey | null } {
   const lineup      = defenceLineup ?? []
   const fielder_pos = getFielderPos(hp)
   const fielder     = hp.fielder
@@ -792,7 +792,7 @@ function resolveRunnerAdvances(
     }
   }
 
-  return { nextRunners, runsScored, outs_added, moves, events }
+  return { nextRunners, runsScored, outs_added, moves, events, chosenTarget }
 }
 
 // ============================================================
@@ -880,8 +880,16 @@ export function advanceRunners(
     allEvents.push(...adv.events)
     next = { ...next, ...adv.nextRunners }
 
-    // 타자 추가 진루 판정 (독립 평가)
-    const batterBase = resolveBatterAdvance(batter, hitPhysics)
+    // 타자 추가 진루 판정
+    // 수비수가 2루 이외 방향으로 송구했거나 송구 없음 → 2루 무혈 진루 가능
+    // 수비수가 2루로 직접 송구 → 실제 경쟁 판정
+    let batterBase: 1 | 2
+    if (adv.chosenTarget !== '2B') {
+      // 2루 송구가 없었으므로 타자는 2루까지 자유 진루
+      batterBase = 2
+    } else {
+      batterBase = resolveBatterAdvance(batter, hitPhysics)
+    }
     if (batterBase === 2 && next.second === null) {
       next.second = batter
       moves.push({ runner: batter, from: 'batter', to: 2 })
