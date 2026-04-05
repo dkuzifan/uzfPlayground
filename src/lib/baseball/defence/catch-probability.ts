@@ -94,16 +94,11 @@ export function calcCatchProbability(
     return clamp(0.95 - 0.10 * excess, 0.05, 0.95)
   }
 
-  // 내야 땅볼 — Phase B 지수 감속 도달 시간
-  if (v_roll_0 <= 0) return 1.0
-
-  const val = d * MU_GROUND / v_roll_0
-  if (val >= 1) return 1.0  // 공이 수비수 앞에서 멈춤
-
-  // t_ball: 공이 거리 d를 구르는 데 걸리는 시간
-  const t_ball    = -Math.log(1 - val) / MU_GROUND
-  const fielder_speed = 3.5 + (defence / 100) * 1.5   // 3.5~5.0 m/s (내야 처리 속도)
-  const t_fielder = 0.4 + d / fielder_speed            // 반응 시간 + 이동 시간
-
-  return clamp(0.3 + (t_ball - t_fielder) * 0.15, 0.05, 0.90)
+  // 내야 땅볼 — 거리·속도 기반 범위 모델
+  // 가까울수록(d 작을수록) 높음, 타구 속도 빠를수록(v_roll_0 클수록) 낮음
+  const fielder_speed_g = 4.0 + (defence / 100) * 2.0  // 4.0–6.0 m/s
+  const reachable_dist  = fielder_speed_g * 1.0          // 1초 이내 이동 가능 거리
+  const speed_penalty   = Math.min(0.25, v_roll_0 / 20 * 0.25)  // 속구 페널티 최대 0.25
+  const excess          = Math.max(0, d - reachable_dist)
+  return clamp(0.90 - 0.10 * excess - speed_penalty, 0.05, 0.90)
 }

@@ -101,16 +101,21 @@ export function resolveHitResult(
   const roll    = Math.random()
 
   if (roll < p_out) {
-    // 포구 성공 → 아웃
+    // 포구 성공 → 아웃 (내야 아웃: 깔끔하게 처리했으므로 원래 t_fielding 그대로)
     const catch_setup_time = p_out >= 0.5 ? 0.2 : 0.4
     return { result: 'out', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield, ball_type: ballType, catch_setup_time }
   }
   if (roll < p_out + p_error) {
     // 잡을 수 있었지만 실수 → 실책 출루
-    return { result: 'reach_on_error', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield, is_error: true }
+    // 내야 실책: 공이 내야수를 통과 → 추격 시간 추가
+    const roe_t_fielding = is_infield ? t_fielding + 3.0 : t_fielding
+    return { result: 'reach_on_error', fielder, fielder_pos, t_fielding: roe_t_fielding, t_ball_travel, is_infield, is_error: true }
   }
 
   // 8. 히트 종류 결정 (거리 기반)
   const result = resolveHitType(physics.range)
-  return { result, fielder, fielder_pos, t_fielding, t_ball_travel, is_infield }
+  // 내야 안타: 공이 내야수를 통과했으므로 추격·픽업 시간 추가
+  // 내야수가 빠른 송구로 주루를 잡는 비현실적 상황 방지
+  const hit_t_fielding = is_infield ? t_fielding + 3.0 : t_fielding
+  return { result, fielder, fielder_pos, t_fielding: hit_t_fielding, t_ball_travel, is_infield }
 }
