@@ -73,10 +73,16 @@ export function resolveHitResult(
   const physics = calcBattedBallPhysics(exit_velocity, launch_angle, theta_h)
 
   // 3. 담당 수비수 선택 (홈런 포함 항상 계산 — fielder/pos 반환에 필요)
-  const { fielder, pos: fielder_pos, dist } = findResponsibleFielder(physics.landing, fielders)
+  const { fielder, dist } = findResponsibleFielder(physics.landing, fielders)
+
+  // 실제 공 픽업 위치 = 착지 지점 (외야수가 이 위치까지 달려와서 잡음)
+  const fielder_pos   = { x: physics.landing.field_x, y: physics.landing.field_y }
 
   const t_ball_travel = physics.t_bounce
-  const t_fielding    = t_ball_travel + 0.3
+  // 외야수가 착지 지점까지 달려오는 시간 포함
+  const fielder_approach_speed = 5.5 + (fielder.stats.defence / 100) * 1.5  // 5.5–7.0 m/s
+  const t_approach    = dist / fielder_approach_speed
+  const t_fielding    = t_ball_travel + t_approach + 0.3
   const is_infield    = physics.range < 36
 
   // 4. 홈런 판정
