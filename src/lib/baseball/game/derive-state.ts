@@ -16,7 +16,7 @@ export interface PitchDot {
 }
 
 export type RunnerAnimEvent =
-  | { type: 'runner_advance'; moves: Array<{ from: 1|2|3|'batter'; to: 1|2|3|'home' }> }
+  | { type: 'runner_advance'; moves: Array<{ from: 1|2|3|'batter'; to: 1|2|3|'home'; wasOut?: boolean }> }
   | { type: 'steal_result';   from: 1|2; to: 2|3|'home'; success: boolean }
   | { type: 'tag_up';         from: 1|2|3; to: 1|2|3|'home'; safe: boolean }
 
@@ -158,7 +158,7 @@ export function deriveState(
 
       case 'runner_advance': {
         const p = ev.payload as {
-          moves: Array<{ runner: Player; from: 1|2|3|'batter'; to: 1|2|3|'home' }>
+          moves: Array<{ runner: Player; from: 1|2|3|'batter'; to: 1|2|3|'home'; wasOut?: boolean }>
         }
         const r = { ...runners }
         for (const move of p.moves) {
@@ -167,6 +167,7 @@ export function deriveState(
           if (move.from === 3) r.third  = false
         }
         for (const move of p.moves) {
+          if (move.wasOut) continue  // 아웃된 주자의 도착 베이스는 점유하지 않음
           if (move.to === 1) r.first  = true
           if (move.to === 2) r.second = true
           if (move.to === 3) r.third  = true
@@ -174,7 +175,7 @@ export function deriveState(
         runners = r
         lastAnimEvent = {
           type:  'runner_advance',
-          moves: p.moves.map(m => ({ from: m.from, to: m.to })),
+          moves: p.moves.map(m => ({ from: m.from, to: m.to, wasOut: m.wasOut })),
         }
         animSeq++
         break

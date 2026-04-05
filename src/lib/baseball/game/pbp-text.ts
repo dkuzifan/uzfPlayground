@@ -105,6 +105,26 @@ export function isHitResult(result: AtBatResult): boolean {
 }
 
 // ============================================================
+// stealResultToText — 도루 성공 텍스트
+// ============================================================
+
+export function stealResultToText(ev: GameEvent): string {
+  const p = ev.payload as { runner: { name: string }; from: 1|2; to: 2|3|'home' }
+  const toStr = p.to === 'home' ? '홈' : `${p.to}루`
+  return `도루 성공 — ${p.runner.name} (${p.from}루→${toStr})`
+}
+
+// ============================================================
+// runnerOutToText — 진루 중 아웃 텍스트
+// ============================================================
+
+export function runnerOutToText(ev: GameEvent): string {
+  const p = ev.payload as { runner: { name: string }; from: 1|2|3; to: 1|2|3|'home' }
+  const toStr = p.to === 'home' ? '홈' : `${p.to}루`
+  return `진루 아웃 — ${p.runner.name} (${p.from}루→${toStr})`
+}
+
+// ============================================================
 // sacFlyToText — 희생플라이 텍스트
 // ============================================================
 

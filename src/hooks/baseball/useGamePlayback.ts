@@ -12,6 +12,8 @@ import {
   atBatResultToText,
   isHitResult,
   pitchingChangeToText,
+  stealResultToText,
+  runnerOutToText,
 } from '@/lib/baseball/game/pbp-text'
 
 // ============================================================
@@ -46,6 +48,7 @@ export interface AtBatGroup {
   pitches:     PitchRow[]
   result:      ResultRow | null
   pitchChange: string | null   // 이 타석 앞에 투수 교체가 있었다면
+  notes:       string[]        // 도루 성공, 진루 아웃 등 타석 중/후 부가 이벤트
 }
 
 export interface PBPGroup {
@@ -109,6 +112,7 @@ function buildPBPGroups(
   let pendingPitchChange: string | null = null
   let currentGroup: PBPGroup | null    = null
   let currentAtBat: AtBatGroup | null  = null
+  let lastAtBat:    AtBatGroup | null  = null  // 직전 완료 타석 (진루 아웃 등 후처리용)
 
   for (const ev of events) {
     switch (ev.type) {
@@ -124,6 +128,7 @@ function buildPBPGroups(
         }
         groups.push(currentGroup)
         currentAtBat = null
+        lastAtBat    = null
         pitchNum     = 0
         break
       }
@@ -146,6 +151,7 @@ function buildPBPGroups(
             pitches:     [],
             result:      null,
             pitchChange: pendingPitchChange,
+            notes:       [],
           }
           pendingPitchChange = null
           currentGroup.atBats.push(currentAtBat)
@@ -175,6 +181,7 @@ function buildPBPGroups(
             pitches:     [],
             result:      null,
             pitchChange: pendingPitchChange,
+            notes:       [],
           }
           pendingPitchChange = null
           currentGroup.atBats.push(currentAtBat)
@@ -182,11 +189,29 @@ function buildPBPGroups(
 
         currentAtBat.result   = atBatResultToText(ev)
         currentAtBat.isActive = false
+        lastAtBat    = currentAtBat
         currentAtBat = null
         pitchNum     = 0
 
         if (ev.isTop) awayIdx++
         else          homeIdx++
+        break
+      }
+
+      case 'steal_result': {
+        const p = ev.payload as { success: boolean }
+        if (p.success && currentAtBat) {
+          currentAtBat.notes.push(stealResultToText(ev))
+        }
+        break
+      }
+
+      case 'runner_out': {
+        // 진루 중 아웃 — 직전 타석(lastAtBat) 또는 현재 타석에 추가
+        const target = currentAtBat ?? lastAtBat
+        if (target) {
+          target.notes.push(runnerOutToText(ev))
+        }
         break
       }
 

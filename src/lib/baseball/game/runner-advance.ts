@@ -32,7 +32,8 @@ export interface RunnerMove {
   runner:          Player
   from:            1 | 2 | 3 | 'batter'
   to:              1 | 2 | 3 | 'home'
-  return_penalty?: number  // 예약: 귀루 중 주자 (#4/#5에서 활용)
+  wasOut?:         boolean  // 진루 중 아웃된 경우 — derive-state에서 도착 베이스를 점유하지 않음
+  return_penalty?: number   // 예약: 귀루 중 주자 (#4/#5에서 활용)
 }
 
 export interface AdvanceResult {
@@ -483,12 +484,21 @@ function resolveRunnerAdvances(
   for (const [fromBase, runner] of runnerEntries) {
     if (!runner) continue
 
-    // 최소 진루 강제 설정
-    // 단타: 1루 주자는 포스 플레이 — 타자가 1루를 차지하므로 반드시 2루로 이동
-    // 2루타: 물리 모델에 맡김 (외야 타구 특성상 decideChallengeAdvance가 자연스럽게 진루 결정)
+    // 최소 진루 강제 설정 (포스 플레이 체인)
+    // 단타: 1루→2루 강제, 1·2루→각각 2루·3루 강제, 만루→3루 주자도 홈 강제
+    // 2루타: 1루→2루 강제, 2루→3루 강제
     let forceMinBase: BaseKey | undefined
-    if (result === 'single' && fromBase === 1) {
-      forceMinBase = '2B'
+    if (result === 'single') {
+      if (fromBase === 3 && runners.second !== null && runners.first !== null) {
+        forceMinBase = 'home'  // 만루: 3루 주자 홈 강제
+      } else if (fromBase === 2 && runners.first !== null) {
+        forceMinBase = '3B'    // 1·2루: 2루 주자 3루 강제
+      } else if (fromBase === 1) {
+        forceMinBase = '2B'    // 1루 주자 2루 강제 (타자가 1루 점유)
+      }
+    } else if (result === 'double') {
+      if (fromBase === 1) forceMinBase = '2B'
+      if (fromBase === 2) forceMinBase = '3B'
     }
 
     const found = findRunnerTarget(
@@ -624,7 +634,13 @@ function resolveRunnerAdvances(
 
       if (verdict === 'out') {
         outs_added++
-        moves.push({ runner, from: fromNum, to: toNum })
+        moves.push({ runner, from: fromNum, to: toNum, wasOut: true })
+        events.push({
+          type:    'runner_out',
+          inning:  inningCtx?.inning ?? 0,
+          isTop:   inningCtx?.isTop  ?? false,
+          payload: { runner, from: fromNum, to: toNum },
+        })
       } else if (verdict === 'wild_throw') {
         // 폭투: 목표 베이스 안착 + extra 1베이스
         applyWildThrow(runner, fromNum, targetBase)
@@ -682,7 +698,13 @@ function resolveRunnerAdvances(
 
       const dist_to_next = euclidDist(BASE_POS[targetBase], BASE_POS[nextTarget])
 
-      if (decideChallengeAdvance(runner, dist_to_next, reBallState, nextTarget, lineup)) {
+      // 2차 도전 전 충돌 체크: 다음 베이스에 이미 다른 주자가 있으면 시도 불가
+      const isNextOccupied =
+        (nextTarget === '1B' && nextRunners.first  !== null) ||
+        (nextTarget === '2B' && nextRunners.second !== null) ||
+        (nextTarget === '3B' && nextRunners.third  !== null)
+
+      if (!isNextOccupied && decideChallengeAdvance(runner, dist_to_next, reBallState, nextTarget, lineup)) {
         // 2차 도전!
         const { player: recv, pos: recv_pos } = getReceiverAtBase(chosenTarget, lineup)
         const secondaryVerdict = resolveSecondaryThrow(
@@ -714,7 +736,13 @@ function resolveRunnerAdvances(
           if (targetBase === '3B') nextRunners.third  = null
           const mi = moves.findIndex(m => m.runner.id === runner.id && m.to === toNum)
           if (mi >= 0) moves.splice(mi, 1)
-          moves.push({ runner, from: fromNum, to: nextToNum })
+          moves.push({ runner, from: fromNum, to: nextToNum, wasOut: true })
+          events.push({
+            type:    'runner_out',
+            inning:  inningCtx?.inning ?? 0,
+            isTop:   inningCtx?.isTop  ?? false,
+            payload: { runner, from: fromNum, to: nextToNum },
+          })
         } else if (secondaryVerdict === 'wild_throw') {
           // 2차 폭투: nextTarget + extra 1베이스
           if (targetBase === '1B') nextRunners.first  = null
@@ -871,15 +899,37 @@ export function advanceRunners(
     allEvents.push(...adv.events)
     next = { ...next, ...adv.nextRunners }
 
-    // 타자 배치: 2루가 비어 있으면 2루, 점유됐으면 1루
-    // (앞 주자가 2루에 머문 경우 — 극히 드물지만 앞 주자가 베이스 권리를 가짐)
-    if (next.second === null) {
-      next.second = batter
-      moves.push({ runner: batter, from: 'batter', to: 2 })
-    } else {
-      next.first = batter
-      moves.push({ runner: batter, from: 'batter', to: 1 })
+    // 타자는 2루타이므로 반드시 2루에 배치
+    // forceMinBase로 인해 2루가 점유된 경우, 카스케이드 밀어냄:
+    //   3루 주자가 있으면 먼저 홈으로 → 2루 주자 3루로 → 타자 2루
+    if (next.second !== null) {
+      const runner2B = next.second
+      next.second = null
+
+      if (next.third !== null) {
+        // 3루 주자도 있으면 홈으로 밀어냄
+        const runner3B = next.third
+        next.third = null
+        runsScored++
+        const mi3 = moves.findIndex(m => m.runner.id === runner3B.id)
+        if (mi3 >= 0) {
+          moves[mi3] = { ...moves[mi3], to: 'home' }
+        } else {
+          moves.push({ runner: runner3B, from: 3, to: 'home' })
+        }
+      }
+
+      // 2루 주자 → 3루
+      next.third = runner2B
+      const mi2 = moves.findIndex(m => m.runner.id === runner2B.id)
+      if (mi2 >= 0) {
+        moves[mi2] = { ...moves[mi2], to: 3 }
+      } else {
+        moves.push({ runner: runner2B, from: 2, to: 3 })
+      }
     }
+    next.second = batter
+    moves.push({ runner: batter, from: 'batter', to: 2 })
   }
 
   return { nextRunners: next, runsScored, outs_added, moves, events: allEvents }

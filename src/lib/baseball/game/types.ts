@@ -66,6 +66,7 @@ export type GameEventType =
   | 'game_end'
   | 'secondary_throw'  // { receiver: Player; receiver_pos: Vec2; target: BaseKey; challenger: Player; out: boolean }
   | 'force_out'        // { runner: Player; from: 1|2|3; to: 2|3|'home' }
+  | 'runner_out'       // { runner: Player; from: 1|2|3; to: 1|2|3|'home' } — 진루 중 아웃
   | 'tag_up'           // { runner: Player; from: 1|2|3; to: 1|2|3|'home'; safe: boolean }
   | 'sac_fly'          // { batter: Player }
   | 'fielding_error'   // { fielder: Player; batter: Player }

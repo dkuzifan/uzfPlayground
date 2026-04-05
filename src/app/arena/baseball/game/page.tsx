@@ -266,6 +266,7 @@ function LiveTab({ pb, homeTeam, awayTeam }: {
           inning={liveState.inning}
           isTop={liveState.isTop}
           dotColor={liveState.isTop ? awayTeam.primary_color : homeTeam.primary_color}
+          isHomeBatting={!liveState.isTop}
         />
         {/* 볼카운트 */}
         <CountBar count={liveState.count} />
@@ -483,12 +484,14 @@ function RunnerDiamond({
   inning,
   isTop,
   dotColor,
+  isHomeBatting,
 }: {
-  lastAnimEvent: RunnerAnimEvent | null
-  animSeq:       number
-  inning:        number
-  isTop:         boolean
-  dotColor:      string
+  lastAnimEvent:  RunnerAnimEvent | null
+  animSeq:        number
+  inning:         number
+  isTop:          boolean
+  dotColor:       string
+  isHomeBatting:  boolean
 }) {
   const dotsRef    = useRef<RunnerDot[]>([])
   const keyCounter = useRef(0)
@@ -544,6 +547,8 @@ function RunnerDiamond({
         const wps     = getWaypoints(fromKey, toKey)
         const total   = wps.length
 
+        const shouldFadeOut = move.wasOut || toKey === 'home'
+
         if (fromKey === 'batter') {
           // 타자: 새 도트 생성 후 이동
           const k = keyCounter.current++
@@ -551,7 +556,7 @@ function RunnerDiamond({
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
               animatePath(k, wps, total, () => {
-                if (toKey === 'home') fadeOut(k)
+                if (shouldFadeOut) fadeOut(k)
               })
             })
           })
@@ -561,7 +566,7 @@ function RunnerDiamond({
           if (!dot) continue
           const k = dot.key
           animatePath(k, wps, total, () => {
-            if (toKey === 'home') fadeOut(k)
+            if (shouldFadeOut) fadeOut(k)
           })
         }
       }
@@ -656,7 +661,8 @@ function RunnerDiamond({
                 top:             `${pos.t}%`,
                 transform:       'translate(-50%,-50%)',
                 opacity:         dot.opacity,
-                backgroundColor: dotColor,
+                backgroundColor: isHomeBatting ? '#ffffff' : dotColor,
+                border:          isHomeBatting ? `4px solid ${dotColor}` : 'none',
                 boxShadow:       `0 0 8px ${dotColor}99`,
                 transition:      `left 0.42s cubic-bezier(0.4,0,0.2,1),
                                   top  0.42s cubic-bezier(0.4,0,0.2,1),
@@ -898,6 +904,13 @@ function AtBatBlock({ ab }: { ab: AtBatGroup }) {
           )}
         </div>
       )}
+      {/* 도루 성공 / 진루 아웃 등 부가 이벤트 */}
+      {ab.notes.map((note, i) => (
+        <div key={i} className="flex items-center gap-1.5 py-0.5 text-xs text-amber-300/80">
+          <span className="text-amber-300/50 font-medium">→</span>
+          <span>{note}</span>
+        </div>
+      ))}
     </div>
   )
 }
