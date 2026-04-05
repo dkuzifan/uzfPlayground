@@ -13,17 +13,30 @@ function gaussianRandom(mean: number, std: number): number {
   return mean + std * z
 }
 
-// 존 높이 분류 (스트라이크 존 기준)
-function getZoneHeight(zoneType: ZoneType): 'high' | 'mid' | 'low' {
-  // zone_type만으로 높이를 완벽히 알 수 없으므로
-  // core/edge는 mid로 처리, 볼 존은 위치에 따라 다르지만 중간값 사용
-  // 실제 ZoneId 기반 높이 분류는 게임 루프에서 actual_zone으로 처리 가능
-  switch (zoneType) {
-    case 'core':  return 'mid'
-    case 'edge':  return 'mid'
-    case 'chase': return 'mid'
-    case 'ball':  return 'mid'
-    case 'dirt':  return 'low'
+// ============================================================
+// 발사각 계산 — 두 성분 혼합 분포 (MLB 기준 캘리브레이션)
+//
+// MLB 타구 분포 타겟:  ground ~41% / LD ~23% / fly ~29% / popup ~7%
+// 두 성분:
+//   grounder 성분 (weight w_g): N(μ_g, σ_g) → 땅볼 위주
+//   fly 성분     (weight 1-w_g): N(μ_f, σ_f) → 뜬공/라인드라이브 위주
+//
+// 단일 Gaussian N(20, 25) 기준 LD ~46% 문제 해결.
+// ============================================================
+
+function calcLaunchAngle(zoneType: ZoneType): number {
+  const cfg = BATTED_BALL_CONFIG
+
+  // dirt 공 → 항상 낮은 발사각 (배트 끝에 맞아 굴러가는 타구)
+  if (zoneType === 'dirt') {
+    return gaussianRandom(cfg.launch_angle_base.low_zone, 8)
+  }
+
+  // 두 성분 혼합 분포
+  if (Math.random() < cfg.mixture_grounder_weight) {
+    return gaussianRandom(cfg.mixture_grounder_mean, cfg.mixture_grounder_std)
+  } else {
+    return gaussianRandom(cfg.mixture_fly_mean, cfg.mixture_fly_std)
   }
 }
 
@@ -43,14 +56,8 @@ export function calcBattedBall(
   const quality_roll = gaussianRandom(1.0, sigma_ev)
   const exit_velocity = cfg.base_exit_velocity * power_factor * quality_roll
 
-  // 발사각
-  const height = getZoneHeight(zoneType)
-  const angle_base =
-    height === 'high' ? cfg.launch_angle_base.high_zone :
-    height === 'low'  ? cfg.launch_angle_base.low_zone :
-                        cfg.launch_angle_base.mid_zone
-  const noise_std = cfg.launch_noise_base * (1 - batter.stats.contact / 200)
-  const launch_angle = gaussianRandom(angle_base, noise_std)
+  // 발사각 — 두 성분 혼합 분포 적용
+  const launch_angle = calcLaunchAngle(zoneType)
 
   return { exit_velocity, launch_angle }
 }

@@ -158,30 +158,32 @@ function GameScreen({
 
   return (
     <div className="flex min-h-screen flex-col bg-[#0a0a0f]">
-      {/* 상단 배너 */}
-      <ScoreBanner
-        score={liveState.score}
-        inning={liveState.inning}
-        isTop={liveState.isTop}
-        homeTeam={homeTeam}
-        awayTeam={awayTeam}
-      />
+      {/* 상단 고정 헤더 (스코어 배너 + 탭) */}
+      <div className="sticky top-0 z-20 bg-[#0a0a0f]">
+        <ScoreBanner
+          score={liveState.score}
+          inning={liveState.inning}
+          isTop={liveState.isTop}
+          homeTeam={homeTeam}
+          awayTeam={awayTeam}
+        />
 
-      {/* 탭 */}
-      <div className="flex border-b border-white/10 px-4">
-        {(['live', 'box'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => onTabSwitch(tab)}
-            className={`px-4 py-2.5 text-sm font-medium transition-colors ${
-              activeTab === tab
-                ? 'border-b-2 border-white text-white'
-                : 'text-white/40 hover:text-white/70'
-            }`}
-          >
-            {tab === 'live' ? 'Live' : 'Box'}
-          </button>
-        ))}
+        {/* 탭 */}
+        <div className="flex border-b border-white/10 px-4">
+          {(['live', 'box'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => onTabSwitch(tab)}
+              className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+                activeTab === tab
+                  ? 'border-b-2 border-white text-white'
+                  : 'text-white/40 hover:text-white/70'
+              }`}
+            >
+              {tab === 'live' ? 'Live' : 'Box'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* 탭 내용 */}

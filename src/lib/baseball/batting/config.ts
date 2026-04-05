@@ -64,11 +64,23 @@ export const BATTED_BALL_CONFIG = {
   power_slope: 0.60,            // power_factor = 0.70 + (Power/100) × 0.60  →  0.70 ~ 1.30
   quality_std_base: 0.08,       // σ = 0.08 × (1 - Contact/200)
   launch_angle_base: {
-    high_zone:  5,              // 높은 존(1/2/3) → 낮은 발사각
-    mid_zone:  20,
-    low_zone:  35,              // 낮은 존(7/8/9) → 높은 발사각
+    high_zone:  5,              // dirt 전용 (현재 low_zone 상수로 사용)
+    mid_zone:  20,              // 미사용 (mixture로 대체)
+    low_zone:   2,              // dirt 공 기본 발사각
   },
-  launch_noise_base: 25,        // ° 기준 — Contact 높을수록 감소. 12→25로 상향하여 LA 분포 현실화 (ground/popup 비율 확보)
+  launch_noise_base: 25,        // dirt 이외 미사용 (mixture 각 성분이 자체 σ 사용)
+  // ── 두 성분 혼합 발사각 분포 (MLB 캘리브레이션) ──────────────
+  // 목표: ground ~41% / LD ~23% / fly ~29% / popup ~7%
+  // 검증: 0.45×N(0,10) + 0.55×N(30,13)
+  //   ground(<10°): 0.45×84% + 0.55×6%  = 41%
+  //   LD(10~25°):   0.45×15% + 0.55×29% = 23%
+  //   fly(25~45°):  0.45×1%  + 0.55×52% = 29%
+  //   popup(>45°):  0.45×0%  + 0.55×13% = 7%
+  mixture_grounder_weight: 0.45,  // 땅볼 성분 비율
+  mixture_grounder_mean:   0,     // °
+  mixture_grounder_std:    10,    // °
+  mixture_fly_mean:        30,    // °
+  mixture_fly_std:         13,    // °
   // EV 구간 경계 (km/h) — 이하: soft / medium / hard / 초과: very_hard
   ev_tiers: { soft: 120, medium: 140, hard: 155 },
   // LA 구간 경계 (°) — 이하: ground / line_drive / fly / 초과: popup

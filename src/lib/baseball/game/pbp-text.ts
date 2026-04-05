@@ -1,7 +1,37 @@
 import type { GameEvent } from './types'
-import type { PitchType } from '../types/player'
+import type { PitchType, Position } from '../types/player'
 import type { AtBatResult } from '../batting/types'
 import type { BallType } from '../defence/types'
+
+// ============================================================
+// 포지션 한국어
+// ============================================================
+
+const POSITION_KO: Partial<Record<Position, string>> = {
+  P:    '투수',
+  C:    '포수',
+  '1B': '1루수',
+  '2B': '2루수',
+  '3B': '3루수',
+  SS:   '유격수',
+  LF:   '좌익수',
+  CF:   '중견수',
+  RF:   '우익수',
+  DH:   '지명타자',
+}
+
+// theta_h → 방향 레이블 (0°=중견수, +=우측, -=좌측)
+function directionLabel(theta: number): string {
+  if (theta <= -28) return '좌측 선상'
+  if (theta <= -10) return '좌중간'
+  if (theta <   10) return '중'
+  if (theta <   28) return '우중간'
+  return '우측 선상'
+}
+
+function posKo(position: Position | undefined): string {
+  return (position && POSITION_KO[position]) ?? ''
+}
 
 // ============================================================
 // 구종 한국어
@@ -92,10 +122,57 @@ const BALL_TYPE_OUT_SUB: Record<BallType, string> = {
 }
 
 export function atBatResultToText(ev: GameEvent): { title: string; sub?: string } {
-  const p = ev.payload as { result: AtBatResult; ball_type?: BallType }
-  if (p.result === 'out' && p.ball_type) {
-    return { title: '아웃', sub: BALL_TYPE_OUT_SUB[p.ball_type] }
+  const p = ev.payload as {
+    result:     AtBatResult
+    ball_type?: BallType
+    fielder?:   { position_1?: Position }
+    theta_h?:   number
   }
+
+  const pos    = p.fielder?.position_1
+  const pName  = posKo(pos)
+  const dir    = p.theta_h !== undefined ? directionLabel(p.theta_h) : ''
+  const isInfield = pos !== undefined && ['P', 'C', '1B', '2B', '3B', 'SS'].includes(pos)
+
+  // ── 아웃 ──────────────────────────────────────────────────
+  if (p.result === 'out' && p.ball_type) {
+    let sub: string
+    switch (p.ball_type) {
+      case 'grounder':
+        sub = pName ? `${pName} 땅볼 아웃` : '땅볼 아웃'
+        break
+      case 'popup':
+        sub = pName ? `${pName} 팝업 아웃` : '팝업 아웃'
+        break
+      case 'line_drive':
+        sub = dir ? `${dir} 라인드라이브 아웃` : '라인드라이브 아웃'
+        break
+      case 'fly':
+      default:
+        sub = (dir && pName) ? `${dir} ${pName} 플라이 아웃`
+            : pName           ? `${pName} 플라이 아웃`
+            : dir             ? `${dir} 플라이 아웃`
+            : '플라이 아웃'
+    }
+    return { title: '아웃', sub }
+  }
+
+  // ── 안타 계열 ─────────────────────────────────────────────
+  if (p.result === 'single') {
+    const sub = isInfield
+      ? (pName ? `${pName} 내야 안타` : '내야 안타')
+      : (dir   ? `${dir} 안타`        : '안타')
+    return { title: '안타', sub }
+  }
+  if (p.result === 'double')   return { title: '2루타',  sub: dir ? `${dir} 2루타`  : '2루타'  }
+  if (p.result === 'triple')   return { title: '3루타',  sub: dir ? `${dir} 3루타`  : '3루타'  }
+  if (p.result === 'home_run') return { title: '홈런',   sub: dir ? `${dir} 홈런`   : '홈런'   }
+
+  // ── 실책 ─────────────────────────────────────────────────
+  if (p.result === 'reach_on_error') {
+    return { title: '실책', sub: pName ? `${pName} 실책 출루` : '실책 출루' }
+  }
+
   return AT_BAT_RESULT_KO[p.result] ?? { title: p.result }
 }
 

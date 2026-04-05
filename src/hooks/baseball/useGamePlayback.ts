@@ -85,8 +85,12 @@ export interface PlaybackActions {
 
 function nextUnitEnd(events: GameEvent[], from: number, unit: ProgressUnit): number {
   if (unit === 'pitch') return from + 1
-  // at_bat: at_bat_result까지 한 번에 공개.
+  // at_bat: at_bat_result 이후 다음 투구/이닝 전까지 후속 이벤트(runner_advance, score 등)를 함께 공개.
+  // 이렇게 해야 at_bat_result와 runner_advance가 같은 틱에 처리되어 애니메이션이 올바르게 동작함.
   // 단, 타석 중 steal_attempt가 있으면 steal_result 직후를 먼저 중간 경계로 반환.
+  const POST_AT_BAT_BOUNDARY = new Set([
+    'pitch', 'steal_attempt', 'inning_start',
+  ])
   for (let i = from; i < events.length; i++) {
     if (events[i].type === 'steal_attempt') {
       for (let j = i + 1; j < events.length; j++) {
@@ -94,7 +98,12 @@ function nextUnitEnd(events: GameEvent[], from: number, unit: ProgressUnit): num
         if (events[j].type === 'at_bat_result')  break  // steal_result 없이 at_bat_result 도달
       }
     }
-    if (events[i].type === 'at_bat_result') return i + 1
+    if (events[i].type === 'at_bat_result') {
+      // at_bat_result 직후부터 다음 투구/이닝 시작 전까지 후속 이벤트 포함
+      let j = i + 1
+      while (j < events.length && !POST_AT_BAT_BOUNDARY.has(events[j].type)) j++
+      return j
+    }
   }
   return events.length
 }

@@ -465,11 +465,12 @@ function resolveRunnerAdvances(
   const attemptedBases = new Set<BaseKey>()
 
   type RunnerAttempt = {
-    runner:      Player
-    fromBase:    1 | 2 | 3
-    targetBase:  BaseKey
-    runner_dist: number
-    t_arrival:   number
+    runner:       Player
+    fromBase:     1 | 2 | 3
+    targetBase:   BaseKey
+    runner_dist:  number
+    t_arrival:    number
+    forceMinBase: BaseKey | undefined  // 강제 최소 진루 베이스
   }
 
   const attempts: RunnerAttempt[] = []
@@ -517,7 +518,7 @@ function resolveRunnerAdvances(
       if (found.targetBase !== 'home') {
         attemptedBases.add(found.targetBase)
       }
-      attempts.push({ runner, fromBase, ...found })
+      attempts.push({ runner, fromBase, ...found, forceMinBase })
     }
   }
 
@@ -528,10 +529,19 @@ function resolveRunnerAdvances(
     (scoreContext.battingScore + 1 >= scoreContext.defenseScore)
 
   // ── 송구 방향 결정 ──────────────────────────────────────────
-  const chosenTarget: BaseKey | null = attempts.length > 0
+  // 2루타에서 forceMinBase까지만 가는 주자는 송구 타깃 후보에서 제외.
+  // 2루타는 공이 충분히 멀리 가므로 수비수가 강제 진루 주자를 잡을 수 없음 (head start 너무 큼).
+  const throwCandidates = result === 'double'
+    ? attempts.filter(a =>
+        a.forceMinBase === undefined ||
+        BASE_ORDER.indexOf(a.targetBase) > BASE_ORDER.indexOf(a.forceMinBase)
+      )
+    : attempts
+
+  const chosenTarget: BaseKey | null = throwCandidates.length > 0
     ? decideThrowTarget(
         fielder,
-        attempts.map(a => ({ runner: a.runner, target: a.targetBase, runner_dist: a.runner_dist })),
+        throwCandidates.map(a => ({ runner: a.runner, target: a.targetBase, runner_dist: a.t_arrival * calcRunnerSpeed(a.runner) })),
         initial_bs,
         isCritical,
         lineup,
@@ -621,16 +631,31 @@ function resolveRunnerAdvances(
 
   // 도전 주자 처리
   for (const attempt of attempts) {
-    const { runner, fromBase, targetBase, runner_dist, t_arrival } = attempt
+    const { runner, fromBase, targetBase, runner_dist, t_arrival, forceMinBase } = attempt
     const fromNum: 1 | 2 | 3                  = fromBase
     const toNum:   1 | 2 | 3 | 'home'         =
       targetBase === '1B' ? 1 :
       targetBase === '2B' ? 2 :
       targetBase === '3B' ? 3 : 'home'
 
+    // 2루타 강제 진루 주자: 자동 안착 (수비수가 송구로 잡을 수 없는 상황)
+    if (result === 'double' && forceMinBase !== undefined && targetBase === forceMinBase) {
+      if (targetBase === 'home') {
+        runsScored++
+      } else {
+        if (targetBase === '1B') nextRunners.first  = runner
+        if (targetBase === '2B') nextRunners.second = runner
+        if (targetBase === '3B') nextRunners.third  = runner
+      }
+      moves.push({ runner, from: fromNum, to: toNum })
+      continue
+    }
+
     if (chosenTarget !== null && targetBase === chosenTarget) {
       // ── 주 타깃 주자: 실제 송구 판정 ──────────────────────────
-      const verdict = throwVerdictForTarget(runner, runner_dist, targetBase)
+      // t_arrival * speed = total runner dist from t=0 (resolveThrow 기준 통일)
+      const effective_runner_dist = t_arrival * calcRunnerSpeed(runner)
+      const verdict = throwVerdictForTarget(runner, effective_runner_dist, targetBase)
 
       if (verdict === 'out') {
         outs_added++
@@ -804,7 +829,7 @@ function resolveBatterAdvance(batter: Player, hp: HitResultDetail): 1 | 2 {
 
   const fielder_pos  = getFielderPos(hp)
   const throw_dist   = euclidDist(fielder_pos, BASE_POS['2B'])
-  const runner_dist  = calcRemainingTo2B(hp.t_ball_travel, batter)
+  const runner_dist  = calcRemainingTo2B(0, batter)
   const verdict      = resolveThrow(hp.fielder, throw_dist, hp.t_fielding, batter, runner_dist)
   return (verdict === 'safe' || verdict === 'wild_throw') ? 2 : 1
 }

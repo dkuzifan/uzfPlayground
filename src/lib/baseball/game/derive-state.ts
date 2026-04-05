@@ -125,6 +125,8 @@ export function deriveState(
           result = 'foul'
         } else if (p.contact === true) {
           result = 'inplay'
+        } else if (p.swing && !p.contact) {
+          result = 'strike'  // 헛스윙: 존 밖이라도 스트라이크
         } else if (p.pitch.is_strike) {
           result = 'strike'
         } else {
