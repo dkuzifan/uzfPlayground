@@ -927,7 +927,7 @@ function AtBatBlock({ ab }: { ab: AtBatGroup }) {
 
 function BoxTab({ stats, linescore, score, homeTeam, awayTeam }: {
   stats:      ReturnType<typeof useGamePlayback>['liveStats']
-  linescore:  { away: number[]; home: number[] }
+  linescore:  { away: (number | null)[]; home: (number | null)[] }
   score:      { home: number; away: number }
   homeTeam:   TW
   awayTeam:   TW
@@ -952,7 +952,7 @@ function BoxTab({ stats, linescore, score, homeTeam, awayTeam }: {
 }
 
 function Linescore({ linescore, homeTeam, awayTeam, finalScore }: {
-  linescore:  { away: number[]; home: number[] }
+  linescore:  { away: (number | null)[]; home: (number | null)[] }
   homeTeam:   TW
   awayTeam:   TW
   finalScore: { home: number; away: number }
@@ -975,14 +975,18 @@ function Linescore({ linescore, homeTeam, awayTeam, finalScore }: {
           <tr>
             <td className="py-1 text-left font-semibold" style={{ color: awayTeam.primary_color }}>{awayTeam.short_name}</td>
             {linescore.away.map((r, i) => (
-              <td key={i} className="py-1 text-white/70">{r}</td>
+              <td key={i} className={`py-1 ${r === null ? 'text-white/20' : 'text-white/70'}`}>
+                {r === null ? '-' : r}
+              </td>
             ))}
             <td className="py-1 font-bold text-white">{finalScore.away}</td>
           </tr>
           <tr>
             <td className="py-1 text-left font-semibold" style={{ color: homeTeam.primary_color }}>{homeTeam.short_name}</td>
             {linescore.home.map((r, i) => (
-              <td key={i} className="py-1 text-white/70">{r}</td>
+              <td key={i} className={`py-1 ${r === null ? 'text-white/20' : 'text-white/70'}`}>
+                {r === null ? '-' : r}
+              </td>
             ))}
             <td className="py-1 font-bold text-white">{finalScore.home}</td>
           </tr>

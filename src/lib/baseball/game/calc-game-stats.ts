@@ -28,14 +28,22 @@ function makePitcherStats(player: Player): PitcherGameStats {
 }
 
 function initTeamState(team: TeamInfo): TeamState {
+  // 선발 라인업 전원 사전 초기화 — 출장 전이라도 박스스코어에 0으로 표시
+  const batters     = new Map<string, BatterGameStats>()
+  const batterOrder: string[] = []
+  for (const player of team.lineup) {
+    batters.set(player.id, makeBatterStats(player))
+    batterOrder.push(player.id)
+  }
+
   const pitchers = new Map<string, PitcherGameStats>()
   pitchers.set(team.pitcher.id, makePitcherStats(team.pitcher))
 
   return {
-    batters:        new Map(),
+    batters,
     pitchers,
     fielders:       new Map(),
-    batterOrder:    [],
+    batterOrder,
     pitcherOrder:   [team.pitcher.id],
     currentPitcher: team.pitcher.id,
     score:          0,

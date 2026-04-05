@@ -68,7 +68,7 @@ export interface PlaybackState {
   liveState:     LiveGameState
   pbpGroups:     PBPGroup[]
   liveStats:     GameStats
-  liveLinescore: { away: number[]; home: number[] }
+  liveLinescore: { away: (number | null)[]; home: (number | null)[] }
   result:        GameResult | null
 }
 
@@ -245,32 +245,32 @@ function buildPBPGroups(
 // buildLiveLinescore — 공개된 이벤트에서 이닝별 득점 추출
 // ============================================================
 
-function buildLiveLinescore(events: GameEvent[]): { away: number[]; home: number[] } {
-  const away: number[] = []
-  const home: number[] = []
+function buildLiveLinescore(events: GameEvent[]): { away: (number | null)[]; home: (number | null)[] } {
+  let maxInning     = 9
   let currentInning = 1
   let currentIsTop  = true
+
+  // 완료된 이닝 득점 수집
+  const awayScores: Record<number, number> = {}
+  const homeScores: Record<number, number> = {}
 
   for (const ev of events) {
     if (ev.type === 'inning_start') {
       currentInning = ev.inning
       currentIsTop  = ev.isTop
+      if (currentInning > maxInning) maxInning = currentInning
     }
     if (ev.type === 'inning_end') {
       const p = ev.payload as { runs_this_half: number }
-      const idx = currentInning - 1
-      if (currentIsTop) {
-        while (away.length <= idx) away.push(0)
-        away[idx] = p.runs_this_half
-      } else {
-        while (home.length <= idx) home.push(0)
-        home[idx] = p.runs_this_half
-      }
+      if (currentIsTop) awayScores[currentInning] = p.runs_this_half
+      else              homeScores[currentInning] = p.runs_this_half
     }
   }
 
-  // 현재 진행 중인 이닝은 linescore에 포함하지 않음 (inning_end 미발생)
-  // away/home 길이를 맞춤 (홈팀 말이 아직 끝나지 않으면 home이 away보다 짧을 수 있음)
+  // 1회~maxInning 배열 생성: 완료된 이닝은 숫자, 미완료는 null
+  const away = Array.from({ length: maxInning }, (_, i) => awayScores[i + 1] ?? null)
+  const home = Array.from({ length: maxInning }, (_, i) => homeScores[i + 1] ?? null)
+
   return { away, home }
 }
 
