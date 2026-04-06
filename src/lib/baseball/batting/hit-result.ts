@@ -40,15 +40,16 @@ export function fenceDistance(
 function resolveHitType(
   range: number,
 ): Exclude<AtBatResult, 'in_progress' | 'strikeout' | 'walk' | 'hit_by_pitch' | 'home_run' | 'out'> {
-  // range < 36m: 내야 → 단타
-  if (range < 36) return 'single'
+  // range < 45m: 내야 ~ 얕은 외야 → 단타
+  // (롤링 거리 포함 유효 거리 기준 재조정: 이전 36m → 45m)
+  if (range < 45) return 'single'
 
-  // 36m ≤ range < 70m: 외야 얕은 타구
+  // 45m ≤ range < 70m: 중간 외야 (80% 단타 / 20% 2루타)
   if (range < 70) {
-    return Math.random() < 0.70 ? 'single' : 'double'
+    return Math.random() < 0.80 ? 'single' : 'double'
   }
 
-  // range ≥ 70m: 깊은 외야 (주루 스탯 반영은 #2 송구 판정 이후 고도화 예정)
+  // range ≥ 70m: 깊은 외야
   const r = Math.random()
   if (r < 0.30) return 'single'
   if (r < 0.90) return 'double'
@@ -90,7 +91,7 @@ export function resolveHitResult(
 
   // 5. 홈런 판정
   if (physics.range >= fenceDistance(theta_h)) {
-    return { result: 'home_run', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield: false, ball_type: ballType, theta_h }
+    return { result: 'home_run', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield: false, range: physics.range, ball_type: ballType, theta_h }
   }
 
   // 6. 포구 확률 계산
@@ -103,16 +104,16 @@ export function resolveHitResult(
   if (roll < p_out) {
     // 포구 성공 → 아웃
     const catch_setup_time = p_out >= 0.5 ? 0.2 : 0.4
-    return { result: 'out', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield, ball_type: ballType, theta_h, catch_setup_time }
+    return { result: 'out', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield, range: physics.range, ball_type: ballType, theta_h, catch_setup_time }
   }
   if (roll < p_out + p_error) {
     // 실책 출루
     const roe_t_fielding = is_infield ? t_fielding + 3.0 : t_fielding
-    return { result: 'reach_on_error', fielder, fielder_pos, t_fielding: roe_t_fielding, t_ball_travel, is_infield, ball_type: ballType, theta_h, is_error: true }
+    return { result: 'reach_on_error', fielder, fielder_pos, t_fielding: roe_t_fielding, t_ball_travel, is_infield, range: physics.range, ball_type: ballType, theta_h, is_error: true }
   }
 
   // 8. 히트 종류 결정
   const result = resolveHitType(physics.range)
   const hit_t_fielding = is_infield ? t_fielding + 3.0 : t_fielding
-  return { result, fielder, fielder_pos, t_fielding: hit_t_fielding, t_ball_travel, is_infield, ball_type: ballType, theta_h }
+  return { result, fielder, fielder_pos, t_fielding: hit_t_fielding, t_ball_travel, is_infield, range: physics.range, ball_type: ballType, theta_h }
 }

@@ -96,14 +96,27 @@ export function calcBattedBallPhysics(
 
   const range_raw = xAt(t_bounce)
 
-  // Magnus carry_factor (백스핀 양력 근사)
-  const contact_quality = Math.max(0, Math.min(1, (ev_kmh - 120) / 50))
-  const carry_factor    = 1.0 + contact_quality * PHYSICS_CONFIG.carry_factor_max
-  const range           = range_raw * carry_factor
-
   // 첫 바운드 수평 속도 (drag 감속 후)
   const vx_bounce = vx0 * Math.exp(-D * t_bounce)
   const v_roll_0  = vx_bounce * RESTITUTION
+
+  // Magnus carry_factor (백스핀 양력 근사 — 공중 타구 전용)
+  const contact_quality = Math.max(0, Math.min(1, (ev_kmh - 120) / 50))
+  const carry_factor    = 1.0 + contact_quality * PHYSICS_CONFIG.carry_factor_max
+
+  // Phase B: 구르기 거리 (grounder 전용)
+  // 첫 바운드 후 잔디 마찰로 감속하며 구르는 거리
+  // mu_roll = 0.85 (야구공 잔디 위 유효 구르기 마찰 계수)
+  const MU_ROLL   = 0.85
+  const roll_dist = la_deg <= 10
+    ? (v_roll_0 * v_roll_0) / (2 * MU_ROLL * G)
+    : 0
+
+  // grounder: carry_factor 미적용 (지면 구르기), 구르기 거리 추가
+  // fly/line_drive: carry_factor 적용, 구르기 없음
+  const range = la_deg <= 10
+    ? range_raw + roll_dist
+    : range_raw * carry_factor
 
   return {
     range,

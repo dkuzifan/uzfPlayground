@@ -197,7 +197,20 @@ export function deriveState(
 
       case 'steal_result': {
         const p = ev.payload as { runner: Player; from: 1|2; to: 2|3|'home'; success: boolean }
-        if (!p.success) outs++
+        if (!p.success) {
+          outs++
+          // 실패: 출발 베이스 주자 제거
+          if (p.from === 1) runners = { ...runners, first:  false }
+          if (p.from === 2) runners = { ...runners, second: false }
+        } else {
+          // 성공: 출발 베이스 → 도착 베이스 이동
+          const r = { ...runners }
+          if (p.from === 1) r.first  = false
+          if (p.from === 2) r.second = false
+          if (p.to === 2)   r.second = true
+          if (p.to === 3)   r.third  = true
+          runners = r
+        }
         animEvents.push({ type: 'steal_result', from: p.from, to: p.to, success: p.success })
         break
       }
@@ -209,8 +222,7 @@ export function deriveState(
       }
 
       case 'tag_up': {
-        const p = ev.payload as { runner: Player; from: 1|2|3; to: 1|2|3|'home'; safe: boolean }
-        animEvents.push({ type: 'tag_up', from: p.from, to: p.to, safe: p.safe })
+        // 태그업 결과는 runner_advance 이벤트에도 포함됨 — animEvents 중복 추가 방지
         break
       }
     }

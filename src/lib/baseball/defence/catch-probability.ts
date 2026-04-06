@@ -90,16 +90,18 @@ export function calcCatchProbability(
     const fielder_speed   = outfielder_speed_min + (defence / 100) * (outfielder_speed_max - outfielder_speed_min)
     const reachable_dist  = fielder_speed * t_bounce
     const excess          = Math.max(d - reachable_dist, 0)
-    // reachable 범위 안: 0.87, 초과할수록 감소 (1m당 −0.10)
-    // 0.95→0.82→0.87: BABIP 25.2%→32.8%→목표 28~31% 중간값 보정
-    return clamp(0.87 - 0.10 * excess, 0.05, 0.87)
+    // 포구 확률 상한: 0.80 (이전 0.87 — 땅볼 수비 모델 보정 후 전체 BABIP 재캘리브레이션)
+    // 1m 초과당 −0.10
+    return clamp(0.80 - 0.10 * excess, 0.05, 0.80)
   }
 
   // 내야 땅볼 — 거리·속도 기반 범위 모델
-  // 가까울수록(d 작을수록) 높음, 타구 속도 빠를수록(v_roll_0 클수록) 낮음
+  // 땅볼은 공이 구르기 때문에 수비수가 공을 보며 이동할 시간이 충분히 있다.
+  // reachable_dist: 2.5초 이내 이동 가능 거리 (타구 → 착지 전체 시간)
+  // speed_penalty: 빠른 타구일수록 정면 돌파가 어려움 (최대 0.12)
   const fielder_speed_g = 4.0 + (defence / 100) * 2.0  // 4.0–6.0 m/s
-  const reachable_dist  = fielder_speed_g * 1.0          // 1초 이내 이동 가능 거리
-  const speed_penalty   = Math.min(0.25, v_roll_0 / 20 * 0.25)  // 속구 페널티 최대 0.25
+  const reachable_dist  = fielder_speed_g * 1.8          // 1.8초 이내 이동 가능 거리
+  const speed_penalty   = Math.min(0.18, v_roll_0 / 20 * 0.18)  // 속구 페널티 최대 0.18
   const excess          = Math.max(0, d - reachable_dist)
   return clamp(0.90 - 0.10 * excess - speed_penalty, 0.05, 0.90)
 }

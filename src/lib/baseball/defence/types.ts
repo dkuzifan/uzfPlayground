@@ -32,6 +32,7 @@ export interface HitResultDetail {
   t_fielding:       number        // t_ball_travel + 0.3s
   t_ball_travel:    number        // = t_bounce
   is_infield:       boolean       // range < 36m
+  range?:            number        // Magnus 보정 착지 거리 (m) — 통계·캘리브레이션용
   ball_type?:        BallType      // 타구 분류 (항상 설정)
   theta_h?:          number        // 방향각 (°): 0=중견수, +=우측, -=좌측
   catch_setup_time?: number       // 포구 난이도별 송구 준비 시간 (일반: 0.2s, 어려운 포구: 0.4s)

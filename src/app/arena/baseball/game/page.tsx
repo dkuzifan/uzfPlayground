@@ -682,10 +682,14 @@ function RunnerDiamond({
   }, [animatePath, fadeOut, updateDots])
 
   // 이닝 변경 시 도트 전체 초기화.
-  // prevSeqRef를 현재 animSeq로 맞춰, 새 이닝의 이벤트만 처리되도록 함.
+  // NOTE: prevSeqRef는 여기서 건드리지 않는다.
+  // nextUnitEnd가 inning_start와 같은 틱에 runner_advance를 공개하므로
+  // inning change effect(1번)와 animSeq effect(2번)가 같은 React 렌더에서 동시에 발화한다.
+  // 여기서 prevSeqRef = animSeq 로 앞당기면 animSeq effect가 그 새 이닝 이벤트를 스킵하는 버그 발생.
+  // 통상 플로우에서 prevSeqRef는 이미 이전 이닝의 모든 이벤트를 처리한 위치이므로
+  // 건드리지 않아도 과거 이닝 이벤트가 재처리되지 않는다.
   useEffect(() => {
     dotsRef.current = []
-    prevSeqRef.current = animSeq  // 과거 이닝 이벤트 재처리 방지
     repaint()
   }, [inning, isTop])  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1103,11 +1107,14 @@ function Linescore({ linescore, homeTeam, awayTeam, finalScore, awayH, homeH, aw
           </tr>
           <tr>
             <td className="py-1 text-left font-semibold" style={{ color: homeTeam.primary_color }}>{homeTeam.short_name}</td>
-            {linescore.home.map((r, i) => (
-              <td key={i} className={`py-1 ${r === null ? 'text-white/20' : 'text-white/70'}`}>
-                {r === null ? '-' : r}
-              </td>
-            ))}
+            {Array.from({ length: innings }, (_, i) => {
+              const r = linescore.home[i]
+              return (
+                <td key={i} className={`py-1 ${r === undefined ? 'text-white/40' : r === null ? 'text-white/20' : 'text-white/70'}`}>
+                  {r === undefined ? 'X' : r === null ? '-' : r}
+                </td>
+              )
+            })}
             <td className="py-1 font-bold text-white">{finalScore.home}</td>
             <td className="py-1 text-white/70">{homeH ?? '-'}</td>
             <td className="py-1 text-white/70">{homeE ?? '-'}</td>
