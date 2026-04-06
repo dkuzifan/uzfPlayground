@@ -1136,20 +1136,31 @@ function resolveInfieldOut(
     return { nextRunners: next, runsScored: 0, outs_added: 0, moves, events }
   }
 
-  // 2. 포스 주자 전원 아웃 처리
+  // 2. 포스 처리: 피벗 베이스 주자만 아웃, 나머지는 정상 진루
   const isForceRunner = (fromBase: 1 | 2 | 3) =>
     pivot.forceRunners.some(f => f.from === fromBase)
 
   for (const fo of pivot.forceRunners) {
-    outs_added++
-    moves.push({ runner: fo.runner, from: fo.from, to: fo.to === 'home' ? 'home' : fo.to, wasOut: true })
-    events.push({
-      type:    'force_out',
-      inning:  inningCtx?.inning ?? 0,
-      isTop:   inningCtx?.isTop  ?? false,
-      payload: { runner: fo.runner, from: fo.from, to: fo.to },
-    })
-    if (fo.to === 'home') runsScored++
+    if (fo.to === pivot.pivotBase) {
+      // 피벗 베이스(2루) 포스아웃 — 1루→2루 주자만 아웃
+      outs_added++
+      moves.push({ runner: fo.runner, from: fo.from, to: fo.to, wasOut: true })
+      events.push({
+        type:    'force_out',
+        inning:  inningCtx?.inning ?? 0,
+        isTop:   inningCtx?.isTop  ?? false,
+        payload: { runner: fo.runner, from: fo.from, to: fo.to },
+      })
+    } else {
+      // 피벗 이외 포스 주자 → 정상 진루 (2루→3루, 3루→홈)
+      if (fo.to === 'home') {
+        runsScored++
+      } else {
+        if (fo.to === 3) next.third  = fo.runner
+        if (fo.to === 2) next.second = fo.runner  // pivotBase=2 케이스에서 발생하지 않음
+      }
+      moves.push({ runner: fo.runner, from: fo.from, to: fo.to })
+    }
   }
 
   // 3. 비포스 주자 처리
