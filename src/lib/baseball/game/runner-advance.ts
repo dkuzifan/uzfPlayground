@@ -196,9 +196,9 @@ function findRunnerTarget(
       // 첫 단계: calcRunnerDist (도루 상태 + secondary lead 반영)
       runner_dist = calcRunnerDist(runner, fromBase, nextKey, stealState)
     } else {
-      // 후속 단계: 이미 이동 중, 두 베이스 간 직선 거리
+      // 후속 단계: 이미 이동 중 (running start 반영 — 루를 돌며 가속이 붙어 있음)
       const currentKey = BASE_ORDER[i - 1]
-      runner_dist = euclidDist(BASE_POS[currentKey], BASE_POS[nextKey])
+      runner_dist = Math.max(0, euclidDist(BASE_POS[currentKey], BASE_POS[nextKey]) - calcPitchLead(runner))
     }
 
     const t_to_next   = runner_dist / runner_speed
@@ -271,7 +271,7 @@ function resolveLDDoublePlay(
       if (fromBase === 1) nextRunners.first  = null
       if (fromBase === 2) nextRunners.second = null
       if (fromBase === 3) nextRunners.third  = null
-      moves.push({ runner, from: fromBase, to: fromBase })
+      moves.push({ runner, from: fromBase, to: fromBase, wasOut: true })
     }
     // 귀루 성공 → 현재 베이스 유지 (nextRunners 변경 없음)
   }
@@ -298,16 +298,21 @@ function resolveOutfieldFlyOut(
 ): AdvanceResult {
   const lineup       = defenceLineup
   const fielder_pos  = getFielderPos(hp)
-  const reaction_delay = hp.catch_setup_time ?? 0.2
+  // 태그업 셋업 시간: 포구 → 송구 준비까지 외야수 실측 기준 0.7~1.0s
+  // 0.2s(기본값)는 너무 짧아 태그업이 전혀 발생하지 않는 문제가 있었음.
+  const reaction_delay = hp.catch_setup_time ?? 0.8
 
-  // 포구 완료 상태 — 외야수가 공을 쥐고 있음
+  // 포구 완료 — 외야수가 공을 쥐고 reaction_delay 동안 송구 준비 중
+  // phase='fielding' + t_remaining=reaction_delay 로 설정하면
+  // calcBallArrivalTime이 (reaction_delay + throw_time)을 올바르게 계산함.
+  // (phase='held'로 만들면 adjustBallState가 reaction_delay를 무시하는 버그 회피)
   const ball_state: BallState = {
-    phase:       'held',
+    phase:       'fielding',
+    t_remaining: reaction_delay,
     fielder:     hp.fielder,
     fielder_pos,
   }
-  // 포구 후 준비 시간만큼 경과한 BallState
-  const adjusted_bs = adjustBallState(ball_state, reaction_delay)
+  const adjusted_bs = ball_state  // reaction_delay는 t_remaining에 이미 반영됨
 
   let nextRunners: Runners = { ...runners }
   let runsScored  = 0
@@ -334,12 +339,9 @@ function resolveOutfieldFlyOut(
       nextKey === '2B' ? 2 :
       nextKey === '3B' ? 3 : 'home'
 
-    const lead_dist   = calcPitchLead(runner)
-    const full_dist   = euclidDist(BASE_POS[fromKey], BASE_POS[nextKey])
-    // 귀루 거리를 더해 decideChallengeAdvance에서 자연스럽게 불리하게 작용
-    const runner_dist = full_dist + lead_dist
+    const full_dist = euclidDist(BASE_POS[fromKey], BASE_POS[nextKey])
 
-    const willChallenge = decideChallengeAdvance(runner, runner_dist, adjusted_bs, nextKey, lineup)
+    const willChallenge = decideChallengeAdvance(runner, full_dist, adjusted_bs, nextKey, lineup)
 
     const inning = inningCtx?.inning ?? 0
     const isTop  = inningCtx?.isTop  ?? false
@@ -349,9 +351,15 @@ function resolveOutfieldFlyOut(
       continue
     }
 
-    // 태그업 시도 → 송구 판정
-    const throw_dist = euclidDist(fielder_pos, BASE_POS[nextKey])
-    const verdict    = resolveThrow(hp.fielder, throw_dist, reaction_delay, runner, runner_dist)
+    // 태그업 시도 → 송구 판정 (relay 필요 여부 자동 선택)
+    const targetPos  = BASE_POS[nextKey]
+    const throw_dist = euclidDist(fielder_pos, targetPos)
+    const relayMan   = selectRelayMan(fielder_pos, lineup)
+    const relayPos   = calcRelayPos(fielder_pos, targetPos)
+    const useRelay   = shouldUseRelay(hp.fielder, fielder_pos, targetPos, 0, relayMan, relayPos)
+    const verdict    = useRelay
+      ? resolveRelayThrow(hp.fielder, fielder_pos, relayMan, targetPos, reaction_delay, runner, full_dist)
+      : resolveThrow(hp.fielder, throw_dist, reaction_delay, runner, full_dist)
 
     events.push({
       type: 'tag_up',
@@ -405,7 +413,7 @@ function resolveOutfieldFlyOut(
       if (fromBase === 2) nextRunners.second = null
       if (fromBase === 3) nextRunners.third  = null
       outs_added++
-      moves.push({ runner, from: fromBase, to: toNum })
+      moves.push({ runner, from: fromBase, to: toNum, wasOut: true })
 
       // outs === 1 이고 이 귀루 아웃이 3번째 아웃 → 이후 진루 처리 중단
       if ((outs ?? 0) === 1) break
@@ -1134,7 +1142,7 @@ function resolveInfieldOut(
 
   for (const fo of pivot.forceRunners) {
     outs_added++
-    moves.push({ runner: fo.runner, from: fo.from, to: fo.to === 'home' ? 'home' : fo.to })
+    moves.push({ runner: fo.runner, from: fo.from, to: fo.to === 'home' ? 'home' : fo.to, wasOut: true })
     events.push({
       type:    'force_out',
       inning:  inningCtx?.inning ?? 0,
@@ -1183,7 +1191,7 @@ function resolveInfieldOut(
   if (isDP) {
     // 병살 성공: 타자도 아웃
     outs_added++
-    moves.push({ runner: batter, from: 'batter', to: 1 })
+    moves.push({ runner: batter, from: 'batter', to: 1, wasOut: true })
   } else {
     // 타자 1루 세이프 (야수 선택)
     next.first = batter

@@ -80,6 +80,7 @@ function calcThrowTime(
   }
 
   // 중계 경로 시간 (t_fielding은 호출자가 이미 반영하므로 여기서는 비행 시간만)
+  // 0.8s: resolveRelayThrow의 중계수 반응 시간과 일치 (일관성 유지)
   const spd_relay       = (80 + relay_man.stats.throw * 0.7) / 3.6
   const dist_to_relay   = euclidDist(fielder_pos, relay_pos)
   const dist_relay_to_t = euclidDist(relay_pos, target_pos)

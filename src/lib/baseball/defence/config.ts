@@ -10,7 +10,7 @@ export const PHYSICS_CONFIG = {
    * - MLB 기준: 0.26  (저마찰 공 + 높은 EV, 2019 이후 Statcast 기반)
    * contact_quality=1.0일 때 carry_factor = 1 + carry_factor_max
    */
-  carry_factor_max: 0.22,
+  carry_factor_max: 0.26,
 
   /**
    * 외야수 스프린트 속도 범위 (m/s)

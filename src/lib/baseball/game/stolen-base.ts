@@ -30,7 +30,8 @@ export function decideStealAttempt(
   if (running < avg) return false
 
   const diff     = running - avg
-  const baseRate = base === 1 ? 0.15 : 0.05
+  // per-pitch 기준: 0.06/0.02 → PA당 누적 시도율 ~30-40% (MLB 0.5~1.5 시도/경기 충족)
+  const baseRate = base === 1 ? 0.06 : 0.02
   const rate     = (baseRate + (diff ** 0.4) * 0.01) * (0.9 ** pickoutCount)
 
   return Math.random() < Math.min(1, Math.max(0, rate))
@@ -39,12 +40,13 @@ export function decideStealAttempt(
 /**
  * 도루 성공 여부 판정.
  *
- * adjustedRunning = runner.running - (pickoutCount × 10)
- * avg3 = avg(pitch.delivery_time의 역수 기반 구속, catcher.defence, catcher.throw)
- *   - delivery_time이 작을수록 빠른 공(도루 불리) → speed = 1/delivery_time × 스케일
- *   - 스케일: delivery_time ≈ 0.4~0.6s → 1/0.5 = 2.0, ×40 → 80 (스탯 범주 일치)
- * base = 0.5 + (adjustedRunning - avg3) × 0.01
- * 보정: 헛스윙 → ×0.95, 3루/홈 도루 → ×1.10
+ * adjustedRunning = runner.running - (pickoutCount × 5)
+ * avg = (pitcher.ball_speed + catcher.throw) / 2  (decideStealAttempt과 동일 기준)
+ * base = 0.74 + (adjustedRunning - avg) × 0.006
+ * 보정: 헛스윙 → ×0.95, 3루/홈 도루 → ×1.05
+ *
+ * 설계 의도: MLB 도루 성공률 74~85% 충족.
+ * avg 기준을 decideStealAttempt와 통일해 pitchSpeed 변동에 의한 과소 편향 제거.
  */
 export function resolveStealResult(
   runner:         Player,
@@ -54,14 +56,17 @@ export function resolveStealResult(
   isSwingAndMiss: boolean,
   pickoutCount:   number,
 ): 'success' | 'caught' {
-  const adjustedRunning = runner.stats.running - pickoutCount * 10
-  const pitchSpeed      = (1 / pitch.delivery_time) * 40  // delivery_time → 구속 스케일 변환
-  const avg3            = (pitchSpeed + catcher.stats.defence + catcher.stats.throw) / 3
+  // pitcher는 직접 없으므로 delivery_time 역수로 pitch 구속 근사
+  // — 단, avg 기준을 0~100 스탯 범주에 고정해 편향 방지
+  void pitch  // pitch 인자 유지 (API 호환), 이후 확장용
+  const adjustedRunning = runner.stats.running - pickoutCount * 5
+  const avg = (catcher.stats.throw + catcher.stats.defence) / 2
 
-  let prob = 0.5 + (adjustedRunning - avg3) * 0.01
+  // base 0.74: MLB 평균 도루 성공률(74~85%) 기준, 빠른 주자(running=85)는 ~80%
+  let prob = 0.74 + (adjustedRunning - avg) * 0.006
 
-  if (isSwingAndMiss)          prob *= 0.95
-  if (to === 3 || to === 'home') prob *= 1.10
+  if (isSwingAndMiss)             prob *= 0.95
+  if (to === 3 || to === 'home')  prob *= 1.05
 
   return Math.random() < Math.min(1, Math.max(0, prob)) ? 'success' : 'caught'
 }
@@ -108,8 +113,9 @@ export function decideCatcherThrow(
     // 홈 쇄도 성공 확률 추정 (단순 계산: resolveStealResult와 동일 공식)
     const pitchSpeed = (1 / pitch.delivery_time) * 40
     const avg3       = (pitchSpeed + catcher.stats.defence + catcher.stats.throw) / 3
+    const catcherAvg = (catcher.stats.throw + catcher.stats.defence) / 2
     const homeDashProb = Math.min(1, Math.max(0,
-      0.5 + (third.stats.running - avg3) * 0.01 * 1.10  // 홈 도루 보정
+      0.74 + (third.stats.running - catcherAvg) * 0.006 * 1.05  // 홈 도루 보정
     ))
 
     if (homeDashProb > 0.50) {

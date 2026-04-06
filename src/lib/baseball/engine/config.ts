@@ -94,22 +94,16 @@ export const PITCH_AFFINITY: Record<PitchType, Partial<Record<ZoneId, number>>> 
 // 2.3× 보정 시 strike%≈62% (MLB ~62%)
 // ============================================================
 
-export const ZONE_SELECT_STRIKE_BASE = 2.3
+// 2.3 → 2.1: BB% 보정 (스트라이크 비율 약간 낮춰 볼넷 증가)
+export const ZONE_SELECT_STRIKE_BASE = 2.1
 
 // ============================================================
 // Count Modifier
 // ============================================================
 
-// ZONE_SELECT_STRIKE_BASE=2.5 도입 후 재조정
-// behind_3balls: 원래 strike_zones×1.8 설계 → base=1.0 기준. base=2.5로 바뀐 후엔
-//   3볼 시 strike% = 9×2.5×1.8/(9×2.5×1.8+16×0.3) ≈ 93% → 비현실적
-//   목표: 3볼 시 strike% ≈ 77% (MLB 3-0 카운트 실제 기준)
-// strike_zones: 1.8→1.2, ball_zones: 0.3→0.5 로 조정
-// behind_3balls: 3볼 카운트 시 스트라이크 존 선호 증가
-// ZONE_SELECT_STRIKE_BASE=2.5 기준으로 재조정
-// {1.0, 0.8}: 3볼에서도 기본 스트라이크 비율 유지 → BB% 개선
+// behind_3balls: 3볼 카운트에서 ball_zones 1.0 (중립) → 자연스러운 볼넷 비율 유도
 export const COUNT_MODIFIER = {
-  behind_3balls: { strike_zones: 1.0, ball_zones: 0.8 },
+  behind_3balls: { strike_zones: 1.0, ball_zones: 1.0 },
   ahead_0_2:     { natural_fall: 1.6, dirt: 1.4 },
   ahead_1_2:     { natural_fall: 1.6, dirt: 1.4 },
   first_pitch:   {},

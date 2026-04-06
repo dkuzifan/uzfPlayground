@@ -90,8 +90,9 @@ export function calcCatchProbability(
     const fielder_speed   = outfielder_speed_min + (defence / 100) * (outfielder_speed_max - outfielder_speed_min)
     const reachable_dist  = fielder_speed * t_bounce
     const excess          = Math.max(d - reachable_dist, 0)
-    // reachable 범위 안: 0.95, 초과할수록 감소 (1m당 −0.10)
-    return clamp(0.95 - 0.10 * excess, 0.05, 0.95)
+    // reachable 범위 안: 0.87, 초과할수록 감소 (1m당 −0.10)
+    // 0.95→0.82→0.87: BABIP 25.2%→32.8%→목표 28~31% 중간값 보정
+    return clamp(0.87 - 0.10 * excess, 0.05, 0.87)
   }
 
   // 내야 땅볼 — 거리·속도 기반 범위 모델

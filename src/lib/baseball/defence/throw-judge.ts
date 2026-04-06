@@ -180,7 +180,7 @@ export function shouldUseRelay(
   const t_direct = t_fielding + dist_direct / spd_OF
   const t_relay  = t_fielding
                  + euclidDist(fielder_pos, relayPos) / spd_OF
-                 + 0.8
+                 + 0.5
                  + euclidDist(relayPos, targetPos)   / spd_relay
 
   return t_relay < t_direct
@@ -191,7 +191,7 @@ export function shouldUseRelay(
 //
 // t_total = t_fielding
 //         + t_throw_to_relay   (OF 송구 → 중계 위치)
-//         + t_relay_reaction   (수신 + 방향전환 + 투구, 고정 0.8s)
+//         + t_relay_reaction   (수신 + 방향전환 + 투구, 고정 0.5s)
 //         + t_throw_from_relay (중계수 → 목표 베이스)
 // ============================================================
 
