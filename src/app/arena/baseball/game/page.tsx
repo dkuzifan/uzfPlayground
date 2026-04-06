@@ -1163,6 +1163,7 @@ function ResultScreen({
   onSetup:  () => void
   onTitle:  () => void
 }) {
+  const [statsTeam, setStatsTeam] = useState<'away' | 'home'>('away')
   const isWalkOff = result.reason === 'walk_off'
   const winner    = result.winner === 'home' ? homeTeam : result.winner === 'away' ? awayTeam : null
 
@@ -1209,9 +1210,41 @@ function ResultScreen({
           homeE={result.stats.home.fielders.reduce((s, f) => s + f.E, 0)}
         />
 
-        {/* 투수 스탯 */}
-        <PitcherTable stats={result.stats.away.pitchers} teamName={awayTeam.name} color={awayTeam.primary_color} />
-        <PitcherTable stats={result.stats.home.pitchers} teamName={homeTeam.name} color={homeTeam.primary_color} />
+        {/* 팀별 타자·투수 성적 */}
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-4">
+          {/* 팀 탭 */}
+          <div className="flex gap-1 rounded-lg bg-white/5 p-1">
+            {(['away', 'home'] as const).map(side => {
+              const team = side === 'away' ? awayTeam : homeTeam
+              return (
+                <button
+                  key={side}
+                  onClick={() => setStatsTeam(side)}
+                  className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition-colors ${
+                    statsTeam === side
+                      ? 'bg-white/10 text-white'
+                      : 'text-white/40 hover:text-white/70'
+                  }`}
+                  style={statsTeam === side ? { color: team.primary_color } : {}}
+                >
+                  {team.short_name}
+                </button>
+              )
+            })}
+          </div>
+
+          {statsTeam === 'away' ? (
+            <>
+              <BatterTable  stats={result.stats.away.batters}  teamName={awayTeam.name} color={awayTeam.primary_color} />
+              <PitcherTable stats={result.stats.away.pitchers} teamName={awayTeam.name} color={awayTeam.primary_color} />
+            </>
+          ) : (
+            <>
+              <BatterTable  stats={result.stats.home.batters}  teamName={homeTeam.name} color={homeTeam.primary_color} />
+              <PitcherTable stats={result.stats.home.pitchers} teamName={homeTeam.name} color={homeTeam.primary_color} />
+            </>
+          )}
+        </div>
 
         {/* 버튼 */}
         <div className="flex gap-3">

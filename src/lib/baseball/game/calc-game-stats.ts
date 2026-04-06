@@ -210,6 +210,18 @@ export function calcGameStats(
         break
       }
 
+      case 'force_out': {
+        // 병살/포스아웃: 진루 중 주자 아웃 → 수비팀 투수 아웃 카운트
+        getCurrentPitcher(defState).outs++
+        break
+      }
+
+      case 'runner_out': {
+        // 진루 시도 중 아웃 (외야 태그업 실패, 진루 중 송구 아웃 등)
+        getCurrentPitcher(defState).outs++
+        break
+      }
+
       case 'inning_end': {
         // 이닝 종료: 에러 주자 집합 초기화 (비자책 추적은 이닝 단위)
         home.errorRunners.clear()
