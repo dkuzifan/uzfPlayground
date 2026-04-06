@@ -270,7 +270,7 @@ function LiveTab({ pb, homeTeam, awayTeam }: {
         />
         {/* 러너 애니메이션 다이아몬드 */}
         <RunnerDiamond
-          lastAnimEvent={liveState.lastAnimEvent}
+          animEvents={liveState.animEvents}
           animSeq={liveState.animSeq}
           inning={liveState.inning}
           isTop={liveState.isTop}
@@ -533,23 +533,27 @@ interface RunnerDot {
 }
 
 function RunnerDiamond({
-  lastAnimEvent,
+  animEvents,
   animSeq,
   inning,
   isTop,
   dotColor,
   isHomeBatting,
 }: {
-  lastAnimEvent:  RunnerAnimEvent | null
+  animEvents:     RunnerAnimEvent[]
   animSeq:        number
   inning:         number
   isTop:          boolean
   dotColor:       string
   isHomeBatting:  boolean
 }) {
-  const dotsRef    = useRef<RunnerDot[]>([])
-  const keyCounter = useRef(0)
-  const prevSeqRef = useRef(-1)
+  const dotsRef       = useRef<RunnerDot[]>([])
+  const keyCounter    = useRef(0)
+  const prevSeqRef    = useRef(0)
+  // animEvents 참조를 항상 최신으로 유지 (dep array에 넣지 않기 위해)
+  const animEventsRef = useRef(animEvents)
+  animEventsRef.current = animEvents
+
   const [, repaint] = useReducer((x: number) => x + 1, 0)
 
   const updateDots = useCallback((updater: (prev: RunnerDot[]) => RunnerDot[]) => {
@@ -557,7 +561,6 @@ function RunnerDiamond({
     repaint()
   }, [])
 
-  // 주어진 key의 도트를 waypoints 순서대로 이동, 완료 시 onDone 호출
   const animatePath = useCallback((
     dotKey:    number,
     waypoints: string[],
@@ -581,81 +584,133 @@ function RunnerDiamond({
     }, 350)
   }, [updateDots])
 
-  // 이닝 변경 시 도트 전체 초기화
-  useEffect(() => {
-    dotsRef.current = []
-    repaint()
-  }, [inning, isTop])  // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (animSeq === prevSeqRef.current || !lastAnimEvent) return
-    prevSeqRef.current = animSeq
-
-    if (lastAnimEvent.type === 'runner_advance') {
-      // 루프 처리 전 스냅샷: 여러 이동이 동시 처리될 때 posKey 갱신으로 인한 잘못된 lookup 방지
+  // ── 즉시 적용 (중간 이벤트: CSS 전환 없이 도트 텔레포트) ──────
+  const applyInstant = useCallback((ev: RunnerAnimEvent) => {
+    if (ev.type === 'runner_advance') {
       const snapshot = [...dotsRef.current]
-
-      for (const move of lastAnimEvent.moves) {
+      for (const move of ev.moves) {
         const fromKey = String(move.from)
         const toKey   = String(move.to) === 'home' ? 'home' : String(move.to)
-        const wps     = getWaypoints(fromKey, toKey)
-        const total   = wps.length
+        if (fromKey === 'batter') {
+          if (!move.wasOut && toKey !== 'home') {
+            const k = keyCounter.current++
+            updateDots(prev => [...prev, { key: k, posKey: toKey, opacity: 1 }])
+          }
+        } else {
+          const dot = snapshot.find(d => d.posKey === fromKey)
+          if (!dot) continue
+          if (move.wasOut || toKey === 'home') {
+            updateDots(prev => prev.filter(d => d.key !== dot.key))
+          } else {
+            updateDots(prev => prev.map(d => d.key === dot.key ? { ...d, posKey: toKey } : d))
+          }
+        }
+      }
+    } else if (ev.type === 'steal_result') {
+      const fromKey = String(ev.from)
+      const toKey   = String(ev.to) === 'home' ? 'home' : String(ev.to)
+      const dot = dotsRef.current.find(d => d.posKey === fromKey)
+      if (!dot) return
+      if (!ev.success || toKey === 'home') {
+        updateDots(prev => prev.filter(d => d.key !== dot.key))
+      } else {
+        updateDots(prev => prev.map(d => d.key === dot.key ? { ...d, posKey: toKey } : d))
+      }
+    } else if (ev.type === 'tag_up') {
+      const fromKey = String(ev.from)
+      const toKey   = String(ev.to) === 'home' ? 'home' : String(ev.to)
+      const dot = dotsRef.current.find(d => d.posKey === fromKey)
+      if (!dot) return
+      if (!ev.safe || toKey === 'home') {
+        updateDots(prev => prev.filter(d => d.key !== dot.key))
+      } else {
+        updateDots(prev => prev.map(d => d.key === dot.key ? { ...d, posKey: toKey } : d))
+      }
+    }
+  }, [updateDots])
 
+  // ── 애니메이션 적용 (마지막 이벤트) ─────────────────────────
+  const applyAnimated = useCallback((ev: RunnerAnimEvent) => {
+    if (ev.type === 'runner_advance') {
+      const snapshot = [...dotsRef.current]
+      for (const move of ev.moves) {
+        const fromKey     = String(move.from)
+        const toKey       = String(move.to) === 'home' ? 'home' : String(move.to)
+        const wps         = getWaypoints(fromKey, toKey)
+        const total       = wps.length
         const shouldFadeOut = move.wasOut || toKey === 'home'
 
         if (fromKey === 'batter') {
-          // 타자: 새 도트 생성 후 이동
           const k = keyCounter.current++
           updateDots(prev => [...prev, { key: k, posKey: 'batter', opacity: 1 }])
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-              animatePath(k, wps, total, () => {
-                if (shouldFadeOut) fadeOut(k)
-              })
+              animatePath(k, wps, total, () => { if (shouldFadeOut) fadeOut(k) })
             })
           })
         } else {
-          // 기존 주자: 스냅샷 기준으로 fromKey 도트 탐색
           const dot = snapshot.find(d => d.posKey === fromKey)
           if (!dot) continue
-          const k = dot.key
-          animatePath(k, wps, total, () => {
-            if (shouldFadeOut) fadeOut(k)
-          })
+          animatePath(dot.key, wps, total, () => { if (shouldFadeOut) fadeOut(dot.key) })
         }
       }
-    }
-
-    if (lastAnimEvent.type === 'steal_result') {
-      const fromKey = String(lastAnimEvent.from)
-      const toKey   = String(lastAnimEvent.to) === 'home' ? 'home' : String(lastAnimEvent.to)
-      const wps     = getWaypoints(fromKey, toKey)
-      const total   = wps.length
+    } else if (ev.type === 'steal_result') {
+      const fromKey = String(ev.from)
+      const toKey   = String(ev.to) === 'home' ? 'home' : String(ev.to)
       const dot     = dotsRef.current.find(d => d.posKey === fromKey)
       if (dot) {
+        const wps   = getWaypoints(fromKey, toKey)
+        const total = wps.length
         animatePath(dot.key, wps, total, () => {
-          if (!lastAnimEvent.success || toKey === 'home') fadeOut(dot.key)
+          if (!ev.success || toKey === 'home') fadeOut(dot.key)
         })
       }
-    }
-
-    if (lastAnimEvent.type === 'tag_up') {
-      const fromKey = String(lastAnimEvent.from)
-      const toKey   = String(lastAnimEvent.to) === 'home' ? 'home' : String(lastAnimEvent.to)
+    } else if (ev.type === 'tag_up') {
+      const fromKey = String(ev.from)
+      const toKey   = String(ev.to) === 'home' ? 'home' : String(ev.to)
       const dot     = dotsRef.current.find(d => d.posKey === fromKey)
       if (dot) {
-        if (!lastAnimEvent.safe) {
+        if (!ev.safe) {
           fadeOut(dot.key)
         } else {
           const wps   = getWaypoints(fromKey, toKey)
           const total = wps.length
-          animatePath(dot.key, wps, total, () => {
-            if (toKey === 'home') fadeOut(dot.key)
-          })
+          animatePath(dot.key, wps, total, () => { if (toKey === 'home') fadeOut(dot.key) })
         }
       }
     }
-  }, [animSeq, lastAnimEvent, animatePath, fadeOut, updateDots])
+  }, [animatePath, fadeOut, updateDots])
+
+  // 이닝 변경 시 도트 전체 초기화.
+  // prevSeqRef를 현재 animSeq로 맞춰, 새 이닝의 이벤트만 처리되도록 함.
+  useEffect(() => {
+    dotsRef.current = []
+    prevSeqRef.current = animSeq  // 과거 이닝 이벤트 재처리 방지
+    repaint()
+  }, [inning, isTop])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── 이벤트 큐 처리 ────────────────────────────────────────────
+  // animSeq가 증가하면 새 이벤트만 추출하여 처리.
+  // 중간 이벤트(n-1개)는 즉시 적용(텔레포트), 마지막 이벤트만 애니메이션.
+  // → at_bat 모드에서 여러 이벤트가 한 틱에 공개돼도 도트 겹침 없음.
+  useEffect(() => {
+    if (animSeq === prevSeqRef.current) return
+
+    const prevSeq = prevSeqRef.current
+    prevSeqRef.current = animSeq
+
+    const all = animEventsRef.current  // 항상 최신 참조
+    const newEvents = all.slice(prevSeq, animSeq)
+    if (newEvents.length === 0) return
+
+    // 중간 이벤트: 즉시 적용 (도트 위치를 올바른 중간 상태로 맞춤)
+    for (let i = 0; i < newEvents.length - 1; i++) {
+      applyInstant(newEvents[i])
+    }
+    // 마지막 이벤트: 애니메이션
+    applyAnimated(newEvents[newEvents.length - 1])
+
+  }, [animSeq, applyInstant, applyAnimated])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const dots = dotsRef.current
 

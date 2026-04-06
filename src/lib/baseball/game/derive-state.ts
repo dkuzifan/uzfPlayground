@@ -31,8 +31,8 @@ export interface LiveGameState {
   currentBatter:     Player
   onDeck:            Player
   pitchDots:         PitchDot[]
-  lastAnimEvent:     RunnerAnimEvent | null
-  animSeq:           number
+  animEvents:        RunnerAnimEvent[]   // 공개된 이벤트 전체의 애니메이션 이벤트 목록
+  animSeq:           number              // animEvents.length — 변화 감지용
   lastAtBatResult:   AtBatResult | null
   lastAtBatBallType: BallType | null
 }
@@ -77,8 +77,7 @@ export function deriveState(
   let count           = { balls: 0, strikes: 0 }
   let pitchDots:      PitchDot[] = []
   let pitchNum        = 0
-  let lastAnimEvent:     RunnerAnimEvent | null = null
-  let animSeq            = 0
+  const animEvents:   RunnerAnimEvent[] = []
   let lastAtBatResult:   AtBatResult | null = null
   let lastAtBatBallType: BallType | null    = null
 
@@ -143,7 +142,8 @@ export function deriveState(
 
       case 'at_bat_result': {
         const p = ev.payload as { result: AtBatResult; ball_type?: BallType }
-        if (['strikeout', 'out', 'pickoff_out', 'caught_stealing'].includes(p.result)) {
+        // pickoff_out / caught_stealing 아웃 카운트는 각각 pickoff_result / steal_result 에서 처리
+        if (['strikeout', 'out', 'double_play', 'fielders_choice'].includes(p.result)) {
           outs++
         }
         lastAtBatResult   = p.result
@@ -175,11 +175,10 @@ export function deriveState(
           if (move.to === 3) r.third  = true
         }
         runners = r
-        lastAnimEvent = {
+        animEvents.push({
           type:  'runner_advance',
           moves: p.moves.map(m => ({ from: m.from, to: m.to, wasOut: m.wasOut })),
-        }
-        animSeq++
+        })
         break
       }
 
@@ -199,8 +198,7 @@ export function deriveState(
       case 'steal_result': {
         const p = ev.payload as { runner: Player; from: 1|2; to: 2|3|'home'; success: boolean }
         if (!p.success) outs++
-        lastAnimEvent = { type: 'steal_result', from: p.from, to: p.to, success: p.success }
-        animSeq++
+        animEvents.push({ type: 'steal_result', from: p.from, to: p.to, success: p.success })
         break
       }
 
@@ -212,8 +210,7 @@ export function deriveState(
 
       case 'tag_up': {
         const p = ev.payload as { runner: Player; from: 1|2|3; to: 1|2|3|'home'; safe: boolean }
-        lastAnimEvent = { type: 'tag_up', from: p.from, to: p.to, safe: p.safe }
-        animSeq++
+        animEvents.push({ type: 'tag_up', from: p.from, to: p.to, safe: p.safe })
         break
       }
     }
@@ -236,8 +233,8 @@ export function deriveState(
     currentBatter,
     onDeck,
     pitchDots,
-    lastAnimEvent,
-    animSeq,
+    animEvents,
+    animSeq: animEvents.length,
     lastAtBatResult,
     lastAtBatBallType,
   }
