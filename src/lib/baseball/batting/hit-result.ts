@@ -11,6 +11,7 @@ import {
   calcCatchProbability,
   findGrounderInterceptor,
   calcGrounderCatchProb,
+  calcCatch4Zone,
 } from '../defence/catch-probability'
 import { ERROR_COEFF } from '../game/config'
 import { PHYSICS_CONFIG } from '../defence/config'
@@ -91,65 +92,64 @@ export function resolveHitResult(
     return { result: 'home_run', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield: false, range: physics.range, ball_type: ballType, theta_h }
   }
 
-  // ── 5. 땅볼: 경로 기반 인터셉트 모델 ──────────────────────
+  // ── 5. 땅볼: 경로 기반 인터셉트 + 4구간 모델 ──────────────
   if (ballType === 'grounder' && physics.grounder) {
     const intercept = findGrounderInterceptor(physics, exit_velocity, launch_angle, fielders)
 
     if (!intercept) {
-      // 수비수 없음 → 안타
-      const { fielder: fb, dist: fbDist } = findResponsibleFielder(physics.landing, fielders)
+      const { fielder: fb } = findResponsibleFielder(physics.landing, fielders)
       return { result: 'single', fielder: fb, fielder_pos: { x: physics.landing.field_x, y: physics.landing.field_y }, t_fielding: 3.0, t_ball_travel: physics.t_bounce, is_infield: physics.range < 36, range: physics.range, ball_type: ballType, theta_h }
     }
 
-    const p_out = calcGrounderCatchProb(intercept, exit_velocity, launch_angle)
-    const p_error = p_out * ERROR_COEFF
+    const catchResult = calcGrounderCatchProb(intercept, exit_velocity, launch_angle)
     const roll = Math.random()
 
     const fielder = intercept.fielder
     const fielder_pos = intercept.fielder_pos
     const t_ball_travel = physics.t_bounce
-    const t_fielding = intercept.t_ball  // 공이 인터셉트 지점에 도달하는 시간
+    const t_fielding = intercept.t_ball + catchResult.t_delay  // 마진 기반 송구 지연 포함
     const is_infield = intercept.intercept_dist < 36
 
-    if (roll < p_out) {
+    if (roll < catchResult.p_out) {
       const catch_setup_time = intercept.margin > 0.5 ? 0.2 : 0.4
       return { result: 'out', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield, range: physics.range, ball_type: ballType, theta_h, catch_setup_time }
     }
-    if (roll < p_out + p_error) {
+    if (roll < catchResult.p_out + catchResult.p_error) {
       const pickup_time = calcPickupTime(fielder)
       return { result: 'reach_on_error', fielder, fielder_pos, t_fielding: t_fielding + pickup_time, t_ball_travel, is_infield, range: physics.range, ball_type: ballType, theta_h, is_error: true }
     }
 
-    // 안타
     const hitResult = resolveHitType(physics.range)
     return { result: hitResult, fielder, fielder_pos, t_fielding: t_fielding + 1.5, t_ball_travel, is_infield, range: physics.range, ball_type: ballType, theta_h }
   }
 
-  // ── 6. 뜬공/라인드라이브: 기존 착지점 기반 모델 ───────────
+  // ── 6. 뜬공/라인드라이브: 4구간 시간 기반 모델 ─────────────
   const { fielder, dist } = findResponsibleFielder(physics.landing, fielders)
   const fielder_pos   = { x: physics.landing.field_x, y: physics.landing.field_y }
   const t_ball_travel = physics.t_bounce
-  const fielder_approach_speed = 5.5 + (fielder.stats.defence / 100) * 1.5
-  const t_approach    = dist / fielder_approach_speed
-  const t_fielding    = t_ball_travel + t_approach + 0.3
   const is_infield    = physics.range < 36
 
-  const p_out = calcCatchProbability(ballType, dist, physics.v_roll_0, physics.t_bounce, fielder)
-  const p_error = p_out * ERROR_COEFF
-  const roll    = Math.random()
+  // 시간 기반 마진 계산 (뜬공)
+  const { outfielder_speed_min, outfielder_speed_max } = PHYSICS_CONFIG
+  const fielder_speed = outfielder_speed_min + (fielder.stats.defence / 100) * (outfielder_speed_max - outfielder_speed_min)
+  const t_fielder_move = dist / fielder_speed + 0.30
+  const fly_margin = t_ball_travel - t_fielder_move
 
-  if (roll < p_out) {
-    const catch_setup_time = p_out >= 0.5 ? 0.2 : 0.4
+  const catchResult = calcCatch4Zone(fly_margin, fielder.stats.defence, fielder.stats.throw, 0, 0)
+  const t_fielding = t_ball_travel + catchResult.t_delay + 0.3
+  const roll = Math.random()
+
+  if (roll < catchResult.p_out) {
+    const catch_setup_time = fly_margin > 0.5 ? 0.2 : 0.4
     return { result: 'out', fielder, fielder_pos, t_fielding, t_ball_travel, is_infield, range: physics.range, ball_type: ballType, theta_h, catch_setup_time }
   }
-  if (roll < p_out + p_error) {
+  if (roll < catchResult.p_out + catchResult.p_error) {
     const pickup_time = calcPickupTime(fielder)
     return { result: 'reach_on_error', fielder, fielder_pos, t_fielding: t_fielding + pickup_time, t_ball_travel, is_infield, range: physics.range, ball_type: ballType, theta_h, is_error: true }
   }
 
   const result = resolveHitType(physics.range)
-  const hit_t_fielding = is_infield ? t_fielding + 3.0 : t_fielding
-  return { result, fielder, fielder_pos, t_fielding: hit_t_fielding, t_ball_travel, is_infield, range: physics.range, ball_type: ballType, theta_h }
+  return { result, fielder, fielder_pos, t_fielding: t_fielding + 1.5, t_ball_travel, is_infield, range: physics.range, ball_type: ballType, theta_h }
 }
 
 // ============================================================

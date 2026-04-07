@@ -14,6 +14,78 @@ function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v))
 }
 
+// ============================================================
+// CatchResult — 통합 포구 결과 (4구간 모델)
+// ============================================================
+
+export interface CatchResult {
+  p_out:        number   // 아웃 확률
+  p_error:      number   // 실책 출루 확률
+  t_delay:      number   // 마진에 따른 송구 추가 지연 (초)
+}
+
+/**
+ * 4구간 통합 포구 판정.
+ * 땅볼·뜬공 공통 — margin(시간)과 수비수 스탯으로 결과 계산.
+ *
+ * 구간 1: margin > T (여유) — 포구 확정, 기본 에러율, 지연 없음
+ * 구간 2: 0 < margin ≤ T (빠듯) — 포구 확정, 에러↑, 송구 지연
+ * 구간 3: -L < margin ≤ 0 (반응/다이빙) — Defence 기반 포구 확률, 에러 없음, 큰 지연
+ * 구간 4: margin ≤ -L (불가) — 안타
+ */
+export function calcCatch4Zone(
+  margin:       number,
+  defence:      number,
+  throwStat:    number,
+  ev_kmh:       number,
+  perp_dist:    number,   // 수직 이동 거리 (땅볼용, 뜬공은 0 전달)
+): CatchResult {
+  const T = PHYSICS_CONFIG.CATCH_CLEAN_THRESHOLD
+  const L = PHYSICS_CONFIG.CATCH_SNAG_LIMIT
+
+  // ── 구간 4: 불가 ──────────────────────────────────────
+  if (margin <= -L) {
+    return { p_out: 0, p_error: 0, t_delay: 0 }
+  }
+
+  // ── 구간 3: 반응/다이빙 캐치 ──────────────────────────
+  if (margin <= 0) {
+    // 포구 확률: Defence 기반 × 남은 여지
+    const remaining = 1 - Math.abs(margin) / L  // 1(margin=0) → 0(margin=-L)
+    const defence_factor = 0.2 + (defence / 100) * 0.6  // Defence 0→20%, 100→80%
+    const p_catch = remaining * defence_factor
+
+    // 지연: 다이빙/뻗어서 잡은 후 회복
+    const base_delay = 0.8 + Math.abs(margin) * 2.0
+    const t_delay = Math.max(0.3, base_delay - (defence / 100) * 0.25 - (throwStat / 100) * 0.10)
+
+    return { p_out: clamp(p_catch, 0, 0.80), p_error: 0, t_delay }
+  }
+
+  // ── 기본 에러율 (구간 1, 2 공통) ──────────────────────
+  const base_error = 0.005 + (1 - defence / 100) * 0.075  // 0.5% ~ 8%
+  // 난이도 보정: 이동 거리 + 타구 속도
+  const movement_diff = perp_dist > 2 ? 0.03 * (perp_dist - 2) : 0
+  const speed_diff = ev_kmh > 130 ? 0.02 * ((ev_kmh - 130) / 10) : 0
+
+  // ── 구간 2: 빠듯한 도달 ───────────────────────────────
+  if (margin <= T) {
+    const tightness = 1 - margin / T  // 0(여유) → 1(간신히)
+    const margin_error = 0.05 * tightness  // 간신히 도달 시 +5%
+    const p_error = Math.min(0.25, base_error + margin_error + movement_diff + speed_diff)
+
+    // 지연: 급박할수록 송구 느림
+    const base_delay = 0.3 * tightness
+    const t_delay = Math.max(0, base_delay - (defence / 100) * 0.10 - (throwStat / 100) * 0.05)
+
+    return { p_out: clamp(1 - p_error, 0.02, 0.99), p_error, t_delay }
+  }
+
+  // ── 구간 1: 여유 도달 ─────────────────────────────────
+  const p_error = Math.min(0.20, base_error + movement_diff + speed_diff)
+  return { p_out: clamp(1 - p_error, 0.02, 0.99), p_error, t_delay: 0 }
+}
+
 // ── 담당 수비수 선택 ──────────────────────────────────────
 
 /**
@@ -79,24 +151,15 @@ export function calcCatchProbability(
   // 팝업: 항상 아웃
   if (ballType === 'popup') return 1.0
 
-  // 플라이 / 라인드라이브 — 도달 여부(이분법) + 에러 확률
+  // 플라이 / 라인드라이브 — 4구간 시간 기반 모델
   if (ballType === 'fly' || ballType === 'line_drive') {
     const { outfielder_speed_min, outfielder_speed_max } = PHYSICS_CONFIG
-    const fielder_speed   = outfielder_speed_min + (defence / 100) * (outfielder_speed_max - outfielder_speed_min)
-    const reachable_dist  = fielder_speed * t_bounce
-    const excess          = d - reachable_dist
+    const fielder_speed = outfielder_speed_min + (defence / 100) * (outfielder_speed_max - outfielder_speed_min)
+    const t_fielder_move = d / fielder_speed + 0.30  // 반응 시간 포함
+    const margin = t_bounce - t_fielder_move
 
-    // ① 도달 판정: 이분법
-    if (excess > 0) return 0  // 도달 불가 → 안타
-
-    // ② 도달 성공 → 에러 확률 계산
-    const margin_dist = -excess  // 여유 거리 (m) — 클수록 쉬운 플레이
-    const base_error = 0.005 + (1 - defence / 100) * 0.075
-    // 여유 거리가 작을수록(간신히 도달) 에러↑, 0m=간신히: +5%, 3m+=여유: +0%
-    const margin_difficulty = Math.max(0, 0.05 * (1 - margin_dist / 3))
-    const p_error = Math.min(0.20, base_error + margin_difficulty)
-
-    return clamp(1 - p_error, 0.02, 0.99)
+    const result = calcCatch4Zone(margin, defence, fielder.stats.throw, 0, 0)
+    return result.p_out  // 기존 인터페이스 호환 (number 반환)
   }
 
   // 내야 땅볼 — 거리·속도 기반 범위 모델 (fallback: 경로 데이터 없을 때)
@@ -210,41 +273,14 @@ export function findGrounderInterceptor(
 }
 
 /**
- * 땅볼 인터셉트 포구 확률.
- *
- * ① 도달 여부: margin >= 0 → 도달, < 0 → 미도달 (이분법)
- * ② 도달 시 에러 확률: Defence + 타구 속도 + 난이도(마진/이동거리)
+ * 땅볼 인터셉트 포구 — 4구간 통합 모델.
+ * CatchResult를 반환하여 hit-result.ts에서 에러 이중 계산 방지.
  */
 export function calcGrounderCatchProb(
   intercept: GrounderInterceptResult,
   ev_kmh:    number,
   la_deg:    number,
-): number {
+): CatchResult {
   const { margin, perp_dist, fielder } = intercept
-  const defence = fielder.stats.defence
-
-  // ① 도달 판정: 이분법
-  if (margin < 0) {
-    // 공이 먼저 통과 → 수비 불가 → 안타
-    return 0
-  }
-
-  // ② 도달 성공 → 에러 확률 계산
-  // 기본 에러율: Defence 스탯 기반
-  //   Defence 100: 0.5%, Defence 50: 4.25%, Defence 0: 8%
-  const base_error = 0.005 + (1 - defence / 100) * 0.075
-
-  // 난이도 보정: 마진이 작을수록 (간신히 도달) 에러↑
-  //   margin=0(간신히): +5%, margin=0.5+(여유): +0%
-  const margin_difficulty = Math.max(0, 0.05 * (1 - margin / 0.5))
-
-  // 이동 거리 보정: 멀리 뛰어야 했으면 (다이빙 등) 에러↑
-  const movement_difficulty = perp_dist > 2 ? 0.03 * (perp_dist - 2) : 0
-
-  // 타구 속도 보정: 빠른 타구일수록 핸들링 어려움 → 에러↑
-  const speed_difficulty = ev_kmh > 130 ? 0.02 * ((ev_kmh - 130) / 10) : 0
-
-  const p_error = Math.min(0.25, base_error + margin_difficulty + movement_difficulty + speed_difficulty)
-
-  return clamp(1 - p_error, 0.02, 0.99)
+  return calcCatch4Zone(margin, fielder.stats.defence, fielder.stats.throw, ev_kmh, perp_dist)
 }

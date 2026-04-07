@@ -21,6 +21,12 @@ export const PHYSICS_CONFIG = {
   outfielder_speed_min: 5.0,
   outfielder_speed_max: 7.5,
 
+  // ── 4구간 포구 모델 ──────────────────────────────────────
+  /** 여유 도달 경계 (초) — 이 이상이면 루틴 플레이 */
+  CATCH_CLEAN_THRESHOLD: 0.3,
+  /** 반응/다이빙 캐치 한계 (초) — 이 이상 지나가면 포구 불가 */
+  CATCH_SNAG_LIMIT: 0.20,
+
   // ── 파울 영역 설정 ──────────────────────────────────────
   /** 페어 영역 경계 (°) — |theta| ≤ 이 값이면 페어 */
   FAIR_ANGLE: 45,
