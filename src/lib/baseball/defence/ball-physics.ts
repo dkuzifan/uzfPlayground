@@ -1,6 +1,8 @@
 import type { Player } from '../types/player'
+import type { ZoneType } from '../engine/types'
 import type { FieldCoords, BallPhysicsResult, BallType } from './types'
 import { PHYSICS_CONFIG } from './config'
+import { CONTACT_CONFIG } from '../batting/config'
 
 // ============================================================
 // 타구 물리 모델
@@ -27,21 +29,52 @@ export function classifyBallType(la_deg: number): BallType {
   return 'popup'
 }
 
-// ── 방향각 선택 ───────────────────────────────────────────
+// ── 파울 영역 분류 ────────────────────────────────────────
+
+export type TerritoryZone = 'fair' | 'foul_catchable' | 'foul_uncatchable'
+
+export function classifyTerritory(theta_deg: number): TerritoryZone {
+  const abs = Math.abs(theta_deg)
+  if (abs <= PHYSICS_CONFIG.FAIR_ANGLE) return 'fair'
+  if (abs <= PHYSICS_CONFIG.STANDS_ANGLE) return 'foul_catchable'
+  return 'foul_uncatchable'
+}
+
+// ── 방향각 선택 ────────────────────���──────────────────────
 
 /**
- * 타자의 당기기 편향 + 정규분포 노이즈로 방향각 결정
- * 0° = 중견수, 양수 = 우측(1루 방향), 음수 = 좌측(3루 방향)
+ * 타자의 당기기 편향 + 정규분포 노이즈로 방향각 결정.
+ * zoneType이 주어지면 fair_prob에 따라 페어/파울 분기:
+ *   - 페어 → ±45° 이내 (truncated Gaussian)
+ *   - 파울 → 45°~70° (좌우 균등)
+ * zoneType이 없으면 기존 방식(±42°, 항상 페어).
  */
-export function selectDirectionAngle(batter: Player): number {
-  // 우타자: 당기기 = 좌측(−5°), 좌타자: 당기기 = 우측(+5°), 스위치: 우타 기준
+export function selectDirectionAngle(batter: Player, zoneType?: ZoneType): number {
   const mu = batter.bats === 'L' ? 5 : -5
 
-  // Box-Muller 정규분포 (σ = 25°)
+  if (zoneType) {
+    const pFair = CONTACT_CONFIG.fair_prob[zoneType]
+
+    if (Math.random() < pFair) {
+      // 페어 영역: truncated Gaussian (±45° 이내)
+      for (;;) {
+        const u1 = Math.random()
+        const u2 = Math.random()
+        const noise = Math.sqrt(-2 * Math.log(u1 + 1e-10)) * Math.cos(2 * Math.PI * u2) * 25
+        const theta = mu + noise
+        if (Math.abs(theta) <= PHYSICS_CONFIG.FAIR_ANGLE) return theta
+      }
+    } else {
+      // 파울 영역: 45°~70° 사이 균등 분포
+      const side = Math.random() < 0.5 ? 1 : -1
+      return side * (PHYSICS_CONFIG.FAIR_ANGLE + Math.random() * (PHYSICS_CONFIG.MAX_DIRECTION_ANGLE - PHYSICS_CONFIG.FAIR_ANGLE))
+    }
+  }
+
+  // fallback: zoneType 미제공 시 기존 동작 (항상 페어)
   const u1 = Math.random()
   const u2 = Math.random()
   const noise = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2) * 25
-
   const theta = mu + noise
   return Math.max(-42, Math.min(42, theta))
 }

@@ -20,4 +20,22 @@ export const PHYSICS_CONFIG = {
    */
   outfielder_speed_min: 5.0,
   outfielder_speed_max: 7.5,
+
+  // ── 파울 영역 설정 ──────────────────────────────────────
+  /** 페어 영역 경계 (°) — |theta| ≤ 이 값이면 페어 */
+  FAIR_ANGLE: 45,
+  /** 수비 가능 파울 영역 끝 (°) — 이 이상이면 관중석 (구장별 오버라이드 예정) */
+  STANDS_ANGLE: 60,
+  /** 방향각 최대 범위 (°) */
+  MAX_DIRECTION_ANGLE: 70,
+
+  // ── 에러 시 줍는 시간 ────────────────────────────────────
+  /** 에러 발생 후 공 줍는 기본 시간 (초) */
+  error_pickup_base: 1.5,
+  /** 수비력에 의한 줍는 시간 감소폭 (초) — defence 100일 때 base - reduction */
+  error_pickup_reduction: 0.5,
+
+  // ── 파울 팁 ──────────────────────────────────────────────
+  /** 2스트라이크 파울 중 파울팁→삼진 확률 */
+  foul_tip_prob: 0.05,
 }

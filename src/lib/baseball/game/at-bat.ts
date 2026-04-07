@@ -174,6 +174,8 @@ export function runAtBat(
               fielder:   batting.hit_physics?.fielder,
               theta_h:   batting.hit_physics?.theta_h,
               range:     batting.hit_physics?.range,
+              is_foul_fly: batting.is_foul === true && batting.at_bat_result === 'out',
+              is_foul_tip: batting.is_foul_tip,
             },
           })
           if (batting.at_bat_result === 'reach_on_error' && batting.hit_physics) {
@@ -335,6 +337,16 @@ export function runAtBat(
       },
     })
 
+    // 파울 플라이 에러 오버레이 이벤트
+    if (batting.foul_fly_error) {
+      events.push({
+        type: 'foul_fly_error',
+        inning,
+        isTop,
+        payload: { fielder: batting.foul_error_fielder, batter },
+      })
+    }
+
     if (batting.at_bat_over) {
       events.push({
         type: 'at_bat_result',
@@ -347,6 +359,8 @@ export function runAtBat(
           fielder:   batting.hit_physics?.fielder,
           theta_h:   batting.hit_physics?.theta_h,
           range:     batting.hit_physics?.range,
+          is_foul_fly: batting.is_foul === true && batting.at_bat_result === 'out',
+          is_foul_tip: batting.is_foul_tip,
         },
       })
       if (batting.at_bat_result === 'reach_on_error' && batting.hit_physics) {
@@ -375,7 +389,7 @@ export function runAtBat(
       const atBatOut =
         batting.at_bat_result === 'strikeout' ? 1 :
         batting.at_bat_result === 'out'       ? 1 :
-        0  // double_play / fielders_choice は resolveInfieldOut の outs_added に委譲
+        0  // double_play / fielders_choice → resolveInfieldOut の outs_added に委譲
       const outs_added = atBatOut + runnerOuts
 
       return {

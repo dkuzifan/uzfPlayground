@@ -22,11 +22,11 @@ const POSITION_KO: Partial<Record<Position, string>> = {
 
 // theta_h → 방향 레이블 (0°=중견수, +=우측, -=좌측)
 function directionLabel(theta: number): string {
-  if (theta <= -28) return '좌측 선상'
-  if (theta <= -10) return '좌중간'
-  if (theta <   10) return '중'
-  if (theta <   28) return '우중간'
-  return '우측 선상'
+  const abs = Math.abs(theta)
+  if (abs > 45) return theta < 0 ? '좌측 파울 지역' : '우측 파울 지역'
+  if (abs >= 28) return theta < 0 ? '좌측 선상' : '우측 선상'
+  if (abs >= 10) return theta < 0 ? '좌중간' : '우중간'
+  return '중'
 }
 
 function posKo(position: Position | undefined): string {
@@ -67,6 +67,8 @@ export function pitchToText(ev: GameEvent): string {
     ? `${Math.round(18.44 / p.pitch.delivery_time * 3.6)}km`
     : ''
 
+  if ((p as { is_foul_tip?: boolean }).is_foul_tip) return `파울팁 삼진 — ${kmh} ${typeName}`
+  if ((p as { foul_fly_error?: boolean }).foul_fly_error) return `파울 플라이 에러 — ${kmh} ${typeName}`
   if (p.is_foul)             return `파울 — ${kmh} ${typeName}`
   if (p.contact === true)    return `컨택 — ${kmh} ${typeName}`
   if (p.swing && !p.contact) return `헛스윙 — ${kmh} ${typeName}`
@@ -133,6 +135,17 @@ export function atBatResultToText(ev: GameEvent): { title: string; sub?: string 
   const pName  = posKo(pos)
   const dir    = p.theta_h !== undefined ? directionLabel(p.theta_h) : ''
   const isInfield = pos !== undefined && ['P', 'C', '1B', '2B', '3B', 'SS'].includes(pos)
+
+  // ── 파울 플라이 아웃 ────────────────────────────────────────
+  if (p.result === 'out' && (p as { is_foul_fly?: boolean }).is_foul_fly) {
+    const sub = pName ? `${pName} 파울 플라이 아웃` : '파울 플라이 아웃'
+    return { title: '아웃', sub }
+  }
+
+  // ── 파울팁 삼진 ──────────────────────────────────────────
+  if (p.result === 'strikeout' && (p as { is_foul_tip?: boolean }).is_foul_tip) {
+    return { title: '삼진 아웃', sub: '파울팁 삼진' }
+  }
 
   // ── 아웃 ──────────────────────────────────────────────────
   if (p.result === 'out' && p.ball_type) {

@@ -73,6 +73,7 @@ export type GameEventType =
   | 'throwing_error'   // { thrower: Player; runner: Player; to: BaseKey; extra_base: BaseKey }
   | 'shift'            // { direction: 'left'|'right'; pull_tendency: number; shifted_positions: Array<{position,from,to}> }
   | 'runner_note'      // { text: string; is_batter: boolean } — 주목할 만한 진루 메모 (PBP 표시용)
+  | 'foul_fly_error'   // { fielder: { name, position_1 }; batter: Player } — 파울 플라이 에러 (오버레이)
 
 export interface GameEvent {
   type:    GameEventType

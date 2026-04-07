@@ -267,6 +267,9 @@ function LiveTab({ pb, homeTeam, awayTeam }: {
           lastAtBatResult={liveState.lastAtBatResult}
           lastAtBatBallType={liveState.lastAtBatBallType}
           batterHand={liveState.currentBatter.bats}
+          isFoulFly={liveState.isFoulFly}
+          isFoulTip={liveState.isFoulTip}
+          foulFlyError={liveState.foulFlyError}
         />
         {/* 러너 애니메이션 다이아몬드 */}
         <RunnerDiamond
@@ -414,16 +417,25 @@ function ZoneVisual({
   lastAtBatResult,
   lastAtBatBallType,
   batterHand,
+  isFoulFly,
+  isFoulTip,
+  foulFlyError,
 }: {
   pitchDots:         ReturnType<typeof useGamePlayback>['liveState']['pitchDots']
   lastAtBatResult:   AtBatResult | null
   lastAtBatBallType: BallType | null
   batterHand:        'L' | 'R' | 'S'
+  isFoulFly?:        boolean
+  isFoulTip?:        boolean
+  foulFlyError?:     string | null
 }) {
   const overlay = lastAtBatResult ? AT_BAT_OVERLAY[lastAtBatResult] : null
-  const outSub  = lastAtBatResult === 'out' && lastAtBatBallType
+  let outSub  = lastAtBatResult === 'out' && lastAtBatBallType
     ? BALL_TYPE_OUT_SUB_OVERLAY[lastAtBatBallType]
     : overlay?.sub
+  // 파울 플라이 아웃 / 파울팁 삼진 오버라이드
+  if (isFoulFly && lastAtBatResult === 'out') outSub = '파울 플라이 아웃'
+  if (isFoulTip && lastAtBatResult === 'strikeout') outSub = '파울팁 삼진'
 
   return (
     <div className="flex justify-center">
@@ -493,6 +505,16 @@ function ZoneVisual({
           >
             <span className="text-white font-bold text-xl leading-tight drop-shadow">{overlay.title}</span>
             {outSub && <span className="text-white/80 text-xs mt-0.5">{outSub}</span>}
+          </div>
+        )}
+
+        {/* 파울 플라이 에러 오버레이 */}
+        {foulFlyError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg backdrop-blur-[2px] transition-opacity duration-300"
+            style={{ backgroundColor: '#f97316aa' }}
+          >
+            <span className="text-white font-bold text-base leading-tight drop-shadow">파울 플라이 에러</span>
+            <span className="text-white/80 text-xs mt-0.5">{foulFlyError}</span>
           </div>
         )}
       </div>

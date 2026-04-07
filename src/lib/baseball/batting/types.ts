@@ -41,15 +41,17 @@ export interface BattingState {
 // null 필드: 해당 분기에 도달하지 않은 경우
 //   - take 시: contact/is_foul/exit_velocity/launch_angle = null
 //   - 헛스윙 시: is_foul/exit_velocity/launch_angle = null
-//   - 파울 시: exit_velocity/launch_angle = null
 export interface BattingResult {
   swing: boolean
   contact: boolean | null
   is_foul: boolean | null
-  exit_velocity: number | null    // km/h (페어 컨택 시만)
-  launch_angle: number | null     // ° (페어 컨택 시만)
+  exit_velocity: number | null    // km/h (컨택 시 — 페어·파울 모두)
+  launch_angle: number | null     // ° (컨택 시 — 페어·파울 모두)
   at_bat_result: AtBatResult
   next_count: { balls: number; strikes: number }
   at_bat_over: boolean            // 게임 루프의 타석 종료 신호
-  hit_physics?: HitResultDetail   // 페어 타구 시만 존재 — advanceRunners에 전달
+  hit_physics?: HitResultDetail   // 인플레이 타구 시 존재 — advanceRunners에 전달
+  is_foul_tip?: boolean           // 파울팁 삼진 (2S + 파울팁 → 삼진 처리)
+  foul_fly_error?: boolean        // 파울 플라이 수비 에러 (파울 처리, 오버레이 표시)
+  foul_error_fielder?: { name: string; position_1: string }  // 에러 발생 수비수
 }

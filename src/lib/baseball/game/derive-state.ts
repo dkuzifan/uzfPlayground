@@ -35,6 +35,9 @@ export interface LiveGameState {
   animSeq:           number              // animEvents.length — 변화 감지용
   lastAtBatResult:   AtBatResult | null
   lastAtBatBallType: BallType | null
+  isFoulFly:         boolean            // 파울 플라이 아웃 여부
+  isFoulTip:         boolean            // 파울팁 삼진 여부
+  foulFlyError:      string | null      // 파울 플라이 에러 수비수 이름 (오버레이용)
 }
 
 // ============================================================
@@ -80,6 +83,9 @@ export function deriveState(
   const animEvents:   RunnerAnimEvent[] = []
   let lastAtBatResult:   AtBatResult | null = null
   let lastAtBatBallType: BallType | null    = null
+  let isFoulFly  = false
+  let isFoulTip  = false
+  let foulFlyError: string | null = null
 
   // 투수 — 교체 발생 시 갱신
   let currentHomePitcher = homePitcher
@@ -141,13 +147,16 @@ export function deriveState(
       }
 
       case 'at_bat_result': {
-        const p = ev.payload as { result: AtBatResult; ball_type?: BallType }
+        const p = ev.payload as { result: AtBatResult; ball_type?: BallType; is_foul_fly?: boolean; is_foul_tip?: boolean }
         // pickoff_out / caught_stealing 아웃 카운트는 각각 pickoff_result / steal_result 에서 처리
         if (['strikeout', 'out', 'double_play', 'fielders_choice'].includes(p.result)) {
           outs++
         }
         lastAtBatResult   = p.result
         lastAtBatBallType = p.ball_type ?? null
+        isFoulFly  = p.is_foul_fly ?? false
+        isFoulTip  = p.is_foul_tip ?? false
+        foulFlyError = null  // 새 타석 결과 시 에러 오버레이 초기화
         // 타자 인덱스 진행
         if (ev.isTop) awayBatterIdx = (awayBatterIdx + 1) % 9
         else          homeBatterIdx = (homeBatterIdx + 1) % 9
@@ -155,6 +164,12 @@ export function deriveState(
         pitchDots = []
         pitchNum  = 0
         count     = { balls: 0, strikes: 0 }
+        break
+      }
+
+      case 'foul_fly_error': {
+        const p = ev.payload as { fielder?: { name: string } }
+        foulFlyError = p.fielder?.name ?? '수비수'
         break
       }
 
@@ -249,5 +264,8 @@ export function deriveState(
     animSeq: animEvents.length,
     lastAtBatResult,
     lastAtBatBallType,
+    isFoulFly,
+    isFoulTip,
+    foulFlyError,
   }
 }

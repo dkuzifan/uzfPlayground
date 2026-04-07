@@ -3,7 +3,8 @@ import type { BattingState } from './types'
 import { CONTACT_CONFIG } from './config'
 
 // ============================================================
-// M4: 컨택 판정 (헛스윙 / 파울 / 페어)
+// M4: 컨택 판정 (헛스윙 / 컨택)
+// 페어/파울 구분은 방향각으로 결정 (hit-ball.ts에서 처리)
 // ============================================================
 
 export function resolveContact(
@@ -13,8 +14,8 @@ export function resolveContact(
   batter: BattingState['batter'],
   familiarity: FamiliarityMap,
   count: BattingState['count']
-): { contact: boolean; is_fair: boolean | null } {
-  const { base_contact, pitch_modifier_max, familiarity_bonus_max, fair_prob, two_strike_contact_bonus } = CONTACT_CONFIG
+): { contact: boolean } {
+  const { base_contact, pitch_modifier_max, familiarity_bonus_max, two_strike_contact_bonus } = CONTACT_CONFIG
 
   // 기본 컨택 확률: intercept + (Contact/100) × slope
   const { intercept, slope } = base_contact[zoneType]
@@ -37,8 +38,5 @@ export function resolveContact(
   const contact_prob = Math.min(Math.max(base * pitch_modifier * familiarity_bonus + strike_bonus, 0), 1)
   const contact = Math.random() < contact_prob
 
-  if (!contact) return { contact: false, is_fair: null }
-
-  const is_fair = Math.random() < fair_prob[zoneType]
-  return { contact: true, is_fair }
+  return { contact }
 }
