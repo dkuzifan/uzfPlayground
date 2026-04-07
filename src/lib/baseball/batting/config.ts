@@ -42,10 +42,7 @@ export const CONTACT_CONFIG = {
   // 2-스트라이크 컨택 보너스: 타자가 배트를 짧게 잡고 플레이트를 보호하는 현실 반영
   // 이 보너스로 2스트라이크 헛스윙 감소 → K% 하향 → MLB 수준에 근접
   two_strike_contact_bonus: 0.20,
-  // 컨택 성공 시 페어 확률
-  // 인플레이 비율 22.9% → 목표 ~17% (MLB 수준)
-  // fair_prob 하향: 파울 증가 → at-bat 연장 → BB 누적 기회↑
-  // (이전 fair_prob=0.55 시 K↑ 이슈는 당시 낮은 컨택률 때문; 현재 컨택률 ~75%이므로 재시도)
+  // 컨택 성공 시 페어 확률 (v1 fallback + selectDirectionAngle에서 사용)
   fair_prob: {
     core:  0.60,
     edge:  0.48,
@@ -53,6 +50,13 @@ export const CONTACT_CONFIG = {
     ball:  0.13,
     dirt:  0.16,
   } satisfies Record<ZoneType, number>,
+
+  // v2 컨택 오프셋 계수 (BATTED_BALL_CONFIG.v2에서도 참조)
+  v2: {
+    timing_noise_std_base:  0.08,
+    center_noise_std_base:  0.10,
+    zone_error_penalty:     0.15,
+  },
 }
 
 // ============================================================
@@ -85,6 +89,34 @@ export const BATTED_BALL_CONFIG = {
   ev_tiers: { soft: 120, medium: 140, hard: 155 },
   // LA 구간 경계 (°) — 이하: ground / line_drive / fly / 초과: popup
   la_tiers: { ground: 10, line_drive: 25, fly: 45 },
+
+  // ── v2 통합 모델 계수 ──────────────────────────────────
+  v2: {
+    // EV 계수
+    power_advantage_scale:  0.15,   // Power vs BallPower 차이가 EV에 미치는 영향
+    pitch_speed_ev_base:    0.85,   // 투구 속도가 EV에 미치는 기본값
+    pitch_speed_ev_scale:   0.15,   // 투구 속도 추가 비례분
+    center_penalty_k:       3.0,    // center_offset → EV 페널티 민감도
+    center_penalty_max:     0.6,    // EV 최대 감소 비율 (60%)
+    timing_penalty_k:       2.0,    // timing_offset → EV 페널티 민감도
+    timing_penalty_max:     0.3,    // EV 최대 감소 비율 (30%)
+    min_ev:                 40,     // EV 하한 (km/h)
+
+    // LA 계수
+    base_la:                12,     // 정중앙 기본 발사각 (°)
+    center_to_la_k:         120,    // center_offset → LA 변환 계수
+    la_noise_std:           6,      // LA 자연 분산 (°)
+
+    // 방향각 (θ) 계수
+    timing_to_theta_k:      150,    // timing_offset → θ 변환 계수
+    center_instability_k:   15,     // center_offset → θ 노이즈 추가 계수
+    theta_base_noise_std:   8,      // θ 기본 노이즈 (°)
+
+    // 컨택 오프셋 계수
+    timing_noise_std_base:  0.08,   // timing_offset 기본 노이즈 σ
+    center_noise_std_base:  0.10,   // center_offset 기본 노이즈 σ
+    zone_error_penalty:     0.15,   // 존 오인식 시 center_offset 추가 σ
+  },
 }
 
 // ============================================================

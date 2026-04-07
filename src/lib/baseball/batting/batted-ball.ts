@@ -75,47 +75,34 @@ export function calcBattedBallV2(
 ): BattedBallV2Result {
   const cfg = BATTED_BALL_CONFIG
 
+  const v2 = cfg.v2
+
   // ── EV ─────────────────────────────────────────────────
-  // 기본값: Power vs BallPower 비교
-  const power_advantage = (batter.stats.power - pitcher_power) / 100  // -1 ~ +1
-  const base_ev = cfg.base_exit_velocity * (1.0 + power_advantage * 0.15)
-    * (0.85 + pitch_speed_index * 0.15)  // 빠른 공일수록 반발력↑
+  const power_advantage = (batter.stats.power - pitcher_power) / 100
+  const base_ev = cfg.base_exit_velocity
+    * (1.0 + power_advantage * v2.power_advantage_scale)
+    * (v2.pitch_speed_ev_base + pitch_speed_index * v2.pitch_speed_ev_scale)
 
-  // 중심 적중 페널티: |center_offset|이 클수록 EV 급감
-  // 정중앙(0) → 100%, 끝에 맞음(0.3+) → 50% 이하
-  const center_penalty = Math.min(1.0, Math.abs(center_offset) * 3.0)
-  const ev_factor = 1.0 - center_penalty * 0.6  // 최악: 40%까지 감소
+  const center_penalty = Math.min(1.0, Math.abs(center_offset) * v2.center_penalty_k)
+  const ev_factor = 1.0 - center_penalty * v2.center_penalty_max
 
-  // 타이밍 페널티: 타이밍이 크게 빗나가면 EV도 하락
-  const timing_penalty = Math.min(1.0, Math.abs(timing_offset) * 2.0)
-  const timing_ev_factor = 1.0 - timing_penalty * 0.3  // 최악: 70%까지 감소
+  const timing_penalty = Math.min(1.0, Math.abs(timing_offset) * v2.timing_penalty_k)
+  const timing_ev_factor = 1.0 - timing_penalty * v2.timing_penalty_max
 
-  // 노이즈
   const ev_noise = gaussianRandom(1.0, cfg.quality_std_base * (1 - batter.stats.contact / 200))
-
-  const exit_velocity = Math.max(40, base_ev * ev_factor * timing_ev_factor * ev_noise)
+  const exit_velocity = Math.max(v2.min_ev, base_ev * ev_factor * timing_ev_factor * ev_noise)
 
   // ── LA ─────────────────────────────────────────────────
-  // center_offset의 수직 성분이 주 결정 요인
-  // 양수 (배트 아래 적중) → 높은 LA (플라이/팝업)
-  // 음수 (배트 위 적중) → 낮은 LA (땅볼)
-  // 0 (정중앙) → ~10-15° (라인드라이브)
-  const base_la = 12  // 정중앙 기본 발사각
-  const la_from_center = center_offset * 120  // 오프셋 0.1 → 12° 추가
-  const la_noise = gaussianRandom(0, 6)  // 자연 분산
-
-  const launch_angle = base_la + la_from_center + la_noise
+  const la_from_center = center_offset * v2.center_to_la_k
+  const la_noise = gaussianRandom(0, v2.la_noise_std)
+  const launch_angle = v2.base_la + la_from_center + la_noise
 
   // ── θ (방향각) ──────────────────────────────────────────
-  // timing_offset이 주 결정 요인
-  // 양수 (빠른 스윙) → 당기기: 우타 좌측(-), 좌타 우측(+)
-  // 음수 (느린 스윙) → 밀어치기: 반대
-  const pull_sign: number = batter.bats === 'L' ? 1 : -1  // 좌타=당기기→우측(+), 우타=당기기→좌측(-)
-  const theta_from_timing = timing_offset * 150 * pull_sign  // 오프셋 0.2 → 30° 이동
+  const pull_sign: number = batter.bats === 'L' ? 1 : -1
+  const theta_from_timing = timing_offset * v2.timing_to_theta_k * pull_sign
 
-  // 배트 끝에 맞으면 방향 불안정성 추가
-  const instability = Math.abs(center_offset) * 15  // 끝에 맞을수록 노이즈 증가
-  const theta_noise = gaussianRandom(0, 8 + instability)
+  const instability = Math.abs(center_offset) * v2.center_instability_k
+  const theta_noise = gaussianRandom(0, v2.theta_base_noise_std + instability)
 
   const theta_h = theta_from_timing + theta_noise
 

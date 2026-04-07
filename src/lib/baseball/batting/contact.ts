@@ -80,25 +80,22 @@ export function resolveContact(
     return { contact: true }
   }
 
+  const v2 = CONTACT_CONFIG.v2 ?? { timing_noise_std_base: 0.08, center_noise_std_base: 0.10, zone_error_penalty: 0.15 }
+
   // timing_offset: 예측한 구종의 속도 vs 실제 구종의 속도
-  // 패스트볼을 예상했는데 체인지업이 오면 → 스윙이 빠름 (timing > 0)
   const predicted_speed = PITCH_SPEED_INDEX[prediction.predicted_type] ?? 0.85
   const actual_speed    = PITCH_SPEED_INDEX[pitchResult.pitch_type] ?? 0.85
-  const speed_diff      = predicted_speed - actual_speed  // 양수: 예측이 더 빠른 공
+  const speed_diff      = predicted_speed - actual_speed
 
-  // Contact 스탯으로 조정 능력 반영: 높을수록 속도 차이를 극복
-  const adjustment_factor = 0.5 + (batter.stats.contact / 100) * 0.5  // 0.5~1.0
+  const adjustment_factor = 0.5 + (batter.stats.contact / 100) * 0.5
   const raw_timing = speed_diff / adjustment_factor
 
-  // 기본 타이밍 노이즈 (완벽한 예측이라도 약간의 오차)
-  const timing_noise = gaussianRandom(0, 0.08 * (1 - batter.stats.contact / 200))
+  const timing_noise = gaussianRandom(0, v2.timing_noise_std_base * (1 - batter.stats.contact / 200))
   const timing_offset = raw_timing + timing_noise
 
   // center_offset: 인지 코스 vs 실제 코스의 차이
-  // actual_x, actual_z가 있으므로 실제 위치와 인지 위치의 차이를 모델링
-  // 인지가 정확하면 (zone_correct) 오차가 작고, 틀리면 오차가 큼
-  const zone_error = perception.zone_correct ? 0.0 : 0.15  // 존 오인식 시 추가 오차
-  const center_noise_std = 0.10 * (1 - batter.stats.contact / 150) + zone_error
+  const zone_error = perception.zone_correct ? 0.0 : v2.zone_error_penalty
+  const center_noise_std = v2.center_noise_std_base * (1 - batter.stats.contact / 150) + zone_error
   const center_offset = gaussianRandom(0, center_noise_std)
 
   return { contact: true, timing_offset, center_offset }

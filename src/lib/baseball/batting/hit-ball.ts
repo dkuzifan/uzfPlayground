@@ -120,16 +120,18 @@ export function hitBall(
     const batted = calcBattedBall(pitch.zone_type, batter)
     exit_velocity = batted.exit_velocity
     launch_angle  = batted.launch_angle
-    // v1에서는 방향각이 resolveHitResult 내부에서 생성되므로 여기선 0
-    theta_h = 0  // resolveHitResult가 내부에서 생성
+    // v1에서는 resolveHitResult 내부에서 방향각 생성 → 여기선 NaN 마커
+    theta_h = NaN
   }
 
   // ⑥ 영역 분류 + 수비 판정
-  const territory = classifyTerritory(theta_h)
+  // v1 fallback (theta_h=NaN): resolveHitResult 내부에서 방향각 생성 → 항상 fair 취급
+  const territory = Number.isNaN(theta_h) ? 'fair' as const : classifyTerritory(theta_h)
 
   // ── 페어 타구 ──────────────────────────────────────────
   if (territory === 'fair') {
-    const hitDetail = resolveHitResult(exit_velocity, launch_angle, batter, defenceLineup ?? [], theta_h)
+    // NaN이면 theta_h_override 미전달 → resolveHitResult 내부에서 selectDirectionAngle 호출
+    const hitDetail = resolveHitResult(exit_velocity, launch_angle, batter, defenceLineup ?? [], Number.isNaN(theta_h) ? undefined : theta_h)
     return {
       swing: true,
       contact: true,

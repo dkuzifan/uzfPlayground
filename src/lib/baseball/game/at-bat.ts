@@ -143,6 +143,7 @@ export function runAtBat(
           runners:   toBoolRunners(currentRunners),
           familiarity,
           inning,
+          recent_pitches,
         }
         const batting = hitBall(battingState, pitch, defenceLineup)
         const isSwingAndMiss = batting.swing && batting.contact === false
@@ -319,6 +320,7 @@ export function runAtBat(
       runners:   toBoolRunners(currentRunners),
       familiarity,
       inning,
+      recent_pitches,
     }
 
     const batting = hitBall(battingState, pitch, defenceLineup)
