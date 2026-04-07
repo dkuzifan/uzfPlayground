@@ -79,9 +79,11 @@ export function calcBattedBallV2(
   const v2 = cfg.v2
 
   // ── EV ─────────────────────────────────────────────────
-  const power_advantage = (batter.stats.power - pitcher_power) / 100
-  const base_ev = cfg.base_exit_velocity
-    * (1.0 + power_advantage * v2.power_advantage_scale)
+  // Power 스탯 → EV 기본 배율 (v1과 동일 구조 유지)
+  const power_factor = 0.70 + (batter.stats.power / 100) * cfg.power_slope  // 0.70~1.30
+  // Power vs BallPower 매치업 보정
+  const matchup_mod = 1.0 + ((batter.stats.power - pitcher_power) / 100) * v2.power_advantage_scale
+  const base_ev = cfg.base_exit_velocity * power_factor * matchup_mod
     * (v2.pitch_speed_ev_base + pitch_speed_index * v2.pitch_speed_ev_scale)
 
   const center_penalty = Math.min(1.0, Math.abs(center_offset) * v2.center_penalty_k)
@@ -94,9 +96,17 @@ export function calcBattedBallV2(
   const exit_velocity = Math.max(v2.min_ev, base_ev * ev_factor * timing_ev_factor * ev_noise)
 
   // ── LA ─────────────────────────────────────────────────
+  // 하이브리드: v1 mixture 기저 + center_offset 보정
+  // mixture: 45% 땅볼 성분 N(0,10) + 55% 뜬공 성분 N(30,13) → MLB 이봉 분포
+  // center_offset: 배트 아래 적중(+) → LA↑, 위 적중(-) → LA↓
+  let base_la: number
+  if (Math.random() < cfg.mixture_grounder_weight) {
+    base_la = gaussianRandom(cfg.mixture_grounder_mean, cfg.mixture_grounder_std)
+  } else {
+    base_la = gaussianRandom(cfg.mixture_fly_mean, cfg.mixture_fly_std)
+  }
   const la_from_center = center_offset * v2.center_to_la_k
-  const la_noise = gaussianRandom(0, v2.la_noise_std)
-  const launch_angle = v2.base_la + la_from_center + la_noise
+  const launch_angle = base_la + la_from_center
 
   // ── θ (방향각) ──────────────────────────────────────────
   // 스위치 타자: 투수 반대 손으로 타격 (vs 우투→좌타, vs 좌투→우타)

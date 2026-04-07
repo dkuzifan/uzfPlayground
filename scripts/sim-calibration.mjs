@@ -118,6 +118,18 @@ for (let g = 0; g < GAMES; g++) {
       acc.pitch_total++
       if (e.payload.swing)           acc.pitch_swing++
       if (e.payload.contact === true) acc.pitch_contact++
+      // 투구 존별 통계
+      const zt = e.payload.pitch?.zone_type
+      if (zt) {
+        acc.zone_count = acc.zone_count ?? {}
+        acc.zone_count[zt] = (acc.zone_count[zt] ?? 0) + 1
+        if (e.payload.swing) {
+          acc.zone_swing = acc.zone_swing ?? {}
+          acc.zone_swing[zt] = (acc.zone_swing[zt] ?? 0) + 1
+        }
+      }
+      if (e.payload.pitch?.is_strike) acc.called_strikes = (acc.called_strikes ?? 0) + 1
+      else acc.called_balls = (acc.called_balls ?? 0) + 1
     }
     if (e.type === 'steal_attempt')  acc.steal_attempts++
     if (e.type === 'steal_result') {
@@ -231,6 +243,18 @@ lineN('진루 이벤트/경기',     acc.runner_advance_events / GAMES, 3.0, 8.0
 lineN('포스아웃/경기',        acc.force_out / GAMES, 0.5, 3.0)
 lineN('송구 아웃/경기',       acc.runner_out / GAMES, 0.0, 0.8)
 lineN('태그업/경기',          acc.tag_up / GAMES, 0.2, 1.5)
+console.log()
+
+// ── 투구 존별 통계 ───────────────────────────────────────────
+console.log('[ 투구 존별 ]')
+const cb = acc.called_balls ?? 0
+const cs = acc.called_strikes ?? 0
+console.log(`  볼: ${cb} (${(cb/acc.pitch_total*100).toFixed(1)}%)  스트라이크: ${cs} (${(cs/acc.pitch_total*100).toFixed(1)}%)  투구/PA: ${(acc.pitch_total/totalPA).toFixed(1)}`)
+for (const z of ['core','edge','chase','ball','dirt']) {
+  const c = acc.zone_count?.[z] ?? 0
+  const s = acc.zone_swing?.[z] ?? 0
+  console.log(`  ${z.padEnd(8)} ${(c/acc.pitch_total*100).toFixed(1)}% (${c}) | 스윙 ${c>0?(s/c*100).toFixed(0):'0'}%`)
+}
 console.log()
 
 // ── 원시 타석 결과 ───────────────────────────────────────────

@@ -14,12 +14,13 @@ import { SWING_CONFIG } from './config'
 // ============================================================
 
 // 존별 기본 스윙 경향 (인지된 존 기준)
+// MLB 전체 스윙률 ~47%: core 높게, ball/dirt 극히 낮게
 const BASE_SWING: Record<ZoneType, number> = {
-  core:  0.85,
-  edge:  0.65,
-  chase: 0.30,
-  ball:  0.08,
-  dirt:  0.05,
+  core:  0.72,
+  edge:  0.50,
+  chase: 0.18,
+  ball:  0.05,
+  dirt:  0.04,
 }
 
 /**
@@ -53,9 +54,9 @@ export function decideSwing(
   //    구종 일치: 자신감 → 스윙 경향 ↑
   //    구종 불일치: 혼란 → 스윙 경향 ↓ (홀드)
   if (prediction.predicted_type === perception.perceived_type) {
-    p_swing *= 1.15  // 예측 적중 → 자신감 15% 상승
+    p_swing *= 1.10  // 예측 적중 → 자신감 10% 상승
   } else {
-    p_swing *= 0.75  // 예측 빗남 → 25% 하락 (홀드 경향)
+    p_swing *= 0.60  // 예측 빗남 → 40% 하락 (강한 홀드 경향)
   }
 
   // 3. 카운트 보정

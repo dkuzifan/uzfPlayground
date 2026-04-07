@@ -41,9 +41,10 @@ function getZoneType(zone: ZoneId): ZoneType {
   }
   // 볼 존
   if (zone.startsWith('B3')) return 'dirt'  // 하단 볼 (바운드 가능)
-  // B1x (상단 볼), B2x (좌우 볼) — 공략 가능 범위면 chase, 아니면 ball
-  // 단순화: B1x/B2x는 chase (스트라이크 존 경계 바로 밖)
-  return zone.startsWith('B1') || zone.startsWith('B2') ? 'chase' : 'ball'
+  // B1x (상단 볼): 상단 코너(B11,B15) = ball, 나머지 = chase
+  // B2x (좌우 볼): 좌우 끝(B21,B22,B25,B26) = ball (스트라이크 존 옆 열), 나머지(B23,B24) = chase
+  if (zone === 'B11' || zone === 'B15' || zone === 'B21' || zone === 'B22' || zone === 'B25' || zone === 'B26') return 'ball'
+  return 'chase'
 }
 
 // ============================================================
@@ -100,7 +101,17 @@ export function classifyZone(
   }
 
   const zone_id = ZONE_GRID[row][col]
-  const zone_type = getZoneType(zone_id)
+  let zone_type = getZoneType(zone_id)
+
+  // 거리 기반 ball 재분류: 존 경계에서 많이 벗어난 투구 → chase → ball 승격
+  // chase로 분류된 투구 중 존 경계에서 0.15m(약 6인치) 이상 벗어나면 ball
+  if (zone_type === 'chase') {
+    const x_excess = Math.max(0, Math.abs(actual_x) - strikeXMax)
+    const z_excess_hi = Math.max(0, actual_z - strikeZMax)
+    const z_excess_lo = Math.max(0, strikeZMin - actual_z)
+    const total_excess = Math.max(x_excess, z_excess_hi, z_excess_lo)
+    if (total_excess > 0.15) zone_type = 'ball'
+  }
 
   return { zone_id, zone_type, is_strike }
 }

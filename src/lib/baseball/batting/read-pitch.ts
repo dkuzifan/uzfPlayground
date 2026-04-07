@@ -72,12 +72,14 @@ export function readPitch(
   // 존 인식 확률:
   //   core/ball: 인식 쉬움 (명확히 안/밖)
   //   edge/chase: 인식 어려움 (경계)
+  // 존 인식 난이도 — 높을수록 정확히 인식
+  // ball/dirt는 명백히 존 밖이라 Eye가 낮아도 잘 인식
   const ZONE_DIFFICULTY: Record<ZoneType, number> = {
     core:  0.90,
-    edge:  0.60,
-    chase: 0.50,
-    ball:  0.85,
-    dirt:  0.90,
+    edge:  0.55,
+    chase: 0.45,
+    ball:  0.95,
+    dirt:  0.95,
   }
 
   const p_zone_correct = eyeNorm * ZONE_DIFFICULTY[pitch.zone_type]
