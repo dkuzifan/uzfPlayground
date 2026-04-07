@@ -47,6 +47,7 @@ export interface PlayerStats {
   // 타자 전용
   contact: number
   power: number
+  eye?: number        // 선구안 — 투구 인식 정확도, 스트라이크/볼 판별. 미설정 시 50 고정
   defence: number
   throw: number
   running: number

@@ -35,6 +35,7 @@ export interface BattingState {
   runners: { first: boolean; second: boolean; third: boolean }
   familiarity: FamiliarityMap   // throwPitch().next_familiarity를 그대로 전달
   inning: number
+  recent_pitches?: Array<{ type: import('../types/player').PitchType; zone: unknown }>  // 최근 투구 이력 (예측용)
 }
 
 // hitBall() 반환값

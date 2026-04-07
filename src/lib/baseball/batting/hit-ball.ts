@@ -4,15 +4,29 @@ import type { BattingState, BattingResult } from './types'
 import { decideBunt }      from './bunt-stub'
 import { decideSwing }     from './swing-decision'
 import { resolveContact }  from './contact'
-import { calcBattedBall }  from './batted-ball'
+import { calcBattedBall, calcBattedBallV2 }  from './batted-ball'
 import { resolveHitResult, resolveFoulCatchable } from './hit-result'
 import { applyPitchToCount } from './count'
-import { selectDirectionAngle, classifyTerritory } from '../defence/ball-physics'
+import { predictPitch }    from './predict-pitch'
+import { readPitch }        from './read-pitch'
+import { classifyTerritory } from '../defence/ball-physics'
 import { PHYSICS_CONFIG } from '../defence/config'
 
+// 구종별 속도 지표 (batted-ball.ts와 동일)
+const PITCH_SPEED_INDEX: Record<string, number> = {
+  fastball: 1.00, sinker: 0.95, cutter: 0.93, slider: 0.82,
+  curveball: 0.72, changeup: 0.80, splitter: 0.83, forkball: 0.78,
+}
+
 // ============================================================
-// hitBall — 투구 1회에 대한 타자 반응 전체 흐름 통합 함수
-// 순수 함수: 모든 상태 변경은 반환값으로만 전달
+// hitBall — v2 통합 타격 파이프라인
+//
+// ① predictPitch (투구 전 예측)
+// ② readPitch (투구 후 인식)
+// ③ decideSwing (스윙 결정)
+// ④ resolveContact (컨택 + timing/center offset)
+// ⑤ calcBattedBallV2 (EV/LA/θ 통합)
+// ⑥ 수비 판정 (resolveHitResult / foul 처리)
 // ============================================================
 
 export function hitBall(
@@ -21,8 +35,9 @@ export function hitBall(
   defenceLineup?: Player[],
 ): BattingResult {
   const { pitcher, batter, count, outs, runners, familiarity, inning } = state
+  const eye = batter.stats.eye ?? 50
 
-  // 0. HBP early return — 스윙 판단 이전 처리
+  // 0. HBP early return
   if (pitch.is_hbp) {
     return {
       swing: false,
@@ -34,14 +49,21 @@ export function hitBall(
     }
   }
 
-  // 1. 번트 결정 (stub — 항상 attempt: false)
+  // 1. 번트 결정 (stub)
   const bunt = decideBunt(batter, count, runners, { outs, inning })
   if (bunt.attempt) {
     return undefined as never
   }
 
-  // 2. 스윙 여부
-  const swing = decideSwing(batter, pitch.zone_type, count)
+  // ① 투구 전 예측
+  const recentPitches = (state.recent_pitches ?? []) as Array<{ type: import('../types/player').PitchType }>
+  const prediction = predictPitch(pitcher.pitch_types, recentPitches, count)
+
+  // ② 투구 후 읽기
+  const perception = readPitch(pitch, prediction, eye)
+
+  // ③ 스윙 결정
+  const swing = decideSwing(batter, pitch.zone_type, count, prediction, perception)
 
   if (!swing) {
     const event = pitch.is_strike ? 'strike' : 'ball'
@@ -55,17 +77,13 @@ export function hitBall(
     }
   }
 
-  // 3. 컨택 판정
-  const { contact } = resolveContact(
-    pitch.zone_type,
-    pitch,
-    pitcher,
-    batter,
-    familiarity,
-    count
+  // ④ 컨택 판정 (timing + center offset)
+  const contactResult = resolveContact(
+    pitch.zone_type, pitch, pitcher, batter, familiarity, count,
+    prediction, perception,
   )
 
-  if (!contact) {
+  if (!contactResult.contact) {
     return {
       swing: true,
       contact: false,
@@ -76,12 +94,40 @@ export function hitBall(
     }
   }
 
-  // 4. 컨택 성공 → EV, LA, 방향각 모두 생성 (페어·파울 공통)
-  const { exit_velocity, launch_angle } = calcBattedBall(pitch.zone_type, batter)
-  const theta_h = selectDirectionAngle(batter, pitch.zone_type)
+  // ⑤ EV/LA/θ 통합 생성
+  let exit_velocity: number
+  let launch_angle: number
+  let theta_h: number
+
+  if (contactResult.timing_offset !== undefined && contactResult.center_offset !== undefined) {
+    // v2 경로: timing/center에서 통합 생성
+    const pitchData = pitcher.pitch_types.find(pt => pt.type === pitch.pitch_type)
+    const pitcher_power = pitchData?.ball_power ?? 50
+    const speed_index = PITCH_SPEED_INDEX[pitch.pitch_type] ?? 0.85
+
+    const batted = calcBattedBallV2(
+      contactResult.timing_offset,
+      contactResult.center_offset,
+      batter,
+      pitcher_power,
+      speed_index,
+    )
+    exit_velocity = batted.exit_velocity
+    launch_angle  = batted.launch_angle
+    theta_h       = batted.theta_h
+  } else {
+    // fallback: v1 경로 (prediction/perception 없을 때)
+    const batted = calcBattedBall(pitch.zone_type, batter)
+    exit_velocity = batted.exit_velocity
+    launch_angle  = batted.launch_angle
+    // v1에서는 방향각이 resolveHitResult 내부에서 생성되므로 여기선 0
+    theta_h = 0  // resolveHitResult가 내부에서 생성
+  }
+
+  // ⑥ 영역 분류 + 수비 판정
   const territory = classifyTerritory(theta_h)
 
-  // ── 5a. 페어 타구 ──────────────────────────────────────────
+  // ── 페어 타구 ──────────────────────────────────────────
   if (territory === 'fair') {
     const hitDetail = resolveHitResult(exit_velocity, launch_angle, batter, defenceLineup ?? [], theta_h)
     return {
@@ -97,12 +143,11 @@ export function hitBall(
     }
   }
 
-  // ── 5b. 수비 가능 파울 영역 ─────────────────────────────────
+  // ── 수비 가능 파울 영역 ─────────────────────────────────
   if (territory === 'foul_catchable') {
     const foulResult = resolveFoulCatchable(exit_velocity, launch_angle, theta_h, defenceLineup ?? [])
 
     if (foulResult.caught && !foulResult.isError && foulResult.hitDetail) {
-      // 파울 플라이 아웃 (태그업 가능 — hit_physics 포함)
       return {
         swing: true,
         contact: true,
@@ -117,7 +162,6 @@ export function hitBall(
     }
 
     if (foulResult.caught && foulResult.isError) {
-      // 파울 플라이 에러 → 파울 처리, 오버레이 표시
       return {
         swing: true,
         contact: true,
@@ -131,12 +175,10 @@ export function hitBall(
         ...applyPitchToCount(count, 'foul', false),
       }
     }
-
-    // 수비 도달 불가 또는 땅볼 → 순수 파울 (fall through to foul tip check)
   }
 
-  // ── 5c. 관중석 파울 또는 수비 불가 파울 ──────────────────────
-  // 2스트라이크 파울팁 체크 → 삼진
+  // ── 순수 파울 ──────────────────────────────────────────
+  // 2스트라이크 파울팁 체크
   if (count.strikes >= 2 && Math.random() < PHYSICS_CONFIG.foul_tip_prob) {
     return {
       swing: true,
@@ -149,7 +191,6 @@ export function hitBall(
     }
   }
 
-  // 순수 파울 → 다음 투구
   return {
     swing: true,
     contact: true,
