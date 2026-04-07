@@ -111,6 +111,7 @@ export function hitBall(
       batter,
       pitcher_power,
       speed_index,
+      pitcher.throws,
     )
     exit_velocity = batted.exit_velocity
     launch_angle  = batted.launch_angle

@@ -72,6 +72,7 @@ export function calcBattedBallV2(
   batter:            BattingState['batter'],
   pitcher_power:     number,
   pitch_speed_index: number,
+  pitcher_throws?:   Handedness,
 ): BattedBallV2Result {
   const cfg = BATTED_BALL_CONFIG
 
@@ -98,7 +99,11 @@ export function calcBattedBallV2(
   const launch_angle = v2.base_la + la_from_center + la_noise
 
   // ── θ (방향각) ──────────────────────────────────────────
-  const pull_sign: number = batter.bats === 'L' ? 1 : -1
+  // 스위치 타자: 투수 반대 손으로 타격 (vs 우투→좌타, vs 좌투→우타)
+  const effective_bats: 'L' | 'R' = batter.bats === 'S'
+    ? (pitcher_throws === 'L' ? 'R' : 'L')  // 스위치: 투수 반대
+    : batter.bats === 'L' ? 'L' : 'R'
+  const pull_sign: number = effective_bats === 'L' ? 1 : -1
   const theta_from_timing = timing_offset * v2.timing_to_theta_k * pull_sign
 
   const instability = Math.abs(center_offset) * v2.center_instability_k
