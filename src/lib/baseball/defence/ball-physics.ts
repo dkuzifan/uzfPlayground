@@ -157,10 +157,68 @@ export function calcBattedBallPhysics(
     ? range_raw + roll_dist
     : range_raw * carry_factor
 
+  // 땅볼 경로 데이터
+  const isGrounder = la_deg <= 10
+  const theta_rad = theta_deg * (Math.PI / 180)
+  const grounder = isGrounder ? {
+    bounce_dist: range_raw,
+    mu_roll:     MU_ROLL,
+    dir:         { dx: Math.sin(theta_rad), dy: Math.cos(theta_rad) },
+  } : undefined
+
   return {
     range,
     v_roll_0,
     t_bounce,
     landing: toFieldCoords(range, theta_deg),
+    grounder,
   }
+}
+
+// ── 땅볼 경로 시간 계산 ──────────────────────────────────
+
+/**
+ * 땅볼이 홈에서 dist(m) 지점에 도달하는 시간을 반환.
+ * 도달 불가능(공이 그 전에 멈춤)이면 Infinity.
+ *
+ * Phase A (공중): d_air(t) = (vx0/D)(1 - e^(-Dt)), t ∈ [0, t_bounce]
+ * Phase B (구르기): d_roll(t) = bounce_dist + v_roll*t' - ½μgt'²
+ */
+export function grounderTimeAtDist(
+  dist:       number,
+  physics:    BallPhysicsResult,
+  ev_kmh:     number,
+  la_deg:     number,
+): number {
+  if (!physics.grounder) return Infinity
+
+  const { bounce_dist, mu_roll } = physics.grounder
+  const v0 = ev_kmh / 3.6
+  const theta = la_deg * (Math.PI / 180)
+  const vx0 = v0 * Math.cos(theta)
+  const D = getD(ev_kmh)
+
+  // Phase A: 공중 단계 (바운드 전)
+  if (dist <= bounce_dist) {
+    // d_air(t) = (vx0/D)(1 - e^(-Dt)) = dist
+    // 1 - e^(-Dt) = dist * D / vx0
+    const ratio = dist * D / vx0
+    if (ratio >= 1) return physics.t_bounce // 거의 바운드 지점
+    return -Math.log(1 - ratio) / D
+  }
+
+  // Phase B: 구르기 단계
+  // d(t') = bounce_dist + v_roll_0 * t' - 0.5 * mu * g * t'^2 = dist
+  // 0.5*mu*g*t'^2 - v_roll_0*t' + (dist - bounce_dist) = 0
+  const a = 0.5 * mu_roll * G
+  const b = -physics.v_roll_0
+  const c = dist - bounce_dist
+  const discriminant = b * b - 4 * a * c
+
+  if (discriminant < 0) return Infinity // 도달 불가 (공이 먼저 멈춤)
+
+  const t_roll = (-b - Math.sqrt(discriminant)) / (2 * a)
+  if (t_roll < 0) return Infinity
+
+  return physics.t_bounce + t_roll
 }

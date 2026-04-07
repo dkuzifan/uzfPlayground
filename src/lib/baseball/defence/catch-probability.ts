@@ -1,13 +1,8 @@
 import type { Player } from '../types/player'
-import type { FieldCoords, BallType } from './types'
+import type { FieldCoords, BallType, BallPhysicsResult } from './types'
 import { FIELDER_DEFAULT_POS } from './fielder-positions'
 import { PHYSICS_CONFIG } from './config'
-
-// ============================================================
-// 포구 확률 계산
-// ============================================================
-
-const MU_GROUND = 0.4  // 잔디 마찰 계수 (Phase B 땅볼용)
+import { grounderTimeAtDist } from './ball-physics'
 
 function euclideanDist(a: FieldCoords, b: { x: number; y: number }): number {
   const dx = a.field_x - b.x
@@ -95,13 +90,125 @@ export function calcCatchProbability(
     return clamp(0.80 - 0.10 * excess, 0.05, 0.80)
   }
 
-  // 내야 땅볼 — 거리·속도 기반 범위 모델
-  // 땅볼은 공이 구르기 때문에 수비수가 공을 보며 이동할 시간이 충분히 있다.
-  // reachable_dist: 2.5초 이내 이동 가능 거리 (타구 → 착지 전체 시간)
-  // speed_penalty: 빠른 타구일수록 정면 돌파가 어려움 (최대 0.12)
+  // 내야 땅볼 — 거리·속도 기반 범위 모델 (fallback: 경로 데이터 없을 때)
   const fielder_speed_g = 4.0 + (defence / 100) * 2.0  // 4.0–6.0 m/s
-  const reachable_dist  = fielder_speed_g * 1.8          // 1.8초 이내 이동 가능 거리
-  const speed_penalty   = Math.min(0.18, v_roll_0 / 20 * 0.18)  // 속구 페널티 최대 0.18
+  const reachable_dist  = fielder_speed_g * 1.8
+  const speed_penalty   = Math.min(0.18, v_roll_0 / 20 * 0.18)
   const excess          = Math.max(0, d - reachable_dist)
   return clamp(0.90 - 0.10 * excess - speed_penalty, 0.05, 0.90)
+}
+
+// ============================================================
+// 땅볼 경로 기반 인터셉트 시스템
+// ============================================================
+
+export interface GrounderInterceptResult {
+  fielder:         Player
+  fielder_pos:     { x: number; y: number }
+  perp_dist:       number    // 수비수→경로 수직 거리 (m)
+  intercept_dist:  number    // 홈→인터셉트 지점 거리 (m)
+  t_ball:          number    // 공이 인터셉트 지점 도달 시간 (s)
+  t_fielder:       number    // 수비수가 인터셉트 지점 도달 시간 (s)
+  margin:          number    // t_ball - t_fielder (양수=수비 여유, 음수=못잡음)
+  can_intercept:   boolean
+}
+
+/**
+ * 땅볼 경로에 대해 각 수비수의 인터셉트 가능성을 계산하고,
+ * 가장 빨리 인터셉트 가능한 수비수를 반환.
+ */
+export function findGrounderInterceptor(
+  physics:    BallPhysicsResult,
+  ev_kmh:     number,
+  la_deg:     number,
+  fielders:   Player[],
+): GrounderInterceptResult | null {
+  if (!physics.grounder) return null
+
+  const { dir } = physics.grounder
+  const REACTION_TIME = 0.25  // 수비수 초기 반응 시간 (s)
+
+  // 공이 멈추는 시간 (t_stop) 및 최종 좌표
+  const t_roll_stop = physics.v_roll_0 / (physics.grounder!.mu_roll * 9.8)
+  const t_stop = physics.t_bounce + t_roll_stop
+  const stop_x = physics.range * dir.dx
+  const stop_y = physics.range * dir.dy
+
+  let best: GrounderInterceptResult | null = null
+
+  for (const f of fielders) {
+    const pos = f.defence_pos ?? FIELDER_DEFAULT_POS[f.position_1]
+    if (!pos) continue
+
+    const proj = pos.x * dir.dx + pos.y * dir.dy
+    const perp = Math.abs(pos.x * dir.dy - pos.y * dir.dx)
+
+    if (proj < 5) continue
+
+    const fielder_speed = 4.0 + (f.stats.defence / 100) * 2.0
+
+    let t_ball: number
+    let t_fielder: number
+    let intercept_dist: number
+    let actual_perp: number
+
+    if (proj <= physics.range) {
+      // Case A: 공이 수비수 투영 지점을 지나감 → 경로 위에서 인터셉트
+      t_ball = grounderTimeAtDist(proj, physics, ev_kmh, la_deg)
+      t_fielder = REACTION_TIME + perp / fielder_speed
+      intercept_dist = proj
+      actual_perp = perp
+    } else {
+      // Case B: 공이 수비수 투영 지점 전에 멈춤 → 수비수가 멈춘 공까지 달려감
+      t_ball = t_stop  // 공이 멈추는 시간 (공은 이미 정지 상태)
+      const dx_stop = pos.x - stop_x
+      const dy_stop = pos.y - stop_y
+      const dist_to_stop = Math.sqrt(dx_stop * dx_stop + dy_stop * dy_stop)
+      t_fielder = REACTION_TIME + dist_to_stop / fielder_speed
+      intercept_dist = physics.range
+      actual_perp = dist_to_stop
+    }
+
+    const margin = t_ball - t_fielder
+    const can_intercept = margin >= 0
+
+    const candidate: GrounderInterceptResult = {
+      fielder: f,
+      fielder_pos: pos,
+      perp_dist: actual_perp,
+      intercept_dist,
+      t_ball,
+      t_fielder,
+      margin,
+      can_intercept,
+    }
+
+    if (!best || margin > best.margin) {
+      best = candidate
+    }
+  }
+
+  return best
+}
+
+/**
+ * 인터셉트 마진으로 포구 확률 계산.
+ * margin > 0: 여유 있는 포구 → 확률 높음
+ * margin < 0: 늦음 → 확률 낮음 (안타)
+ * margin ≈ 0: 아슬아슬 → 50/50
+ */
+export function calcGrounderCatchProb(
+  intercept: GrounderInterceptResult,
+): number {
+  const { margin, perp_dist } = intercept
+
+  // 시그모이드: margin이 클수록 확실한 아웃
+  // scale=0.3 → ±0.3초 범위에서 확률 급변
+  const base = 1 / (1 + Math.exp(-margin / 0.3))
+
+  // 수직 거리 보정: 멀리 뛰어야 할수록 포구 난이도 상승
+  // 3m 이상이면 다이빙 캐치 영역 → 추가 페널티
+  const perp_penalty = perp_dist > 3 ? 0.10 * (perp_dist - 3) : 0
+
+  return clamp(base - perp_penalty, 0.02, 0.95)
 }

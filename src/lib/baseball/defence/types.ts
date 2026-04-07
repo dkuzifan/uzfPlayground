@@ -12,6 +12,12 @@ export interface BallPhysicsResult {
   v_roll_0: number        // 첫 바운드 직후 수평 속도 (m/s)
   t_bounce: number        // 첫 바운드 시간 (s)
   landing:  FieldCoords   // 착지 필드 좌표
+  // 땅볼 경로 데이터 (grounder 전용, 뜬공은 undefined)
+  grounder?: {
+    bounce_dist: number   // 첫 바운드 지점 홈으로부터 거리 (m)
+    mu_roll:     number   // 마찰 계수
+    dir:         { dx: number; dy: number }  // 방향 단위벡터
+  }
 }
 
 // LA 기준 타구 분류 — 포구 확률 로직 분기에 사용
