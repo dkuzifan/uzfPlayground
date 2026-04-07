@@ -126,7 +126,15 @@ export function findGrounderInterceptor(
   if (!physics.grounder) return null
 
   const { dir } = physics.grounder
-  const REACTION_TIME = 0.25  // 수비수 초기 반응 시간 (s)
+
+  // 포지션별 반응 시간 (s)
+  // P: 팔로스루 → 수비 전환 필요, C: 웅크린 자세에서 기립
+  // 내야수: 레디 자세, 외야수: 먼 거리 판단 시간
+  const REACTION_BY_POS: Record<string, number> = {
+    P: 0.45, C: 0.35,
+    '1B': 0.25, '2B': 0.25, SS: 0.25, '3B': 0.25,
+    LF: 0.30, CF: 0.30, RF: 0.30,
+  }
 
   // 공이 멈추는 시간 (t_stop) 및 최종 좌표
   const t_roll_stop = physics.v_roll_0 / (physics.grounder!.mu_roll * 9.8)
@@ -146,6 +154,7 @@ export function findGrounderInterceptor(
     if (proj < 5) continue
 
     const fielder_speed = 4.0 + (f.stats.defence / 100) * 2.0
+    const reaction = REACTION_BY_POS[f.position_1] ?? 0.25
 
     let t_ball: number
     let t_fielder: number
@@ -155,7 +164,7 @@ export function findGrounderInterceptor(
     if (proj <= physics.range) {
       // Case A: 공이 수비수 투영 지점을 지나감 → 경로 위에서 인터셉트
       t_ball = grounderTimeAtDist(proj, physics, ev_kmh, la_deg)
-      t_fielder = REACTION_TIME + perp / fielder_speed
+      t_fielder = reaction + perp / fielder_speed
       intercept_dist = proj
       actual_perp = perp
     } else {
@@ -164,7 +173,7 @@ export function findGrounderInterceptor(
       const dx_stop = pos.x - stop_x
       const dy_stop = pos.y - stop_y
       const dist_to_stop = Math.sqrt(dx_stop * dx_stop + dy_stop * dy_stop)
-      t_fielder = REACTION_TIME + dist_to_stop / fielder_speed
+      t_fielder = reaction + dist_to_stop / fielder_speed
       intercept_dist = physics.range
       actual_perp = dist_to_stop
     }
@@ -203,8 +212,8 @@ export function calcGrounderCatchProb(
   const { margin, perp_dist } = intercept
 
   // 시그모이드: margin이 클수록 확실한 아웃
-  // scale=0.3 → ±0.3초 범위에서 확률 급변
-  const base = 1 / (1 + Math.exp(-margin / 0.3))
+  // scale=0.15 → ±0.15초 범위에서 확률 급변 (더 날카로운 판정)
+  const base = 1 / (1 + Math.exp(-margin / 0.15))
 
   // 수직 거리 보정: 멀리 뛰어야 할수록 포구 난이도 상승
   // 3m 이상이면 다이빙 캐치 영역 → 추가 페널티
