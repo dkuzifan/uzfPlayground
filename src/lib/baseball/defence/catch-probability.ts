@@ -208,15 +208,27 @@ export function findGrounderInterceptor(
  */
 export function calcGrounderCatchProb(
   intercept: GrounderInterceptResult,
+  ev_kmh:    number,
+  la_deg:    number,
 ): number {
-  const { margin, perp_dist } = intercept
+  const { margin, perp_dist, intercept_dist } = intercept
 
-  // 시그모이드: margin이 클수록 확실한 아웃
-  // scale=0.15 → ±0.15초 범위에서 확률 급변 (더 날카로운 판정)
-  const base = 1 / (1 + Math.exp(-margin / 0.15))
+  let base: number
 
-  // 수직 거리 보정: 멀리 뛰어야 할수록 포구 난이도 상승
-  // 3m 이상이면 다이빙 캐치 영역 → 추가 페널티
+  if (margin >= 0) {
+    // 수비수가 먼저 도착 → 시간 여유 기반
+    // scale=0.15 → 0.15초 이상 여유면 거의 확실
+    base = 1 / (1 + Math.exp(-margin / 0.15))
+  } else {
+    // 공이 먼저 통과 → 물리적 거리(overshoot) 기반
+    // margin < 0일 때 공이 인터셉트 지점을 얼마나 지나갔는지
+    const ball_speed = ev_kmh / 3.6  // 대략적 공 속도 (감속 미반영, 보수적)
+    const overshoot = ball_speed * Math.abs(margin)  // 지나간 거리 (m)
+    // 0.3m 이내: 반사적 포구 가능 (~30%), 1m 이상: 불가능
+    base = Math.exp(-overshoot * 3)  // 0.3m→41%, 0.5m→22%, 1m→5%, 2m→0.2%
+  }
+
+  // 수직 거리 보정: 3m 이상이면 다이빙 캐치 영역
   const perp_penalty = perp_dist > 3 ? 0.10 * (perp_dist - 3) : 0
 
   return clamp(base - perp_penalty, 0.02, 0.95)

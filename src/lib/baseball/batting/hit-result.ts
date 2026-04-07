@@ -101,7 +101,7 @@ export function resolveHitResult(
       return { result: 'single', fielder: fb, fielder_pos: { x: physics.landing.field_x, y: physics.landing.field_y }, t_fielding: 3.0, t_ball_travel: physics.t_bounce, is_infield: physics.range < 36, range: physics.range, ball_type: ballType, theta_h }
     }
 
-    const p_out = calcGrounderCatchProb(intercept)
+    const p_out = calcGrounderCatchProb(intercept, exit_velocity, launch_angle)
     const p_error = p_out * ERROR_COEFF
     const roll = Math.random()
 
