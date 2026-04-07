@@ -65,9 +65,15 @@ export function selectDirectionAngle(batter: Player, zoneType?: ZoneType): numbe
         if (Math.abs(theta) <= PHYSICS_CONFIG.FAIR_ANGLE) return theta
       }
     } else {
-      // 파울 영역: 45°~70° 사이 균등 분포
+      // 파울 영역: 45°~180° — 지수 감소 분포
+      // 파울 라인 근처(45~60°)가 가장 빈번, 뒤로 갈수록 급감
+      // 지수 분포: θ = 45 + exponential(λ), λ=0.012
+      // 수비 가능(45~60°) ≈ 파울의 17%, 관중석/백네트 ≈ 83%
       const side = Math.random() < 0.5 ? 1 : -1
-      return side * (PHYSICS_CONFIG.FAIR_ANGLE + Math.random() * (PHYSICS_CONFIG.MAX_DIRECTION_ANGLE - PHYSICS_CONFIG.FAIR_ANGLE))
+      const lambda = 0.012
+      const raw = -Math.log(1 - Math.random() + 1e-10) / lambda
+      const foulAngle = PHYSICS_CONFIG.FAIR_ANGLE + Math.min(raw, 135) // 45° + 0~135° = 45°~180°
+      return side * foulAngle
     }
   }
 
