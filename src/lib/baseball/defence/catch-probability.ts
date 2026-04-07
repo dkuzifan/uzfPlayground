@@ -79,15 +79,24 @@ export function calcCatchProbability(
   // 팝업: 항상 아웃
   if (ballType === 'popup') return 1.0
 
-  // 플라이 / 라인드라이브 — 체공 시간 기반
+  // 플라이 / 라인드라이브 — 도달 여부 + 에러 확률 분리
   if (ballType === 'fly' || ballType === 'line_drive') {
     const { outfielder_speed_min, outfielder_speed_max } = PHYSICS_CONFIG
     const fielder_speed   = outfielder_speed_min + (defence / 100) * (outfielder_speed_max - outfielder_speed_min)
     const reachable_dist  = fielder_speed * t_bounce
     const excess          = Math.max(d - reachable_dist, 0)
-    // 포구 확률 상한: 0.80 (이전 0.87 — 땅볼 수비 모델 보정 후 전체 BABIP 재캘리브레이션)
-    // 1m 초과당 −0.10
-    return clamp(0.80 - 0.10 * excess, 0.05, 0.80)
+
+    // ① 도달 확률: excess가 크면 도달 불가
+    const p_reach = clamp(1.0 - 0.15 * excess, 0, 1.0)
+
+    // ② 에러 확률: 도달했을 때 놓칠 확률 (수비 스탯 기반)
+    //    Defence 100: 0.5% 에러, Defence 30: 8% 에러
+    //    난이도 보정: excess > 0이면 다이빙/달려서 잡는 상황 → 에러↑
+    const base_error = 0.005 + (1 - defence / 100) * 0.075  // 0.5% ~ 8%
+    const difficulty_error = excess > 0 ? Math.min(0.15, excess * 0.05) : 0
+    const p_error = Math.min(0.20, base_error + difficulty_error)
+
+    return clamp(p_reach * (1 - p_error), 0.02, 0.99)
   }
 
   // 내야 땅볼 — 거리·속도 기반 범위 모델 (fallback: 경로 데이터 없을 때)
@@ -201,35 +210,45 @@ export function findGrounderInterceptor(
 }
 
 /**
- * 인터셉트 마진으로 포구 확률 계산.
- * margin > 0: 여유 있는 포구 → 확률 높음
- * margin < 0: 늦음 → 확률 낮음 (안타)
- * margin ≈ 0: 아슬아슬 → 50/50
+ * 땅볼 인터셉트 포구 확률 — 도달 확률 + 에러 확률 분리.
+ *
+ * ① 도달 확률 (p_reach): 마진/overshoot 기반
+ * ② 에러 확률 (p_error): Defence 스탯 + 포구 난이도 기반
+ * → p_out = p_reach × (1 - p_error)
  */
 export function calcGrounderCatchProb(
   intercept: GrounderInterceptResult,
   ev_kmh:    number,
   la_deg:    number,
 ): number {
-  const { margin, perp_dist, intercept_dist } = intercept
+  const { margin, perp_dist, fielder } = intercept
+  const defence = fielder.stats.defence
 
-  let base: number
+  // ① 도달 확률
+  let p_reach: number
 
   if (margin >= 0) {
     // 수비수가 먼저 도착 → 시간 여유 기반
-    // scale=0.15 → 0.15초 이상 여유면 거의 확실
-    base = 1 / (1 + Math.exp(-margin / 0.15))
+    p_reach = 1 / (1 + Math.exp(-margin / 0.15))
   } else {
-    // 공이 먼저 통과 → 물리적 거리(overshoot) 기반
-    // margin < 0일 때 공이 인터셉트 지점을 얼마나 지나갔는지
-    const ball_speed = ev_kmh / 3.6  // 대략적 공 속도 (감속 미반영, 보수적)
-    const overshoot = ball_speed * Math.abs(margin)  // 지나간 거리 (m)
-    // 0.3m 이내: 반사적 포구 가능 (~30%), 1m 이상: 불가능
-    base = Math.exp(-overshoot * 3)  // 0.3m→41%, 0.5m→22%, 1m→5%, 2m→0.2%
+    // 공이 먼저 통과 → overshoot 거리 기반
+    const ball_speed = ev_kmh / 3.6
+    const overshoot = ball_speed * Math.abs(margin)
+    p_reach = Math.exp(-overshoot * 3)
   }
 
-  // 수직 거리 보정: 3m 이상이면 다이빙 캐치 영역
-  const perp_penalty = perp_dist > 3 ? 0.10 * (perp_dist - 3) : 0
+  // 수직 거리 보정: 멀리 뛰어야 할수록 도달 난이도↑
+  if (perp_dist > 3) {
+    p_reach *= Math.max(0.1, 1.0 - 0.12 * (perp_dist - 3))
+  }
 
-  return clamp(base - perp_penalty, 0.02, 0.95)
+  // ② 에러 확률: 도달했을 때 놓칠 확률 (수비 스탯 기반)
+  //    Defence 100: 0.5% 에러, Defence 30: 8% 에러
+  //    난이도 보정: 수직 이동이 길면(다이빙) 에러↑, 빠른 타구도 에러↑
+  const base_error = 0.005 + (1 - defence / 100) * 0.075
+  const difficulty = (perp_dist > 2 ? 0.03 * (perp_dist - 2) : 0)
+    + (ev_kmh > 140 ? 0.02 * ((ev_kmh - 140) / 10) : 0)
+  const p_error = Math.min(0.20, base_error + difficulty)
+
+  return clamp(p_reach * (1 - p_error), 0.02, 0.99)
 }
