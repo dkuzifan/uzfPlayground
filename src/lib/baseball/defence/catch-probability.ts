@@ -79,24 +79,24 @@ export function calcCatchProbability(
   // 팝업: 항상 아웃
   if (ballType === 'popup') return 1.0
 
-  // 플라이 / 라인드라이브 — 도달 여부 + 에러 확률 분리
+  // 플라이 / 라인드라이브 — 도달 여부(이분법) + 에러 확률
   if (ballType === 'fly' || ballType === 'line_drive') {
     const { outfielder_speed_min, outfielder_speed_max } = PHYSICS_CONFIG
     const fielder_speed   = outfielder_speed_min + (defence / 100) * (outfielder_speed_max - outfielder_speed_min)
     const reachable_dist  = fielder_speed * t_bounce
-    const excess          = Math.max(d - reachable_dist, 0)
+    const excess          = d - reachable_dist
 
-    // ① 도달 확률: excess가 크면 도달 불가
-    const p_reach = clamp(1.0 - 0.15 * excess, 0, 1.0)
+    // ① 도달 판정: 이분법
+    if (excess > 0) return 0  // 도달 불가 → 안타
 
-    // ② 에러 확률: 도달했을 때 놓칠 확률 (수비 스탯 기반)
-    //    Defence 100: 0.5% 에러, Defence 30: 8% 에러
-    //    난이도 보정: excess > 0이면 다이빙/달려서 잡는 상황 → 에러↑
-    const base_error = 0.005 + (1 - defence / 100) * 0.075  // 0.5% ~ 8%
-    const difficulty_error = excess > 0 ? Math.min(0.15, excess * 0.05) : 0
-    const p_error = Math.min(0.20, base_error + difficulty_error)
+    // ② 도달 성공 → 에러 확률 계산
+    const margin_dist = -excess  // 여유 거리 (m) — 클수록 쉬운 플레이
+    const base_error = 0.005 + (1 - defence / 100) * 0.075
+    // 여유 거리가 작을수록(간신히 도달) 에러↑, 0m=간신히: +5%, 3m+=여유: +0%
+    const margin_difficulty = Math.max(0, 0.05 * (1 - margin_dist / 3))
+    const p_error = Math.min(0.20, base_error + margin_difficulty)
 
-    return clamp(p_reach * (1 - p_error), 0.02, 0.99)
+    return clamp(1 - p_error, 0.02, 0.99)
   }
 
   // 내야 땅볼 — 거리·속도 기반 범위 모델 (fallback: 경로 데이터 없을 때)
@@ -210,11 +210,10 @@ export function findGrounderInterceptor(
 }
 
 /**
- * 땅볼 인터셉트 포구 확률 — 도달 확률 + 에러 확률 분리.
+ * 땅볼 인터셉트 포구 확률.
  *
- * ① 도달 확률 (p_reach): 마진/overshoot 기반
- * ② 에러 확률 (p_error): Defence 스탯 + 포구 난이도 기반
- * → p_out = p_reach × (1 - p_error)
+ * ① 도달 여부: margin >= 0 → 도달, < 0 → 미도달 (이분법)
+ * ② 도달 시 에러 확률: Defence + 타구 속도 + 난이도(마진/이동거리)
  */
 export function calcGrounderCatchProb(
   intercept: GrounderInterceptResult,
@@ -224,31 +223,28 @@ export function calcGrounderCatchProb(
   const { margin, perp_dist, fielder } = intercept
   const defence = fielder.stats.defence
 
-  // ① 도달 확률
-  let p_reach: number
-
-  if (margin >= 0) {
-    // 수비수가 먼저 도착 → 시간 여유 기반
-    p_reach = 1 / (1 + Math.exp(-margin / 0.15))
-  } else {
-    // 공이 먼저 통과 → overshoot 거리 기반
-    const ball_speed = ev_kmh / 3.6
-    const overshoot = ball_speed * Math.abs(margin)
-    p_reach = Math.exp(-overshoot * 3)
+  // ① 도달 판정: 이분법
+  if (margin < 0) {
+    // 공이 먼저 통과 → 수비 불가 → 안타
+    return 0
   }
 
-  // 수직 거리 보정: 멀리 뛰어야 할수록 도달 난이도↑
-  if (perp_dist > 3) {
-    p_reach *= Math.max(0.1, 1.0 - 0.12 * (perp_dist - 3))
-  }
-
-  // ② 에러 확률: 도달했을 때 놓칠 확률 (수비 스탯 기반)
-  //    Defence 100: 0.5% 에러, Defence 30: 8% 에러
-  //    난이도 보정: 수직 이동이 길면(다이빙) 에러↑, 빠른 타구도 에러↑
+  // ② 도달 성공 → 에러 확률 계산
+  // 기본 에러율: Defence 스탯 기반
+  //   Defence 100: 0.5%, Defence 50: 4.25%, Defence 0: 8%
   const base_error = 0.005 + (1 - defence / 100) * 0.075
-  const difficulty = (perp_dist > 2 ? 0.03 * (perp_dist - 2) : 0)
-    + (ev_kmh > 140 ? 0.02 * ((ev_kmh - 140) / 10) : 0)
-  const p_error = Math.min(0.20, base_error + difficulty)
 
-  return clamp(p_reach * (1 - p_error), 0.02, 0.99)
+  // 난이도 보정: 마진이 작을수록 (간신히 도달) 에러↑
+  //   margin=0(간신히): +5%, margin=0.5+(여유): +0%
+  const margin_difficulty = Math.max(0, 0.05 * (1 - margin / 0.5))
+
+  // 이동 거리 보정: 멀리 뛰어야 했으면 (다이빙 등) 에러↑
+  const movement_difficulty = perp_dist > 2 ? 0.03 * (perp_dist - 2) : 0
+
+  // 타구 속도 보정: 빠른 타구일수록 핸들링 어려움 → 에러↑
+  const speed_difficulty = ev_kmh > 130 ? 0.02 * ((ev_kmh - 130) / 10) : 0
+
+  const p_error = Math.min(0.25, base_error + margin_difficulty + movement_difficulty + speed_difficulty)
+
+  return clamp(1 - p_error, 0.02, 0.99)
 }
