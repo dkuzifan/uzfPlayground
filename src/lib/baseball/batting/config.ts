@@ -64,8 +64,8 @@ export const CONTACT_CONFIG = {
 // ============================================================
 
 export const BATTED_BALL_CONFIG = {
-  base_exit_velocity: 138,      // km/h — 134→138: v2 center/timing 페널티 보상 + HR 비율 확보
-  power_slope: 0.60,            // power_factor = 0.70 + (Power/100) × 0.60  →  0.70 ~ 1.30
+  base_exit_velocity: 145,      // km/h — center 분포 확대에 맞춰 소폭 하향
+  power_slope: 0.75,            // power_factor = 0.70 + (Power/100) × 0.75  →  0.70 ~ 1.45
   quality_std_base: 0.08,       // σ = 0.08 × (1 - Contact/200)
   launch_angle_base: {
     high_zone:  5,              // dirt 전용 (현재 low_zone 상수로 사용)
@@ -96,8 +96,8 @@ export const BATTED_BALL_CONFIG = {
     power_advantage_scale:  0.10,   // Power vs BallPower 매치업 보정 (±10%)
     pitch_speed_ev_base:    0.85,   // 투구 속도가 EV에 미치는 기본값
     pitch_speed_ev_scale:   0.15,   // 투구 속도 추가 비례분
-    center_penalty_k:       2.0,    // center_offset → EV 페널티 민감도 (3.0→2.0: HR 허용)
-    center_penalty_max:     0.55,   // EV 최대 감소 비율 (55%)
+    center_penalty_k:       2.5,    // center_offset → EV 페널티 민감도 (1.5→2.5: 가파른 EV 감소)
+    center_penalty_max:     0.60,   // EV 최대 감소 비율 (60%) — 빗맞으면 급감, 정타면 최대
     timing_penalty_k:       1.5,    // timing_offset → EV 페널티 민감도 (2.0→1.5)
     timing_penalty_max:     0.25,   // EV 최대 감소 비율 (25%)
     min_ev:                 40,     // EV 하한 (km/h)
@@ -114,7 +114,7 @@ export const BATTED_BALL_CONFIG = {
 
     // 컨택 오프셋 계수
     timing_noise_std_base:  0.08,   // timing_offset 기본 노이즈 σ
-    center_noise_std_base:  0.18,   // center_offset 기본 노이즈 σ (0.10→0.18: LA 다양화)
+    center_noise_std_base:  0.28,   // center_offset 기본 노이즈 σ (0.18→0.28: 약한 타구↑, EV 분포 확대)
     zone_error_penalty:     0.15,   // 존 오인식 시 center_offset 추가 σ
   },
 }
