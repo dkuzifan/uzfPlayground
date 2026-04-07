@@ -408,6 +408,23 @@ AND 타구가 내야 땅볼
 
 ---
 
+> **⚠️ v2 리워크 (2026-04-07)**: Section 7-1 ~ 7-3은 MVP 설계. v2에서는 아래 모델로 교체.
+> 상세 스펙: `docs/baseball/prd/260330-baseball-batting-engine.md` — v2 섹션 참조.
+>
+> **v2 파이프라인 요약**:
+> ```
+> ① predictPitch (투구 전 구종/코스 예측 — 패턴 기반 차감)
+> ② readPitch (투구 후 인식 — Eye 스탯 기반)
+> ③ decideSwingV2 (예측 vs 인식 비교 → 스윙 결정)
+> ④ resolveContactV2 → timing_offset + center_offset 출력
+> ⑤ calcBattedBallV2 → EV/LA/θ 통합 생성
+>     - center_offset → EV (주), LA (주)
+>     - timing_offset → θ (주)
+> ⑥ 기존 수비 엔진으로 궤적+판정
+> ```
+>
+> **핵심 변경**: `fair_prob` 삭제 (방향각 ±45° 기반), EV/LA/θ 물리적 상관관계 부여
+
 ### 7-1. 스윙 여부 (선구안)
 
 ```
