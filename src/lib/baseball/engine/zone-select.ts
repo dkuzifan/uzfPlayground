@@ -26,8 +26,10 @@ const BALL_ZONES = new Set<ZoneId>([
   'B31', 'B32', 'B33', 'B34', 'B35',
 ])
 
-// core 존 (한복판): 5개 — 투수가 회피해야 하는 존
-const CORE_ZONES = new Set<ZoneId>([2, 4, 5, 6, 8])
+// core 존 (한복판): 1개 — 투수가 가장 피해야 하는 존
+const CORE_ZONES = new Set<ZoneId>([5])
+// mid 존 (십자): 4개 — 치기 좋은 위치, 투수 주의 필요
+const MID_ZONES = new Set<ZoneId>([2, 4, 6, 8])
 // edge 존 (코너): 4개 — 투수가 선호하는 존
 const EDGE_ZONES = new Set<ZoneId>([1, 3, 7, 9])
 // chase 존 (경계 밖): 스트라이크 존 바로 옆 볼 존
@@ -77,9 +79,11 @@ export function selectTargetZone(
     if (BALL_ZONES.has(zone)) {
       strikeBase = CHASE_ZONES.has(zone) ? ZONE_SELECT_CHASE_BONUS : 1.0
     } else if (CORE_ZONES.has(zone)) {
-      strikeBase = ZONE_SELECT_STRIKE_BASE * ZONE_SELECT_CORE_PENALTY
+      strikeBase = ZONE_SELECT_STRIKE_BASE * ZONE_SELECT_CORE_PENALTY  // 한복판 강력 회피
+    } else if (MID_ZONES.has(zone)) {
+      strikeBase = ZONE_SELECT_STRIKE_BASE * 0.7  // 십자 중간 회피
     } else {
-      strikeBase = ZONE_SELECT_STRIKE_BASE  // edge
+      strikeBase = ZONE_SELECT_STRIKE_BASE  // edge (코너) — 투수 선호
     }
     let w = (affinity[zone] ?? 1.0) * strikeBase
 

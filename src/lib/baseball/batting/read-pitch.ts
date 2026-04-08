@@ -13,6 +13,7 @@ import type { PredictionResult } from './predict-pitch'
 export interface PerceptionResult {
   perceived_type:     PitchType
   perceived_zone:     ZoneType
+  perceived_zone_id:  import('../engine/types').ZoneId  // 인지된 구체적 존 ID
   type_correct:       boolean   // 구종 인식 성공 여부
   zone_correct:       boolean   // 존 인식 성공 여부
 }
@@ -96,5 +97,8 @@ export function readPitch(
     zone_correct = false
   }
 
-  return { perceived_type, perceived_zone, type_correct, zone_correct }
+  // perceived_zone_id: 정확히 인지하면 actual_zone, 오인식이면 예측 존 ID
+  const perceived_zone_id = zone_correct ? pitch.actual_zone : prediction.predicted_zone_id
+
+  return { perceived_type, perceived_zone, perceived_zone_id, type_correct, zone_correct }
 }

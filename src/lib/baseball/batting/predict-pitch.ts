@@ -1,17 +1,18 @@
 import type { PitchType, PitchTypeData } from '../types/player'
-import type { ZoneType } from '../engine/types'
+import type { ZoneType, ZoneId } from '../engine/types'
 
 // ============================================================
 // 투구 전 예측 — 타자가 다음 구종과 코스를 예측
 //
 // 구종 예측: 투수의 구종별 능력치(가중) × 반복 패널티
-// 코스 예측: 카운트 기반 존 기대 분포
+// 코스 예측: 카운트 기반 존 기대 분포 + 구체적 존 ID
 // ============================================================
 
 export interface PredictionResult {
-  predicted_type:   PitchType
-  predicted_zone:   ZoneType
-  type_confidence:  number     // 예측 구종 확률 (0~1, 디버깅용)
+  predicted_type:    PitchType
+  predicted_zone:    ZoneType
+  predicted_zone_id: ZoneId     // 구체적 존 ID (좌표 근접도 계산용)
+  type_confidence:   number     // 예측 구종 확률 (0~1, 디버깅용)
 }
 
 /**
@@ -28,7 +29,7 @@ export function predictPitch(
   count:          { balls: number; strikes: number },
 ): PredictionResult {
   if (pitchTypes.length === 0) {
-    return { predicted_type: 'fastball', predicted_zone: 'core', type_confidence: 0 }
+    return { predicted_type: 'fastball', predicted_zone: 'core', predicted_zone_id: 5, type_confidence: 0 }
   }
 
   // ── 구종 예측 확률 ──────────────────────────────────────
@@ -54,7 +55,7 @@ export function predictPitch(
   // 정규화
   const totalW = weights.reduce((s, e) => s + e.w, 0)
   if (totalW <= 0) {
-    return { predicted_type: pitchTypes[0].type, predicted_zone: 'core', type_confidence: 0 }
+    return { predicted_type: pitchTypes[0].type, predicted_zone: 'core', predicted_zone_id: 5, type_confidence: 0 }
   }
 
   // 가중치 기반 랜덤 선택
@@ -74,8 +75,9 @@ export function predictPitch(
   // ── 코스 예측 ──────────────────────────────────────────
 
   const predicted_zone = predictZone(count)
+  const predicted_zone_id = predictZoneId(predicted_zone)
 
-  return { predicted_type, predicted_zone, type_confidence }
+  return { predicted_type, predicted_zone, predicted_zone_id, type_confidence }
 }
 
 /**
@@ -110,4 +112,20 @@ function predictZone(count: { balls: number; strikes: number }): ZoneType {
   if (r < 0.65) return 'edge'
   if (r < 0.85) return 'chase'
   return 'ball'
+}
+
+/**
+ * 존 타입에서 구체적 존 ID를 랜덤 선택.
+ * 타자가 "인코스 높은 쪽"처럼 구체적인 위치를 노리는 것을 모델링.
+ */
+function predictZoneId(zoneType: ZoneType): ZoneId {
+  const ZONE_IDS_BY_TYPE: Record<ZoneType, ZoneId[]> = {
+    core:  [5],                 // 한복판
+    edge:  [1, 2, 3, 4, 6, 7, 8, 9],  // mid + edge (코너 포함)
+    chase: ['B12', 'B13', 'B14', 'B21', 'B22', 'B23', 'B24', 'B25', 'B26'],
+    ball:  ['B11', 'B15', 'B31', 'B32', 'B33', 'B34', 'B35'],
+    dirt:  ['B31', 'B32', 'B33', 'B34', 'B35'],
+  }
+  const candidates = ZONE_IDS_BY_TYPE[zoneType]
+  return candidates[Math.floor(Math.random() * candidates.length)]
 }

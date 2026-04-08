@@ -20,6 +20,53 @@ export const SWING_CONFIG = {
     '3-2': +0.05,
   } as Record<string, number>,
   eye_default: 60,  // Eye 스탯 미설정 시 기본값 — 50→60: 볼존 인식 + K% 밸런스
+
+  // ── v2 스윙 결정 ──────────────────────────────────────
+  // 카운트 압박 테이블: 카운트별 기본 스윙 경향 (스탯 보정 전)
+  // MLB 실측: 초구 ~28%, 0-2 ~52%, 3-0 ~20%
+  count_pressure: {
+    '0-0': 0.30,
+    '0-1': 0.35,
+    '0-2': 0.55,
+    '1-0': 0.32,
+    '1-1': 0.38,
+    '1-2': 0.52,
+    '2-0': 0.28,
+    '2-1': 0.35,
+    '2-2': 0.48,
+    '3-0': 0.18,
+    '3-1': 0.25,
+    '3-2': 0.45,
+  } as Record<string, number>,
+
+  // 스탯 스케일링 비율
+  contact_swing_scale: 0.25,   // Contact가 스윙 경향에 미치는 영향 (0~+0.25)
+  eye_take_scale:      0.20,   // Eye가 볼에서 스윙 억제에 미치는 영향 (0~-0.20)
+
+  // 구종 속도 계열 분류
+  pitch_speed_tier: {
+    fastball:  'fast',
+    sinker:    'fast',
+    cutter:    'fast',
+    slider:    'breaking',
+    curveball: 'breaking',
+    changeup:  'offspeed',
+    splitter:  'offspeed',
+    forkball:  'offspeed',
+  } as Record<string, 'fast' | 'breaking' | 'offspeed'>,
+
+  // 속도 계열 유사성 (예측 계열 vs 실제 계열)
+  speed_tier_similarity: {
+    'fast-fast':         1.0,   // 동일 계열
+    'breaking-breaking': 1.0,
+    'offspeed-offspeed': 1.0,
+    'fast-offspeed':     0.5,   // 타이밍 차이 큼
+    'offspeed-fast':     0.5,
+    'fast-breaking':     0.4,   // 타이밍 차이 매우 큼
+    'breaking-fast':     0.4,
+    'breaking-offspeed': 0.8,   // 비교적 유사
+    'offspeed-breaking': 0.8,
+  } as Record<string, number>,
 }
 
 // ============================================================

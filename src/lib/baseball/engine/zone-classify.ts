@@ -35,7 +35,8 @@ const ZONE_GRID: ZoneId[][] = [
 // ZoneId → ZoneType 매핑
 function getZoneType(zone: ZoneId): ZoneType {
   if (typeof zone === 'number') {
-    // 스트라이크 존: 코너(1,3,7,9) = edge, 중앙(5) = core, 나머지 = core
+    // ZoneType 분류: core(중앙+십자) / edge(코너)
+    // 투구 전략에서는 별도 3단계 사용 (zone-select.ts: CORE/MID/EDGE_ZONES)
     if (zone === 5 || zone === 2 || zone === 4 || zone === 6 || zone === 8) return 'core'
     return 'edge'  // 1, 3, 7, 9
   }
