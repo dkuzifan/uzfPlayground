@@ -94,6 +94,10 @@ export function resolveContact(
   const contact_reduction = Math.max(0.60, 1.0 - (batter.stats.contact / 100) * 0.40)
   const effective_dist = coord_dist * contact_reduction
 
+  // 제곱 비례 페널티: 작은 거리는 거의 무시, 큰 거리는 급격히 증가
+  // 0.05m → 0.003, 0.15m → 0.023, 0.25m → 0.063, 0.50m → 0.250
+  const dist_sq = effective_dist * effective_dist
+
   // ── timing_offset: 구종 속도 차이 + 존 거리 페널티 ─────
   const predicted_speed = PITCH_SPEED_INDEX[prediction.predicted_type] ?? 0.85
   const actual_speed    = PITCH_SPEED_INDEX[pitchResult.pitch_type] ?? 0.85
@@ -102,14 +106,13 @@ export function resolveContact(
   const adjustment_factor = 0.5 + (batter.stats.contact / 100) * 0.5
   const raw_timing = speed_diff / adjustment_factor
 
-  // 존 거리 → 재계산 시간 추가 (감쇠 합산: 두 번째 페널티 60%)
-  const zone_timing_penalty = effective_dist * 0.3  // 0.15m → +0.045, 0.30m → +0.09
+  // 존 거리(제곱) → 재계산 시간 추가 (감쇠 합산)
+  const zone_timing_penalty = dist_sq * 0.4
   const timing_noise = gaussianRandom(0, v2.timing_noise_std_base * (1 - batter.stats.contact / 200))
   const timing_offset = raw_timing + zone_timing_penalty * 0.6 + timing_noise
 
-  // ── center_offset: 존 거리 + 인식 오차 ────────────────
-  // 존 거리가 클수록 배트 위치 조정이 큼 → center_offset 기저값 증가
-  const zone_center_penalty = effective_dist * 0.4  // 0.15m → 0.06, 0.30m → 0.12
+  // ── center_offset: 존 거리(제곱) + 인식 오차 ──────────
+  const zone_center_penalty = dist_sq * 0.6
   const zone_error = perception.zone_correct ? 0.0 : v2.zone_error_penalty
   const center_noise_std = v2.center_noise_std_base * (1 - batter.stats.contact / 150) + zone_error
   const center_offset = zone_center_penalty + gaussianRandom(0, center_noise_std)
