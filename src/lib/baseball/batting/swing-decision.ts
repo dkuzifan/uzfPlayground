@@ -19,7 +19,7 @@ import { calcCoordinateDistance } from './zone-proximity'
 
 // 존별 기본 스윙 경향 (인지된 존 기준 — "이게 스트라이크인가?")
 const ZONE_SWING: Record<ZoneType, number> = {
-  core: 0.72, edge: 0.55, chase: 0.22, ball: 0.06, dirt: 0.04,
+  core: 0.78, edge: 0.60, chase: 0.22, ball: 0.06, dirt: 0.04,
 }
 
 // 예측 적중 시 스윙 의지 (존에 따라 차등 — 볼은 리스크 때문에 낮음)
@@ -106,7 +106,7 @@ export function decideSwing(
   const zone_desire = ZONE_SWING[perceived_zone]
   const pred_desire = PREDICTION_DESIRE[perceived_zone]
 
-  const prox_suppress = 1 - proximity * 0.5  // 0.5~1.0 (proximity가 존의지 절반만 억제)
+  const prox_suppress = 1 - proximity * 0.4  // 0.6~1.0 (proximity가 존의지 40%만 억제)
   let p_swing = zone_desire * prox_suppress * (1 - selectivity)
               + pred_desire * proximity
 
