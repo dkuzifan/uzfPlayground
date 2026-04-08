@@ -97,6 +97,16 @@ export const PITCH_AFFINITY: Record<PitchType, Partial<Record<ZoneId, number>>> 
 // 2.3 → 2.1: BB% 보정 (스트라이크 비율 약간 낮춰 볼넷 증가)
 export const ZONE_SELECT_STRIKE_BASE = 2.1
 
+// core(한복판) 페널티: 투수는 한복판을 피하고 코너를 노림
+// core 가중치 = STRIKE_BASE × CORE_PENALTY = 2.1 × 0.4 = 0.84
+// edge 가중치 = STRIKE_BASE = 2.1 (기본)
+// → edge:core ≈ 2.5:1 비율
+export const ZONE_SELECT_CORE_PENALTY = 0.4
+
+// chase(경계 밖 볼존) 보너스: 미끼구/낭비구용
+// chase 가중치 = 1.0 × 1.5 = 1.5 (볼존 기본 1.0 대비)
+export const ZONE_SELECT_CHASE_BONUS = 1.5
+
 // ============================================================
 // Count Modifier
 // ============================================================

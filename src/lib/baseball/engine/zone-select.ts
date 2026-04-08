@@ -7,6 +7,8 @@ import {
   BASE_DISTANCE,
   MAX_SPEED,
   ZONE_SELECT_STRIKE_BASE,
+  ZONE_SELECT_CORE_PENALTY,
+  ZONE_SELECT_CHASE_BONUS,
 } from './config'
 
 // 5×5 그리드의 모든 존 ID 목록
@@ -23,6 +25,13 @@ const BALL_ZONES = new Set<ZoneId>([
   'B21', 'B22', 'B23', 'B24', 'B25', 'B26',
   'B31', 'B32', 'B33', 'B34', 'B35',
 ])
+
+// core 존 (한복판): 5개 — 투수가 회피해야 하는 존
+const CORE_ZONES = new Set<ZoneId>([2, 4, 5, 6, 8])
+// edge 존 (코너): 4개 — 투수가 선호하는 존
+const EDGE_ZONES = new Set<ZoneId>([1, 3, 7, 9])
+// chase 존 (경계 밖): 스트라이크 존 바로 옆 볼 존
+const CHASE_ZONES = new Set<ZoneId>(['B12', 'B13', 'B14', 'B21', 'B22', 'B23', 'B24', 'B25', 'B26'])
 
 // 낙하계 존 (change of eye level: 높은 → 낮은 이동 선호)
 const NATURAL_FALL_ZONES = new Set<ZoneId>([7, 8, 9, 'B31', 'B32', 'B33', 'B34', 'B35'])
@@ -60,8 +69,18 @@ export function selectTargetZone(
   const prev = recentPitches[recentPitches.length - 1]
 
   const weights = ALL_ZONES.map(zone => {
-    // 스트라이크 존 기본 가중치 보정 (9 strike vs 16 ball → ~63% strike rate)
-    const strikeBase = BALL_ZONES.has(zone) ? 1.0 : ZONE_SELECT_STRIKE_BASE
+    // 스트라이크 존 기본 가중치 보정
+    // core(한복판): 페널티 — 투수는 한복판을 피하고 코너를 노림
+    // edge(코너): 기본 — 투수가 가장 선호하는 존
+    // chase(경계 밖): 보너스 — 미끼/낭비구로 활용
+    let strikeBase: number
+    if (BALL_ZONES.has(zone)) {
+      strikeBase = CHASE_ZONES.has(zone) ? ZONE_SELECT_CHASE_BONUS : 1.0
+    } else if (CORE_ZONES.has(zone)) {
+      strikeBase = ZONE_SELECT_STRIKE_BASE * ZONE_SELECT_CORE_PENALTY
+    } else {
+      strikeBase = ZONE_SELECT_STRIKE_BASE  // edge
+    }
     let w = (affinity[zone] ?? 1.0) * strikeBase
 
     // Count Modifier
@@ -71,15 +90,25 @@ export function selectTargetZone(
     const isFall   = NATURAL_FALL_ZONES.has(zone)
     const isDirt   = DIRT_ZONES.has(zone)
 
-    if (balls === 3) {
-      // 볼카운트 3: 스트라이크 존 선호, 볼존 억제
-      w *= isBall ? COUNT_MODIFIER.behind_3balls.ball_zones : COUNT_MODIFIER.behind_3balls.strike_zones
-    } else if (strikes === 2 && balls === 0) {
+    // 투수 유리 (2S): chase/dirt 선호 (낭비구, 미끼)
+    if (strikes === 2 && balls <= 1) {
       if (isFall) w *= COUNT_MODIFIER.ahead_0_2.natural_fall
       if (isDirt) w *= COUNT_MODIFIER.ahead_0_2.dirt
-    } else if (strikes === 2 && balls === 1) {
-      if (isFall) w *= COUNT_MODIFIER.ahead_1_2.natural_fall
-      if (isDirt) w *= COUNT_MODIFIER.ahead_1_2.dirt
+      if (CHASE_ZONES.has(zone)) w *= 1.5  // chase 선호
+    }
+    // 투수 불리 (3B): 존 안 선호, 볼존 억제
+    else if (balls === 3) {
+      w *= isBall ? COUNT_MODIFIER.behind_3balls.ball_zones : COUNT_MODIFIER.behind_3balls.strike_zones
+    }
+    // 타자 유리 (2B-0S, 3B-0S, 3B-1S): 코너 공략, 한복판 회피 강화
+    else if (balls >= 2 && strikes === 0) {
+      if (CORE_ZONES.has(zone)) w *= 0.5     // 한복판 더 회피
+      if (CHASE_ZONES.has(zone)) w *= 1.3    // chase 약간 선호
+    }
+    // 초구: edge 중심, chase 살짝 섞기
+    else if (balls === 0 && strikes === 0) {
+      if (EDGE_ZONES.has(zone)) w *= 1.2     // edge 약간 선호
+      if (CHASE_ZONES.has(zone)) w *= 1.1    // chase 약간
     }
 
     // Sequence Modifier
