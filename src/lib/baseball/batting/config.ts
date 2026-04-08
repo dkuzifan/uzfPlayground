@@ -78,11 +78,11 @@ export const CONTACT_CONFIG = {
   // MLB 컨택률: 스트라이크 존 ~80%, 체이스 ~55%
   // 헛스윙 과다 문제 해결: core/edge intercept 상향, pitch_modifier_max 인하
   base_contact: {
-    core:  { intercept: 0.65, slope: 0.30 },  // 0.65 ~ 0.95  (contact=75: 0.875)
-    edge:  { intercept: 0.52, slope: 0.28 },  // 0.52 ~ 0.80  (contact=75: 0.73)
-    chase: { intercept: 0.20, slope: 0.22 },  // 0.20 ~ 0.42  (contact=75: 0.365)
-    ball:  { intercept: 0.05, slope: 0.15 },  // 0.05 ~ 0.20
-    dirt:  { intercept: 0.10, slope: 0.15 },  // 0.10 ~ 0.25
+    core:  { intercept: 0.65, slope: 0.30 },  // 0.65 ~ 0.95
+    edge:  { intercept: 0.52, slope: 0.28 },  // 0.52 ~ 0.80
+    chase: { intercept: 0.32, slope: 0.23 },  // 0.32 ~ 0.55
+    ball:  { intercept: 0.18, slope: 0.18 },  // 0.18 ~ 0.36
+    dirt:  { intercept: 0.15, slope: 0.18 },  // 0.15 ~ 0.33
   } satisfies Record<ZoneType, { intercept: number; slope: number }>,
   pitch_modifier_max: 0.18,      // 구종 난이도 최대 페널티 (0.30→0.18 인하: 헛스윙 과다 방지)
   familiarity_bonus_max: 0.15,   // familiarity 최대 보너스 +15%
@@ -111,7 +111,7 @@ export const CONTACT_CONFIG = {
 // ============================================================
 
 export const BATTED_BALL_CONFIG = {
-  base_exit_velocity: 148,      // km/h — 150→148: HR/SLG 약간 과다 보정
+  base_exit_velocity: 147,      // km/h — 컨택율↑에 따른 SLG 보정
   power_slope: 0.75,            // power_factor = 0.70 + (Power/100) × 0.75  →  0.70 ~ 1.45
   quality_std_base: 0.08,       // σ = 0.08 × (1 - Contact/200)
   launch_angle_base: {
