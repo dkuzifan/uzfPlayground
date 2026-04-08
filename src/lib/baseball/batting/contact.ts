@@ -3,6 +3,7 @@ import type { BattingState } from './types'
 import type { PredictionResult } from './predict-pitch'
 import type { PerceptionResult } from './read-pitch'
 import { CONTACT_CONFIG } from './config'
+import { calcCoordinateDistance } from './zone-proximity'
 
 // ============================================================
 // v2: 컨택 판정 — timing_offset + center_offset 출력
@@ -82,7 +83,18 @@ export function resolveContact(
 
   const v2 = CONTACT_CONFIG.v2 ?? { timing_noise_std_base: 0.08, center_noise_std_base: 0.10, zone_error_penalty: 0.15 }
 
-  // timing_offset: 예측한 구종의 속도 vs 실제 구종의 속도
+  // ── 좌표 거리 페널티 ──────────────────────────────────
+  // 예측 위치와 실제 투구 위치의 물리적 거리 → 조정 필요량
+  const coord_dist = calcCoordinateDistance(
+    prediction.predicted_zone_id,
+    pitchResult.actual_x, pitchResult.actual_z,
+    batter.zone_bottom, batter.zone_top,
+  )
+  // Contact로 거리 페널티 감소 (최대 40% 감소, 물리적 한계)
+  const contact_reduction = Math.max(0.60, 1.0 - (batter.stats.contact / 100) * 0.40)
+  const effective_dist = coord_dist * contact_reduction
+
+  // ── timing_offset: 구종 속도 차이 + 존 거리 페널티 ─────
   const predicted_speed = PITCH_SPEED_INDEX[prediction.predicted_type] ?? 0.85
   const actual_speed    = PITCH_SPEED_INDEX[pitchResult.pitch_type] ?? 0.85
   const speed_diff      = predicted_speed - actual_speed
@@ -90,13 +102,17 @@ export function resolveContact(
   const adjustment_factor = 0.5 + (batter.stats.contact / 100) * 0.5
   const raw_timing = speed_diff / adjustment_factor
 
+  // 존 거리 → 재계산 시간 추가 (감쇠 합산: 두 번째 페널티 60%)
+  const zone_timing_penalty = effective_dist * 0.3  // 0.15m → +0.045, 0.30m → +0.09
   const timing_noise = gaussianRandom(0, v2.timing_noise_std_base * (1 - batter.stats.contact / 200))
-  const timing_offset = raw_timing + timing_noise
+  const timing_offset = raw_timing + zone_timing_penalty * 0.6 + timing_noise
 
-  // center_offset: 인지 코스 vs 실제 코스의 차이
+  // ── center_offset: 존 거리 + 인식 오차 ────────────────
+  // 존 거리가 클수록 배트 위치 조정이 큼 → center_offset 기저값 증가
+  const zone_center_penalty = effective_dist * 0.4  // 0.15m → 0.06, 0.30m → 0.12
   const zone_error = perception.zone_correct ? 0.0 : v2.zone_error_penalty
   const center_noise_std = v2.center_noise_std_base * (1 - batter.stats.contact / 150) + zone_error
-  const center_offset = gaussianRandom(0, center_noise_std)
+  const center_offset = zone_center_penalty + gaussianRandom(0, center_noise_std)
 
   return { contact: true, timing_offset, center_offset }
 }

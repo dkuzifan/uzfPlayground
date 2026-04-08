@@ -63,7 +63,7 @@ export function hitBall(
   const perception = readPitch(pitch, prediction, eye)
 
   // ③ 스윙 결정
-  const swing = decideSwing(batter, pitch.zone_type, count, prediction, perception)
+  const swing = decideSwing(batter, pitch.zone_type, count, prediction, perception, pitch.actual_x, pitch.actual_z)
 
   if (!swing) {
     const event = pitch.is_strike ? 'strike' : 'ball'
