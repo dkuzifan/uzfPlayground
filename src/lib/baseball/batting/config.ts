@@ -111,7 +111,7 @@ export const CONTACT_CONFIG = {
 // ============================================================
 
 export const BATTED_BALL_CONFIG = {
-  base_exit_velocity: 147,      // km/h — 컨택율↑에 따른 SLG 보정
+  base_exit_velocity: 148,      // km/h
   power_slope: 0.75,            // power_factor = 0.70 + (Power/100) × 0.75  →  0.70 ~ 1.45
   quality_std_base: 0.08,       // σ = 0.08 × (1 - Contact/200)
   launch_angle_base: {
@@ -157,7 +157,7 @@ export const BATTED_BALL_CONFIG = {
     // 방향각 (θ) 계수
     timing_to_theta_k:      150,    // timing_offset → θ 변환 계수
     center_instability_k:   15,     // center_offset → θ 노이즈 추가 계수
-    theta_base_noise_std:   8,      // θ 기본 노이즈 (°)
+    theta_base_noise_std:   10,     // θ 기본 노이즈 (°) — 배트 각도 자연 분산 (프로 타자 기준)
 
     // 컨택 오프셋 계수
     timing_noise_std_base:  0.08,   // timing_offset 기본 노이즈 σ
