@@ -145,7 +145,9 @@ field_y = range × cos(θ_h)     ← 전후 (홈→중견수 = +)
   - `coverage_radius`: Defence 스탯 기반 (Defence 70 → 8m, 100 → 12m)
   - `k`: 거리당 P_out 감소율 (0.04/m)
 - 내야 땅볼: `t_ball` (Phase B 도달 시간) vs `t_fielder` (반응+이동 시간) 비교
-  - `t_fielder = reaction_time + d / fielder_speed`
+  - `t_fielder = reaction_time[position] + d / fielder_speed`
+    > **⚠️ v2 (2026-04-07)**: 반응시간 포지션별 — P:0.45s, C:0.35s, IF:0.25s, OF:0.30s
+    > 땅볼: 경로 기반 인터셉트 (`findGrounderInterceptor`), 4구간 포구 모델 (`calcCatch4Zone`)
   - `t_ball < t_fielder` → P_out 낮음, `t_ball > t_fielder` → P_out 높음
 - 팝업: P_out = 1.0
 
@@ -248,8 +250,10 @@ field_y = range × cos(θ_h)     ← 전후 (홈→중견수 = +)
   //   d = v_roll_0/μ × (1 − e^(−μ·T))  →  T = −ln(1 − d×μ/v_roll_0) / μ
   //   (d × μ ≥ v_roll_0 이면 공이 멈추므로 T = ∞, P_out = 1.0)
   t_ball     = −ln(1 − d×μ / v_roll_0) / μ
-  t_fielder  = 0.4(반응시간) + d / fielder_speed
-  P_out = clamp(0.3 + (t_ball − t_fielder) × 0.15, 0.05, 0.90)
+  t_fielder  = reaction_time[position] + d / fielder_speed
+  // ⚠️ v2: P_out은 4구간 모델(calcCatch4Zone)로 교체됨
+  // margin = t_ball - t_fielder → 여유/빠듯/반응캐치/불가
+  P_out = clamp(0.3 + (t_ball − t_fielder) × 0.15, 0.05, 0.90)  // ← v1 레거시
   ```
 
 **R7. 홈런 판정 — `isHomeRun(range, fieldY)`**
