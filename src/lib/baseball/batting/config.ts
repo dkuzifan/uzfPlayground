@@ -111,7 +111,7 @@ export const CONTACT_CONFIG = {
 // ============================================================
 
 export const BATTED_BALL_CONFIG = {
-  base_exit_velocity: 145,      // km/h — center 분포 확대에 맞춰 소폭 하향
+  base_exit_velocity: 148,      // km/h — 150→148: HR/SLG 약간 과다 보정
   power_slope: 0.75,            // power_factor = 0.70 + (Power/100) × 0.75  →  0.70 ~ 1.45
   quality_std_base: 0.08,       // σ = 0.08 × (1 - Contact/200)
   launch_angle_base: {
