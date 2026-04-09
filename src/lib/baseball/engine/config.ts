@@ -34,10 +34,12 @@ export const STAMINA_CONFIG = {
 // Control Scatter
 // ============================================================
 
+// v2: 가우시안 제구 모델 — σ = f(BallControl)
 export const SCATTER_CONFIG = {
-  base_radius:  0.20,  // 기본 오차 반경 (m)
-  axis_ratio:   0.6,   // minor/major 축 비율
-  fatigue_mult: 0.5,   // 스태미나 소진 시 오차 증가 배수
+  sigma_min:    0.05,  // Control 100일 때 σ (m) — 극히 드문 실수만
+  sigma_max:    0.20,  // Control 0일 때 σ (m) — 넓게 퍼지지만 HBP 과다 방지
+  axis_ratio:   0.7,   // σ_z / σ_x 비율 (수직이 약간 더 넓음)
+  fatigue_mult: 0.5,   // 스태미나 소진 시 σ 증가 배수
 }
 
 // ============================================================
@@ -77,15 +79,17 @@ export const FAMILIARITY_INC   = 0.1   // 투구 1회당 증가량
 // 선호 존: 2.0, 준선호 존: 1.5, 기본: 1.0 (미정의 시 1.0)
 // ============================================================
 
+// v2: 구종별 ball/dirt 존 의도적 타겟팅 포함
+// 변화구는 존 밖이 "목표"인 경우가 많음 (유인구)
 export const PITCH_AFFINITY: Record<PitchType, Partial<Record<ZoneId, number>>> = {
-  fastball:  { 1: 2.0, 2: 2.0, 3: 2.0, B12: 1.5, B13: 1.5 },
-  sinker:    { 7: 2.0, 8: 2.0, 9: 2.0, B25: 1.5, B31: 1.5, B32: 1.5 },
-  cutter:    { 3: 2.0, 6: 2.0, 9: 2.0, B22: 1.5 },
-  slider:    { 3: 2.0, 6: 2.0, 9: 2.0, B22: 1.5, B24: 1.5, B26: 1.5 },
-  curveball: { 7: 2.0, 8: 2.0, 9: 2.0, B33: 1.5, B34: 1.5, B35: 1.5 },
-  changeup:  { 7: 2.0, 8: 2.0, 9: 2.0, B34: 1.5 },
-  splitter:  { 8: 2.0, 9: 2.0, B32: 1.5, B33: 1.5 },
-  forkball:  { 8: 2.0, 9: 2.0, B33: 1.5, B35: 1.5 },
+  fastball:  { 1: 2.0, 2: 2.0, 3: 2.0, 4: 1.5, 6: 1.5, B12: 1.3, B13: 1.3, B14: 1.3 },
+  sinker:    { 7: 2.0, 8: 2.0, 9: 2.0, B25: 1.5, B32: 2.0, B33: 1.5 },
+  cutter:    { 3: 2.0, 6: 2.0, 9: 2.0, B22: 2.0, B24: 1.5 },
+  slider:    { 3: 2.0, 6: 2.0, 9: 2.0, B22: 2.5, B24: 2.5, B26: 2.5 },   // 아웃코스 볼존 유인
+  curveball: { 7: 2.0, 8: 2.0, 9: 2.0, B32: 2.0, B33: 2.5, B34: 2.0 },   // dirt 유인
+  changeup:  { 7: 1.5, 8: 2.0, 9: 1.5, B33: 2.0, B34: 1.5, B32: 1.5 },   // 낮은 존 + dirt
+  splitter:  { 8: 2.0, 9: 1.5, B32: 2.0, B33: 2.5, B34: 2.0 },           // dirt 중심
+  forkball:  { 8: 2.0, B32: 2.0, B33: 2.5, B34: 2.0, B35: 1.5 },         // dirt 중심
 }
 
 // ============================================================
@@ -101,11 +105,11 @@ export const ZONE_SELECT_STRIKE_BASE = 2.1
 // core 가중치 = STRIKE_BASE × CORE_PENALTY = 2.1 × 0.4 = 0.84
 // edge 가중치 = STRIKE_BASE = 2.1 (기본)
 // → edge:core ≈ 2.5:1 비율
-export const ZONE_SELECT_CORE_PENALTY = 0.4
+export const ZONE_SELECT_CORE_PENALTY = 0.25  // 0.4→0.25: core 비율 추가 감소
 
 // chase(경계 밖 볼존) 보너스: 미끼구/낭비구용
 // chase 가중치 = 1.0 × 1.5 = 1.5 (볼존 기본 1.0 대비)
-export const ZONE_SELECT_CHASE_BONUS = 1.5
+export const ZONE_SELECT_CHASE_BONUS = 2.0  // 1.5→2.0: chase/유인구 비중 증가
 
 // ============================================================
 // Count Modifier

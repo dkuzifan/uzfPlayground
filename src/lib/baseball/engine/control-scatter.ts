@@ -71,22 +71,17 @@ function zoneCenterXZ(
 }
 
 // ============================================================
-// 타원 내 균일 무작위 점 (Box-Muller 없이 rejection sampling)
+// Box-Muller 가우시안 난수
 // ============================================================
 
-function randomInEllipse(major: number, minor: number): { dx: number; dz: number } {
-  for (let i = 0; i < 100; i++) {
-    const dx = (Math.random() * 2 - 1) * major
-    const dz = (Math.random() * 2 - 1) * minor
-    if ((dx / major) ** 2 + (dz / minor) ** 2 <= 1) {
-      return { dx, dz }
-    }
-  }
-  return { dx: 0, dz: 0 }
+function gaussianRandom(mean: number, sigma: number): number {
+  const u1 = Math.random()
+  const u2 = Math.random()
+  return mean + sigma * Math.sqrt(-2 * Math.log(u1 + 1e-10)) * Math.cos(2 * Math.PI * u2)
 }
 
 // ============================================================
-// M5: 제구 오차 + HBP 판정
+// M5: 제구 오차 + HBP 판정 (v2: 가우시안 분포)
 // ============================================================
 
 export function applyControlScatter(
@@ -96,24 +91,26 @@ export function applyControlScatter(
   maxStamina: number,
   batter: Player
 ): { actual_x: number; actual_z: number; actual_zone: ZoneId; is_hbp: boolean } {
-  const { base_radius, axis_ratio, fatigue_mult } = SCATTER_CONFIG
+  const { sigma_min, sigma_max, axis_ratio, fatigue_mult } = SCATTER_CONFIG
 
-  // 제구 스탯 (30~100) → 오차 스케일: 제구 낮을수록 오차 커짐
-  const controlFactor = 1 - (pitchData.ball_control - 30) / 70  // 0(완벽) ~ 1(최악)
+  // σ = f(BallControl): Control 100 → σ_min, Control 0 → σ_max
+  const controlNorm = Math.max(0, Math.min(1, pitchData.ball_control / 100))
+  const sigma_base = sigma_max - controlNorm * (sigma_max - sigma_min)
 
-  // 스태미나 피로 보정
-  const staminaRatio   = maxStamina > 0 ? remainingStamina / maxStamina : 1
-  const fatigueFactor  = 1 + fatigue_mult * (1 - staminaRatio)
+  // 스태미나 피로 보정: 피로하면 σ 증가
+  const staminaRatio  = maxStamina > 0 ? remainingStamina / maxStamina : 1
+  const fatigueFactor = 1 + fatigue_mult * (1 - staminaRatio)
 
-  const major = base_radius * controlFactor * fatigueFactor
-  const minor = major * axis_ratio
+  const sigma_x = sigma_base * fatigueFactor
+  const sigma_z = sigma_x * axis_ratio
 
   const { cx, cz } = zoneCenterXZ(
     targetZone,
     batter.zone_bottom,
     batter.zone_top
   )
-  const { dx, dz } = randomInEllipse(major, minor)
+  const dx = gaussianRandom(0, sigma_x)
+  const dz = gaussianRandom(0, sigma_z)
 
   const actual_x = cx + dx
   const actual_z = cz + dz
