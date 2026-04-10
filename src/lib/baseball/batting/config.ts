@@ -8,8 +8,9 @@ import type { ZoneType } from '../engine/types'
 // core=0.85, edge=0.65로 설정 시 전체 스윙률~62% (MLB 47% 초과) → 하향 조정
 export const SWING_CONFIG = {
   base_swing: {
-    core:  0.72,
-    edge:  0.55,
+    core:  0.78,    // 한복판 — 가장 강하게 스윙
+    mid:   0.70,    // 십자 — 치기 좋음
+    edge:  0.55,    // 코너 — 보통
     chase: 0.22,
     ball:  0.07,
     dirt:  0.07,
@@ -78,8 +79,9 @@ export const CONTACT_CONFIG = {
   // MLB 컨택률: 스트라이크 존 ~80%, 체이스 ~55%
   // 헛스윙 과다 문제 해결: core/edge intercept 상향, pitch_modifier_max 인하
   base_contact: {
-    core:  { intercept: 0.65, slope: 0.30 },  // 0.65 ~ 0.95
-    edge:  { intercept: 0.52, slope: 0.28 },  // 0.52 ~ 0.80
+    core:  { intercept: 0.70, slope: 0.30 },  // 0.70 ~ 1.00 (한복판 — 가장 높음)
+    mid:   { intercept: 0.62, slope: 0.30 },  // 0.62 ~ 0.92 (십자)
+    edge:  { intercept: 0.52, slope: 0.28 },  // 0.52 ~ 0.80 (코너)
     chase: { intercept: 0.32, slope: 0.23 },  // 0.32 ~ 0.55
     ball:  { intercept: 0.18, slope: 0.18 },  // 0.18 ~ 0.36
     dirt:  { intercept: 0.15, slope: 0.18 },  // 0.15 ~ 0.33
@@ -91,8 +93,9 @@ export const CONTACT_CONFIG = {
   two_strike_contact_bonus: 0.20,
   // 컨택 성공 시 페어 확률 (v1 fallback + selectDirectionAngle에서 사용)
   fair_prob: {
-    core:  0.60,
-    edge:  0.48,
+    core:  0.65,    // 한복판 — 페어 비율 가장 높음
+    mid:   0.55,    // 십자
+    edge:  0.48,    // 코너
     chase: 0.30,
     ball:  0.13,
     dirt:  0.16,

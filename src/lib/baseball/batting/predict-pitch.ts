@@ -92,23 +92,26 @@ function predictZone(count: { balls: number; strikes: number }): ZoneType {
   // 투수 유리: 낭비구/chase 기대
   if (strikes === 2 && balls <= 1) {
     const r = Math.random()
-    if (r < 0.40) return 'chase'
-    if (r < 0.60) return 'ball'
-    if (r < 0.80) return 'edge'
+    if (r < 0.35) return 'chase'
+    if (r < 0.55) return 'ball'
+    if (r < 0.70) return 'edge'
+    if (r < 0.90) return 'mid'
     return 'core'
   }
 
-  // 타자 유리: 스트라이크 존 기대
+  // 타자 유리: 스트라이크 존 기대 (mid가 가장 흔함)
   if (balls >= 3 && strikes <= 1) {
     const r = Math.random()
-    if (r < 0.50) return 'core'
-    if (r < 0.80) return 'edge'
+    if (r < 0.20) return 'core'
+    if (r < 0.60) return 'mid'
+    if (r < 0.85) return 'edge'
     return 'chase'
   }
 
-  // 중립
+  // 중립: mid가 가장 흔하고, 코너/한복판 + 존 밖 섞임
   const r = Math.random()
-  if (r < 0.35) return 'core'
+  if (r < 0.15) return 'core'
+  if (r < 0.45) return 'mid'
   if (r < 0.65) return 'edge'
   if (r < 0.85) return 'chase'
   return 'ball'
@@ -121,7 +124,8 @@ function predictZone(count: { balls: number; strikes: number }): ZoneType {
 function predictZoneId(zoneType: ZoneType): ZoneId {
   const ZONE_IDS_BY_TYPE: Record<ZoneType, ZoneId[]> = {
     core:  [5],                 // 한복판
-    edge:  [1, 2, 3, 4, 6, 7, 8, 9],  // mid + edge (코너 포함)
+    mid:   [2, 4, 6, 8],        // 십자
+    edge:  [1, 3, 7, 9],        // 코너
     chase: ['B12', 'B13', 'B14', 'B21', 'B22', 'B23', 'B24', 'B25', 'B26'],
     ball:  ['B11', 'B15', 'B31', 'B32', 'B33', 'B34', 'B35'],
     dirt:  ['B31', 'B32', 'B33', 'B34', 'B35'],

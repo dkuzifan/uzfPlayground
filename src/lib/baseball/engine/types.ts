@@ -4,7 +4,7 @@ import type { PitchType, Player } from '../types/player'
 // Zone Types
 // ============================================================
 
-export type ZoneType = 'core' | 'edge' | 'chase' | 'ball' | 'dirt'
+export type ZoneType = 'core' | 'mid' | 'edge' | 'chase' | 'ball' | 'dirt'
 
 // 5×5 그리드 존 ID (Section 10-1, 우타자 기준)
 // 1~9: 스트라이크 존 (3×3), B1x: 위 볼, B2x: 좌우 볼, B3x: 아래/dirt

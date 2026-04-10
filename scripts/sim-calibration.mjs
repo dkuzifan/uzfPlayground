@@ -250,7 +250,7 @@ console.log('[ 투구 존별 ]')
 const cb = acc.called_balls ?? 0
 const cs = acc.called_strikes ?? 0
 console.log(`  볼: ${cb} (${(cb/acc.pitch_total*100).toFixed(1)}%)  스트라이크: ${cs} (${(cs/acc.pitch_total*100).toFixed(1)}%)  투구/PA: ${(acc.pitch_total/totalPA).toFixed(1)}`)
-for (const z of ['core','edge','chase','ball','dirt']) {
+for (const z of ['core','mid','edge','chase','ball','dirt']) {
   const c = acc.zone_count?.[z] ?? 0
   const s = acc.zone_swing?.[z] ?? 0
   console.log(`  ${z.padEnd(8)} ${(c/acc.pitch_total*100).toFixed(1)}% (${c}) | 스윙 ${c>0?(s/c*100).toFixed(0):'0'}%`)

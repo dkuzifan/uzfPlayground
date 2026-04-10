@@ -19,12 +19,12 @@ import { calcCoordinateDistance } from './zone-proximity'
 
 // 존별 기본 스윙 경향 (인지된 존 기준 — "이게 스트라이크인가?")
 const ZONE_SWING: Record<ZoneType, number> = {
-  core: 0.78, edge: 0.60, chase: 0.22, ball: 0.06, dirt: 0.04,
+  core: 0.82, mid: 0.74, edge: 0.58, chase: 0.22, ball: 0.06, dirt: 0.04,
 }
 
 // 예측 적중 시 스윙 의지 (존에 따라 차등 — 볼은 리스크 때문에 낮음)
 const PREDICTION_DESIRE: Record<ZoneType, number> = {
-  core: 0.75, edge: 0.75, chase: 0.55, ball: 0.35, dirt: 0.25,
+  core: 0.78, mid: 0.76, edge: 0.72, chase: 0.55, ball: 0.35, dirt: 0.25,
 }
 
 // 카운트별 선택성: 높을수록 "내 공만 기다린다" (존의지 억제)

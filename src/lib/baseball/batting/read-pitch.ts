@@ -76,8 +76,9 @@ export function readPitch(
   // 존 인식 난이도 — 높을수록 정확히 인식
   // ball/dirt는 명백히 존 밖이라 Eye가 낮아도 잘 인식
   const ZONE_DIFFICULTY: Record<ZoneType, number> = {
-    core:  0.90,
-    edge:  0.55,
+    core:  0.95,    // 한복판은 가장 명확
+    mid:   0.85,    // 십자
+    edge:  0.55,    // 코너 (경계)
     chase: 0.45,
     ball:  0.95,
     dirt:  0.95,
