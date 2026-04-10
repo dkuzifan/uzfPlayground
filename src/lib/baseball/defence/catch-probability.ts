@@ -63,15 +63,15 @@ export function calcCatch4Zone(
   }
 
   // ── 기본 에러율 (구간 1, 2 공통) ──────────────────────
-  const base_error = 0.005 + (1 - defence / 100) * 0.075  // 0.5% ~ 8%
+  const base_error = 0.002 + (1 - defence / 100) * 0.035  // 0.2% ~ 3.7% (MLB 인플레이 에러율 ~1.5% 역산)
   // 난이도 보정: 이동 거리 + 타구 속도
-  const movement_diff = perp_dist > 2 ? 0.03 * (perp_dist - 2) : 0
-  const speed_diff = ev_kmh > 130 ? 0.02 * ((ev_kmh - 130) / 10) : 0
+  const movement_diff = perp_dist > 2 ? 0.015 * (perp_dist - 2) : 0
+  const speed_diff = ev_kmh > 130 ? 0.01 * ((ev_kmh - 130) / 10) : 0
 
   // ── 구간 2: 빠듯한 도달 ───────────────────────────────
   if (margin <= T) {
     const tightness = 1 - margin / T  // 0(여유) → 1(간신히)
-    const margin_error = 0.05 * tightness  // 간신히 도달 시 +5%
+    const margin_error = 0.03 * tightness  // 간신히 도달 시 +3%
     const p_error = Math.min(0.25, base_error + margin_error + movement_diff + speed_diff)
 
     // 지연: 급박할수록 송구 느림
