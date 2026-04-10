@@ -34,7 +34,8 @@ export function throwPitch(state: GamePitchState): PitchResult {
     pitcher,
     pitchType,
     count,
-    recent_pitches
+    recent_pitches,
+    batter.bats,
   )
 
   // 4. 제구 오차 + HBP 판정

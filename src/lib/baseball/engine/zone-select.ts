@@ -59,13 +59,25 @@ function weightedRandom<T>(items: T[], weights: number[]): T {
 // M4: 코스 선택 + delivery_time 계산
 // ============================================================
 
+// 타자 몸쪽 볼존 (우타: 좌측 B21/B23/B25, 좌타: 우측 B22/B24/B26)
+const INSIDE_BALL_R = new Set<ZoneId>(['B21', 'B23', 'B25'])  // 우타자 몸쪽
+const INSIDE_BALL_L = new Set<ZoneId>(['B22', 'B24', 'B26'])  // 좌타자 몸쪽
+
+// 인코스 볼존 보너스 감소 비율 (아웃코스 대비)
+// 1.0 = 아웃코스와 동일, 0.5 = 아웃코스의 절반, 0.0 = 보너스 없음
+// 리스크 완화: 0이 아닌 0.5로 설정 → 인코스 공략 유지하되 빈도↓
+// Phase 2에서 투수 AI로 대체 시 이 상수 제거 예정
+const INSIDE_BALL_CHASE_RATIO = 0.5
+
 export function selectTargetZone(
   pitcher: GamePitchState['pitcher'],
   pitchType: PitchType,
   count: GamePitchState['count'],
-  recentPitches: GamePitchState['recent_pitches']
+  recentPitches: GamePitchState['recent_pitches'],
+  batterBats?: 'L' | 'R' | 'S',
 ): { zone: ZoneId; delivery_time: number } {
   const affinity = PITCH_AFFINITY[pitchType]
+  const insideBallZones = batterBats === 'L' ? INSIDE_BALL_L : INSIDE_BALL_R
 
   // 이전 구 정보
   const prev = recentPitches[recentPitches.length - 1]
@@ -75,9 +87,18 @@ export function selectTargetZone(
     // core(한복판): 페널티 — 투수는 한복판을 피하고 코너를 노림
     // edge(코너): 기본 — 투수가 가장 선호하는 존
     // chase(경계 밖): 보너스 — 미끼/낭비구로 활용
+    // 타자 몸쪽 볼존: chase 보너스 감소 (HBP 리스크)
     let strikeBase: number
     if (BALL_ZONES.has(zone)) {
-      strikeBase = CHASE_ZONES.has(zone) ? ZONE_SELECT_CHASE_BONUS : 1.0
+      if (CHASE_ZONES.has(zone)) {
+        // chase 존 중 타자 몸쪽이면 보너스 감소
+        const isInside = insideBallZones.has(zone)
+        strikeBase = isInside
+          ? 1.0 + (ZONE_SELECT_CHASE_BONUS - 1.0) * INSIDE_BALL_CHASE_RATIO  // 1.5 (아웃코스 2.0의 50%)
+          : ZONE_SELECT_CHASE_BONUS  // 2.0 (아웃코스 정상 보너스)
+      } else {
+        strikeBase = 1.0
+      }
     } else if (CORE_ZONES.has(zone)) {
       strikeBase = ZONE_SELECT_STRIKE_BASE * ZONE_SELECT_CORE_PENALTY  // 한복판 강력 회피
     } else if (MID_ZONES.has(zone)) {
