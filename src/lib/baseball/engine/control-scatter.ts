@@ -2,7 +2,7 @@ import type { Player, PitchTypeData } from '../types/player'
 import type { ZoneId } from './types'
 import { SCATTER_CONFIG, BATTER_BODY } from './config'
 import { classifyZone } from './zone-classify'
-import { getZoneCenter } from '../batting/zone-proximity'
+import { pickTargetInZone } from '../batting/zone-proximity'
 
 // ============================================================
 // 존 중심 좌표 테이블 (m, 홈플레이트 중심 기준)
@@ -105,9 +105,10 @@ export function applyControlScatter(
   const sigma_x = sigma_base * fatigueFactor
   const sigma_z = sigma_x * axis_ratio
 
-  const center = getZoneCenter(targetZone, batter.zone_bottom, batter.zone_top)
-  const cx = center.x
-  const cz = center.z
+  // 존 내 의도된 타겟 좌표 선택 (존 타입별 분포)
+  const target = pickTargetInZone(targetZone, batter.zone_bottom, batter.zone_top)
+  const cx = target.x
+  const cz = target.z
   const dx = gaussianRandom(0, sigma_x)
   const dz = gaussianRandom(0, sigma_z)
 

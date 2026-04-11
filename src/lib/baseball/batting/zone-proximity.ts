@@ -80,7 +80,7 @@ export function getZoneBounds(
 
 /**
  * 존 ID → 중심 좌표 (x, z).
- * 경계의 중심점을 반환. 추후 존 내 좌표 분포 설계 시 경계 내 랜덤으로 교체 가능.
+ * 예측 근접도 계산 등에서 사용 (타자가 예측하는 "대표 지점").
  */
 export function getZoneCenter(
   zone: ZoneId,
@@ -91,6 +91,126 @@ export function getZoneCenter(
   return {
     x: (bounds.x_min + bounds.x_max) / 2,
     z: (bounds.z_min + bounds.z_max) / 2,
+  }
+}
+
+// ============================================================
+// 존 ID → ZoneType (좌표 없이 판별)
+// ============================================================
+
+function zoneIdToType(zone: ZoneId): 'core' | 'mid' | 'edge' | 'chase' | 'ball' | 'dirt' {
+  if (typeof zone === 'number') {
+    if (zone === 5) return 'core'
+    if (zone === 2 || zone === 4 || zone === 6 || zone === 8) return 'mid'
+    return 'edge'  // 1, 3, 7, 9
+  }
+  // 볼존
+  if (zone.startsWith('B3')) return 'dirt'  // B31~B35
+  // 코너 볼존 + 사이드 볼존 끝 = ball
+  if (zone === 'B11' || zone === 'B15') return 'ball'
+  if (zone === 'B21' || zone === 'B22' || zone === 'B25' || zone === 'B26') return 'ball'
+  // 나머지 B1x, B23, B24 = chase
+  return 'chase'
+}
+
+// ============================================================
+// 편향 랜덤: 0~1 범위에서 한쪽으로 치우친 값
+// direction=true → 1쪽으로 편향, false → 0쪽으로 편향
+// strength 0 = 균등, 0.6 = 중간 편향, 0.9 = 강한 편향
+// ============================================================
+
+function biasedUnit(toMax: boolean, strength: number): number {
+  const r = Math.random()
+  if (strength <= 0) return r
+  const power = Math.max(0.1, 1 - strength)
+  return toMax ? Math.pow(r, power) : 1 - Math.pow(1 - r, power)
+}
+
+// ============================================================
+// 존 내 의도된 타겟 좌표 선택
+//
+// core/mid: 셀 내 균등 (단순 위치)
+// edge:     코너 모서리 쪽 편향 (페인팅)
+// chase:    스트라이크 존 경계 쪽 편향 (유혹)
+// ball:     셀 중앙 (확실한 볼)
+// dirt:     바닥 쪽 편향 (낮은 낙차구)
+// ============================================================
+
+export function pickTargetInZone(
+  zone: ZoneId,
+  zone_bottom: number,
+  zone_top: number,
+): { x: number; z: number } {
+  const bounds = getZoneBounds(zone, zone_bottom, zone_top)
+  const type = zoneIdToType(zone)
+  const [row] = getZoneRowCol(zone)
+
+  const xRange = bounds.x_max - bounds.x_min
+  const zRange = bounds.z_max - bounds.z_min
+
+  switch (type) {
+    case 'core':
+    case 'mid': {
+      // 셀 내 균등
+      return {
+        x: bounds.x_min + Math.random() * xRange,
+        z: bounds.z_min + Math.random() * zRange,
+      }
+    }
+
+    case 'edge': {
+      // 코너 모서리 쪽으로 편향 (페인팅)
+      // Zone 1: top-left → x_min, z_max
+      // Zone 3: top-right → x_max, z_max
+      // Zone 7: bottom-left → x_min, z_min
+      // Zone 9: bottom-right → x_max, z_min
+      const zNum = typeof zone === 'number' ? zone : 0
+      const xToMax = (zNum === 3 || zNum === 9)
+      const zToMax = (zNum === 1 || zNum === 3)
+      return {
+        x: bounds.x_min + biasedUnit(xToMax, 0.5) * xRange,
+        z: bounds.z_min + biasedUnit(zToMax, 0.5) * zRange,
+      }
+    }
+
+    case 'chase': {
+      // 스트라이크 존 경계 쪽으로 편향 (유혹구)
+      // 열 0 (좌측 chase): 경계가 x_max 쪽
+      // 열 4 (우측 chase): 경계가 x_min 쪽
+      // 행 0 (상단 chase): 경계가 z_min 쪽
+      // 행 4 (하단 chase, dirt이지만 fallback): 경계가 z_max 쪽
+      const [, col] = getZoneRowCol(zone)
+      let tX = Math.random()
+      let tZ = Math.random()
+
+      if (col === 0) tX = biasedUnit(true, 0.6)   // x_max 쪽 (존 가까이)
+      else if (col === 4) tX = biasedUnit(false, 0.6) // x_min 쪽
+      // 중간 열은 균등
+
+      if (row === 0) tZ = biasedUnit(false, 0.6)  // z_min 쪽 (존 가까이)
+
+      return {
+        x: bounds.x_min + tX * xRange,
+        z: bounds.z_min + tZ * zRange,
+      }
+    }
+
+    case 'ball': {
+      // 셀 중앙 (확실한 볼 — 애매하지 않음)
+      // 약간의 변동만 허용
+      return {
+        x: bounds.x_min + (0.3 + Math.random() * 0.4) * xRange,
+        z: bounds.z_min + (0.3 + Math.random() * 0.4) * zRange,
+      }
+    }
+
+    case 'dirt': {
+      // 바닥 쪽 편향 (낙차구는 낮게)
+      return {
+        x: bounds.x_min + Math.random() * xRange,
+        z: bounds.z_min + biasedUnit(false, 0.5) * zRange,  // z_min 쪽
+      }
+    }
   }
 }
 
