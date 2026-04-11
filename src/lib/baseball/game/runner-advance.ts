@@ -1078,7 +1078,11 @@ type PivotInfo = {
   pivotBase:    2 | 3 | 'home'
 }
 
-function detectPivotBase(runners: Runners): PivotInfo | null {
+function detectPivotBase(
+  runners: Runners,
+  outs:    number,
+  hp:      HitResultDetail,
+): PivotInfo | null {
   // 포스 발생 조건: 1루 주자가 있어야 함 (타자가 1루를 차지하므로)
   if (!runners.first) return null
 
@@ -1093,8 +1097,23 @@ function detectPivotBase(runners: Runners): PivotInfo | null {
     }
   }
 
-  // pivotBase: 병살에 가장 유리한 베이스 (2루 우선 — 2루→1루가 가장 짧은 DP 경로)
-  return { forceRunners, pivotBase: 2 }
+  // pivotBase 동적 선택:
+  //  1. 만루 + outs<2 → 홈 포스아웃 (득점 방지 최우선, 2-3 DP 시도)
+  //  2. 1+2루 + 3루수 쪽 타구 → 3루 포스아웃 (2루 주자 아웃)
+  //  3. 기본 → 2루 포스아웃 (6-4-3, 4-6-3 DP)
+  let pivotBase: 2 | 3 | 'home' = 2
+
+  if (runners.first && runners.second && runners.third && outs < 2) {
+    // 만루 + 0~1아웃 → 홈에서 득점 방지
+    pivotBase = 'home'
+  } else if (runners.first && runners.second && !runners.third) {
+    // 1+2루: 타구가 3루수 쪽(x < -5m)이면 3루 포스아웃 유리
+    if (hp.fielder_pos.x < -5) {
+      pivotBase = 3
+    }
+  }
+
+  return { forceRunners, pivotBase }
 }
 
 function decide3BRunnerHome(
@@ -1127,8 +1146,8 @@ function resolveInfieldOut(
   let outs_added = 0
   let runsScored = 0
 
-  // 1. 포스 감지
-  const pivot = detectPivotBase(runners)
+  // 1. 포스 감지 (pivotBase는 outs + 타구 위치에 따라 동적 결정)
+  const pivot = detectPivotBase(runners, outs, hp)
 
   if (!pivot) {
     // 포스 없음 → 타자만 아웃, 주자 이동 없음 (기존 동작 유지)
