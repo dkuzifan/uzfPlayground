@@ -91,15 +91,6 @@ export const CONTACT_CONFIG = {
   // 2-스트라이크 컨택 보너스: 타자가 배트를 짧게 잡고 플레이트를 보호하는 현실 반영
   // 이 보너스로 2스트라이크 헛스윙 감소 → K% 하향 → MLB 수준에 근접
   two_strike_contact_bonus: 0.20,
-  // 컨택 성공 시 페어 확률 (v1 fallback + selectDirectionAngle에서 사용)
-  fair_prob: {
-    core:  0.65,    // 한복판 — 페어 비율 가장 높음
-    mid:   0.55,    // 십자
-    edge:  0.48,    // 코너
-    chase: 0.30,
-    ball:  0.13,
-    dirt:  0.16,
-  } satisfies Record<ZoneType, number>,
 
   // v2 컨택 오프셋 계수 (BATTED_BALL_CONFIG.v2에서도 참조)
   v2: {
@@ -117,12 +108,6 @@ export const BATTED_BALL_CONFIG = {
   base_exit_velocity: 148,      // km/h
   power_slope: 0.75,            // power_factor = 0.70 + (Power/100) × 0.75  →  0.70 ~ 1.45
   quality_std_base: 0.08,       // σ = 0.08 × (1 - Contact/200)
-  launch_angle_base: {
-    high_zone:  5,              // dirt 전용 (현재 low_zone 상수로 사용)
-    mid_zone:  20,              // 미사용 (mixture로 대체)
-    low_zone:   2,              // dirt 공 기본 발사각
-  },
-  launch_noise_base: 25,        // dirt 이외 미사용 (mixture 각 성분이 자체 σ 사용)
   // ── 두 성분 혼합 발사각 분포 (MLB 캘리브레이션) ──────────────
   // 목표: ground ~41% / LD ~23% / fly ~29% / popup ~7%
   // 검증: 0.45×N(0,10) + 0.55×N(30,13)

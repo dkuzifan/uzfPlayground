@@ -4,7 +4,7 @@ import type { BattingState, BattingResult } from './types'
 import { decideBunt }      from './bunt-stub'
 import { decideSwing }     from './swing-decision'
 import { resolveContact }  from './contact'
-import { calcBattedBall, calcBattedBallV2 }  from './batted-ball'
+import { calcBattedBallV2 }  from './batted-ball'
 import { resolveHitResult, resolveFoulCatchable } from './hit-result'
 import { applyPitchToCount } from './count'
 import { predictPitch }    from './predict-pitch'
@@ -94,45 +94,27 @@ export function hitBall(
     }
   }
 
-  // ⑤ EV/LA/θ 통합 생성
-  let exit_velocity: number
-  let launch_angle: number
-  let theta_h: number
+  // ⑤ EV/LA/θ 통합 생성 (v2: timing + center offset 기반)
+  const pitchData = pitcher.pitch_types.find(pt => pt.type === pitch.pitch_type)
+  const pitcher_power = pitchData?.ball_power ?? 50
+  const speed_index = PITCH_SPEED_INDEX[pitch.pitch_type] ?? 0.85
 
-  if (contactResult.timing_offset !== undefined && contactResult.center_offset !== undefined) {
-    // v2 경로: timing/center에서 통합 생성
-    const pitchData = pitcher.pitch_types.find(pt => pt.type === pitch.pitch_type)
-    const pitcher_power = pitchData?.ball_power ?? 50
-    const speed_index = PITCH_SPEED_INDEX[pitch.pitch_type] ?? 0.85
-
-    const batted = calcBattedBallV2(
-      contactResult.timing_offset,
-      contactResult.center_offset,
-      batter,
-      pitcher_power,
-      speed_index,
-      pitcher.throws,
-    )
-    exit_velocity = batted.exit_velocity
-    launch_angle  = batted.launch_angle
-    theta_h       = batted.theta_h
-  } else {
-    // fallback: v1 경로 (prediction/perception 없을 때)
-    const batted = calcBattedBall(pitch.zone_type, batter)
-    exit_velocity = batted.exit_velocity
-    launch_angle  = batted.launch_angle
-    // v1에서는 resolveHitResult 내부에서 방향각 생성 → 여기선 NaN 마커
-    theta_h = NaN
-  }
+  const batted = calcBattedBallV2(
+    contactResult.timing_offset!,
+    contactResult.center_offset!,
+    batter,
+    pitcher_power,
+    speed_index,
+    pitcher.throws,
+  )
+  const { exit_velocity, launch_angle, theta_h } = batted
 
   // ⑥ 영역 분류 + 수비 판정
-  // v1 fallback (theta_h=NaN): resolveHitResult 내부에서 방향각 생성 → 항상 fair 취급
-  const territory = Number.isNaN(theta_h) ? 'fair' as const : classifyTerritory(theta_h)
+  const territory = classifyTerritory(theta_h)
 
   // ── 페어 타구 ──────────────────────────────────────────
   if (territory === 'fair') {
-    // NaN이면 theta_h_override 미전달 → resolveHitResult 내부에서 selectDirectionAngle 호출
-    const hitDetail = resolveHitResult(exit_velocity, launch_angle, batter, defenceLineup ?? [], Number.isNaN(theta_h) ? undefined : theta_h)
+    const hitDetail = resolveHitResult(exit_velocity, launch_angle, batter, defenceLineup ?? [], theta_h)
     return {
       swing: true,
       contact: true,

@@ -1,8 +1,5 @@
-import type { Player } from '../types/player'
-import type { ZoneType } from '../engine/types'
 import type { FieldCoords, BallPhysicsResult, BallType } from './types'
 import { PHYSICS_CONFIG } from './config'
-import { CONTACT_CONFIG } from '../batting/config'
 
 // ============================================================
 // 타구 물리 모델
@@ -40,52 +37,6 @@ export function classifyTerritory(theta_deg: number): TerritoryZone {
   return 'foul_uncatchable'
 }
 
-// ── 방향각 선택 ────────────────────���──────────────────────
-
-/**
- * 타자의 당기기 편향 + 정규분포 노이즈로 방향각 결정.
- * zoneType이 주어지면 fair_prob에 따라 페어/파울 분기:
- *   - 페어 → ±45° 이내 (truncated Gaussian)
- *   - 파울 → 45°~70° (좌우 균등)
- * zoneType이 없으면 기존 방식(±42°, 항상 페어).
- */
-export function selectDirectionAngle(batter: Player, zoneType?: ZoneType): number {
-  const mu = batter.bats === 'L' ? 5 : -5
-
-  if (zoneType) {
-    const pFair = CONTACT_CONFIG.fair_prob[zoneType]
-
-    if (Math.random() < pFair) {
-      // 페어 영역: truncated Gaussian (±45° 이내)
-      for (;;) {
-        const u1 = Math.random()
-        const u2 = Math.random()
-        const noise = Math.sqrt(-2 * Math.log(u1 + 1e-10)) * Math.cos(2 * Math.PI * u2) * 25
-        const theta = mu + noise
-        if (Math.abs(theta) <= PHYSICS_CONFIG.FAIR_ANGLE) return theta
-      }
-    } else {
-      // 파울 영역: 45°~180° — 지수 감소 분포
-      // 파울 라인 근처(45~60°)가 가장 빈번, 뒤로 갈수록 급감
-      // 지수 분포: θ = 45 + exponential(λ), λ=0.012
-      // 수비 가능(45~60°) ≈ 파울의 17%, 관중석/백네트 ≈ 83%
-      const side = Math.random() < 0.5 ? 1 : -1
-      const lambda = 0.012
-      const raw = -Math.log(1 - Math.random() + 1e-10) / lambda
-      const foulAngle = PHYSICS_CONFIG.FAIR_ANGLE + Math.min(raw, 135) // 45° + 0~135° = 45°~180°
-      return side * foulAngle
-    }
-  }
-
-  // fallback: zoneType 미제공 시 기존 동작 (항상 페어)
-  const u1 = Math.random()
-  const u2 = Math.random()
-  const noise = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2) * 25
-  const theta = mu + noise
-  return Math.max(-42, Math.min(42, theta))
-}
-
-// ── 착지 좌표 변환 ────────────────────────────────────────
 
 export function toFieldCoords(range: number, theta_deg: number): FieldCoords {
   const theta = theta_deg * (Math.PI / 180)

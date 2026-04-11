@@ -1,4 +1,3 @@
-import type { ZoneType } from '../engine/types'
 import type { BattingState } from './types'
 import type { Handedness } from '../types/player'
 import { BATTED_BALL_CONFIG } from './config'
@@ -12,35 +11,6 @@ function gaussianRandom(mean: number, std: number): number {
   const u2 = Math.random()
   const z = Math.sqrt(-2 * Math.log(u1 + 1e-10)) * Math.cos(2 * Math.PI * u2)
   return mean + std * z
-}
-
-// ============================================================
-// v1: 기존 독립 EV/LA 생성 (fallback)
-// ============================================================
-
-function calcLaunchAngle(zoneType: ZoneType): number {
-  const cfg = BATTED_BALL_CONFIG
-  if (zoneType === 'dirt') {
-    return gaussianRandom(cfg.launch_angle_base.low_zone, 8)
-  }
-  if (Math.random() < cfg.mixture_grounder_weight) {
-    return gaussianRandom(cfg.mixture_grounder_mean, cfg.mixture_grounder_std)
-  } else {
-    return gaussianRandom(cfg.mixture_fly_mean, cfg.mixture_fly_std)
-  }
-}
-
-export function calcBattedBall(
-  zoneType: ZoneType,
-  batter: BattingState['batter']
-): { exit_velocity: number; launch_angle: number } {
-  const cfg = BATTED_BALL_CONFIG
-  const power_factor = 0.70 + (batter.stats.power / 100) * cfg.power_slope
-  const sigma_ev = cfg.quality_std_base * (1 - batter.stats.contact / 200)
-  const quality_roll = gaussianRandom(1.0, sigma_ev)
-  const exit_velocity = cfg.base_exit_velocity * power_factor * quality_roll
-  const launch_angle = calcLaunchAngle(zoneType)
-  return { exit_velocity, launch_angle }
 }
 
 // ============================================================

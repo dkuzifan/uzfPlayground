@@ -2,7 +2,6 @@ import type { Player }         from '../types/player'
 import type { AtBatResult }    from './types'
 import type { HitResultDetail } from '../defence/types'
 import {
-  selectDirectionAngle,
   calcBattedBallPhysics,
   classifyBallType,
 } from '../defence/ball-physics'
@@ -63,18 +62,15 @@ function resolveHitType(
 // ============================================================
 // M7: 타구 결과 판정
 // 수비수 위치 + Defence 스탯 + 타구 물리 기반
-// theta_h_override: 이미 생성된 방향각이 있으면 재사용
 // ============================================================
 
 export function resolveHitResult(
   exit_velocity: number,
   launch_angle:  number,
-  batter:        Player,
+  _batter:       Player,
   fielders:      Player[],
-  theta_h_override?: number,
+  theta_h:       number,
 ): HitResultDetail {
-  // 1. 방향각 결정
-  const theta_h = theta_h_override ?? selectDirectionAngle(batter)
 
   // 2. 타구 물리 계산
   const physics = calcBattedBallPhysics(exit_velocity, launch_angle, theta_h)
