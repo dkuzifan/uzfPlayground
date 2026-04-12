@@ -49,12 +49,12 @@ function calcPickupTime(fielder: Player): number {
 function resolveHitType(
   range: number,
 ): Exclude<AtBatResult, 'in_progress' | 'strikeout' | 'walk' | 'hit_by_pitch' | 'home_run' | 'out'> {
-  if (range < 45) return 'single'
-  if (range < 70) {
-    return Math.random() < 0.80 ? 'single' : 'double'
+  if (range < 48) return 'single'
+  if (range < 72) {
+    return Math.random() < 0.82 ? 'single' : 'double'
   }
   const r = Math.random()
-  if (r < 0.30) return 'single'
+  if (r < 0.32) return 'single'
   if (r < 0.90) return 'double'
   return 'triple'
 }

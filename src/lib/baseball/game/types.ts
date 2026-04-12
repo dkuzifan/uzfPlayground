@@ -74,6 +74,7 @@ export type GameEventType =
   | 'shift'            // { direction: 'left'|'right'; pull_tendency: number; shifted_positions: Array<{position,from,to}> }
   | 'runner_note'      // { text: string; is_batter: boolean } — 주목할 만한 진루 메모 (PBP 표시용)
   | 'foul_fly_error'   // { fielder: { name, position_1 }; batter: Player } — 파울 플라이 에러 (오버레이)
+  | 'wild_pitch'       // { pitcher: Player; runners_advanced: Array<{runner,from,to}> }
 
 export interface GameEvent {
   type:    GameEventType

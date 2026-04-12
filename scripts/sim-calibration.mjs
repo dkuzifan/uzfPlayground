@@ -74,7 +74,7 @@ const acc = {
   innings: 0,
   // 진루
   runner_advance_events: 0,
-  force_out: 0, runner_out: 0,
+  force_out: 0, runner_out: 0, wild_pitch: 0,
   // 라인드라이브 아웃 여부 확인용
   tag_up: 0,
   // 투수 IP
@@ -136,10 +136,11 @@ for (let g = 0; g < GAMES; g++) {
       acc.steal_result_total++
       if (e.payload.success) acc.steal_success++
     }
-    if (e.type === 'runner_advance') acc.runner_advance_events++
+    if (e.type === 'runner_advance') acc.runner_advance_events += (e.payload.moves?.length ?? 1)
     if (e.type === 'force_out')      acc.force_out++
     if (e.type === 'runner_out')     acc.runner_out++
     if (e.type === 'tag_up')         acc.tag_up++
+    if (e.type === 'wild_pitch')    acc.wild_pitch++
   }
 }
 
@@ -243,6 +244,7 @@ lineN('진루 이벤트/경기',     acc.runner_advance_events / GAMES, 3.0, 8.0
 lineN('포스아웃/경기',        acc.force_out / GAMES, 0.5, 3.0)
 lineN('송구 아웃/경기',       acc.runner_out / GAMES, 0.0, 0.8)
 lineN('태그업/경기',          acc.tag_up / GAMES, 0.2, 1.5)
+lineN('폭투·패스트볼/경기',   acc.wild_pitch / GAMES, 0.5, 1.5)
 console.log()
 
 // ── 투구 존별 통계 ───────────────────────────────────────────

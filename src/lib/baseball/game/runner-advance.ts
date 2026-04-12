@@ -871,7 +871,8 @@ export function advanceRunners(
   }
 
   // 내야 그라운더 아웃 → 병살/야수선택/포스아웃 처리
-  if (result === 'out' && hitPhysics?.is_infield) {
+  // 라인드라이브/팝업 아웃은 포스 대상 아님 (터치 아웃만, 포스 아님)
+  if (result === 'out' && hitPhysics?.is_infield && hitPhysics.ball_type === 'grounder') {
     return resolveInfieldOut(
       runners, batter, hitPhysics, outs ?? 0,
       defenceLineup, inningCtx,
@@ -1205,18 +1206,27 @@ function resolveInfieldOut(
   }
 
   // 4. 병살 판정 (피벗 맨 → 1루 송구 vs 타자 도달 시간)
+  // 타자는 타구 접촉 시점부터 달리고 있으므로,
+  // 수비수 포구 + 피벗 송구까지 걸린 시간 ��안 이미 진행한 거리를 차감
   const pivotKey = pivot.pivotBase === 2 ? '2B' : pivot.pivotBase === 3 ? '3B' : 'home'
   const pivotMan = getReceiverAtBase(pivotKey, lineup).player
 
   const pivot_pos        = BASE_POS[pivotKey]
-  const throw_speed      = (80 + pivotMan.stats.throw * 0.7) / 3.6
+  const throw_speed_piv  = (80 + pivotMan.stats.throw * 0.7) / 3.6
   const throw_dist       = euclidDist(pivot_pos, BASE_POS['1B'])
-  const pivot_throw_time = 0.3 + throw_dist / throw_speed
+  const pivot_throw_time = 0.3 + throw_dist / throw_speed_piv  // 피벗 수신 + 턴 + 1루 송구
+
+  // 타자의 1루까지 '남은' 시간: 포구→피벗 도달까지 이미 달린 거리 차감
+  const fielder_throw_speed = (80 + hp.fielder.stats.throw * 0.7) / 3.6
+  const dist_fielder_to_pivot = euclidDist(hp.fielder_pos, pivot_pos)
+  const t_elapsed = hp.t_fielding + dist_fielder_to_pivot / fielder_throw_speed  // 접촉→피벗 도착 시간
 
   const batter_run_speed = 5.0 + (batter.stats.running / 100) * 3.0
-  const t_batter_to_1B   = 27.43 / batter_run_speed
+  const batter_already_run = batter_run_speed * t_elapsed
+  const remaining_to_1B  = Math.max(0, 27.43 - batter_already_run)
+  const t_batter_remain  = remaining_to_1B / batter_run_speed
 
-  const isDP = t_batter_to_1B > pivot_throw_time
+  const isDP = t_batter_remain > pivot_throw_time
 
   if (isDP) {
     // 병살 성공: 타자도 아웃

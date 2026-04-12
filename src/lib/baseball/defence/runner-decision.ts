@@ -166,7 +166,10 @@ export function decideChallengeAdvance(
   const t_runner         = runner_dist / runner_speed
   const actual_margin    = t_ball - t_runner      // 양수 = 공이 늦게 도착 = 주자 유리
   const sigma            = 0.5 * (1 - judgment / 100)
-  const perceived_margin = actual_margin + gaussianNoise(sigma)
+  // 주자는 클로즈 플레이에서 자신이 유리하다는 것을 경험적으로 알고 있음
+  // resolveThrow의 runner_bias(+0.5s)를 부분적으로 반영한 용기 보정
+  const courage_bias     = 0.5
+  const perceived_margin = actual_margin + courage_bias + gaussianNoise(sigma)
 
   return perceived_margin > 0
 }

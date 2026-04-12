@@ -6,6 +6,7 @@ import { hitBall }         from '../batting/hit-ball'
 import { advanceRunners }  from './runner-advance'
 import { decidePickoff, resolvePickoff }                          from '../engine/pickoff'
 import { decideStealAttempt, resolveStealResult, decideCatcherThrow } from './stolen-base'
+import { WILD_PITCH_BASE } from './config'
 
 // ============================================================
 // runners 포맷 변환: Player|null → boolean (엔진 호환)
@@ -35,6 +36,48 @@ function advanceStealRunner(runners: Runners, from: 1 | 2): Runners {
 }
 
 // ============================================================
+// checkWildPitch — 폭투/패스트볼 체크
+// 주자가 있을 때 투구마다 호출. WP 발생 시 주자 1베이스 진루.
+// ============================================================
+
+function checkWildPitch(
+  pitcher:  Player,
+  runners:  Runners,
+  isWild:   boolean,     // 투구가 ball zone에 도달했는지
+): { occurred: boolean; nextRunners: Runners; runsScored: number;
+     advances: Array<{ runner: Player; from: number; to: number | 'home' }> } {
+  const hasRunners = runners.first !== null || runners.second !== null || runners.third !== null
+  if (!hasRunners) return { occurred: false, nextRunners: runners, runsScored: 0, advances: [] }
+
+  // WP 확률: 기본 × 제구 보정 × 존 보정
+  const control_factor = 1.2 - (pitcher.stats.ball_control / 100) * 0.8   // 0.4~1.2
+  const zone_factor    = isWild ? 2.0 : 0.5                               // ball zone 투구 → 2배
+  const p_wp = WILD_PITCH_BASE * control_factor * zone_factor
+
+  if (Math.random() >= p_wp) return { occurred: false, nextRunners: runners, runsScored: 0, advances: [] }
+
+  // WP 발생 → 모든 주자 1베이스 진루
+  let runsScored = 0
+  const advances: Array<{ runner: Player; from: number; to: number | 'home' }> = []
+  const next: Runners = { first: null, second: null, third: null }
+
+  if (runners.third) {
+    runsScored++
+    advances.push({ runner: runners.third, from: 3, to: 'home' })
+  }
+  if (runners.second) {
+    next.third = runners.second
+    advances.push({ runner: runners.second, from: 2, to: 3 })
+  }
+  if (runners.first) {
+    next.second = runners.first
+    advances.push({ runner: runners.first, from: 1, to: 2 })
+  }
+
+  return { occurred: true, nextRunners: next, runsScored, advances }
+}
+
+// ============================================================
 // runAtBat — 단일 타석 루프
 // throwPitch → hitBall 반복, at_bat_over=true 까지
 // ============================================================
@@ -53,7 +96,8 @@ export function runAtBat(
   let familiarity     = ctx.familiarity
   let recent_pitches  = ctx.recent_pitches
   let currentRunners  = { ...ctx.runners }  // 타석 내 mutable 주자 상태
-  let pickoutCount    = 0                   // 타석 내 견제 실패 횟수
+  let pickoutCount    = 0                   // ���석 내 견제 실패 횟수
+  let wpRunsAccum     = 0                   // 타석 내 폭투 득점 누적
 
   while (true) {
 
@@ -86,7 +130,7 @@ export function runAtBat(
         return {
           result:              'pickoff_out',
           outs_added:          1,
-          runs_scored:         0,
+          runs_scored:         wpRunsAccum,
           next_runners:        currentRunners,
           moves:               [{ runner: pickoff.runner, from: pickoff.base, to: pickoff.base, wasOut: true }],
           next_stamina:        stamina,
@@ -117,6 +161,40 @@ export function runAtBat(
     stamina        = pitch.next_stamina
     familiarity    = pitch.next_familiarity
     recent_pitches = [...recent_pitches, { type: pitch.pitch_type, zone: pitch.actual_zone }].slice(-10)
+
+    // ②-b [투구 후] 폭투/패스트볼 체크
+    const isWildZone = pitch.zone_type === 'ball' || pitch.zone_type === 'chase'
+    const wp = checkWildPitch(pitcher, currentRunners, isWildZone)
+    if (wp.occurred) {
+      currentRunners = wp.nextRunners
+
+      events.push({
+        type: 'pitch',
+        inning,
+        isTop,
+        payload: {
+          pitch,
+          swing:      false,
+          contact:    null,
+          is_foul:    null,
+          next_count: count,  // WP는 카운트에 영향 없음 (볼/스트라이크는 별도 처리)
+        },
+      })
+      events.push({
+        type: 'wild_pitch',
+        inning,
+        isTop,
+        payload: { pitcher, runners_advanced: wp.advances },
+      })
+
+      // WP 득점 누적 (타석 종료 시 합산)
+      wpRunsAccum += wp.runsScored
+
+      // 카운트는 그대로 유지, 다음 투구로 (WP는 볼/스트라이크와 별개)
+      // 실제 MLB: WP 시 투구는 여전히 볼/스트라이크로 카운트됨
+      // 간소화: WP 투구는 카운트 미반영 (다음 투구에서 처리)
+      continue
+    }
 
     // ③ [투구 후] 도루 시도 체크
     // 선행 주자 우선 (2루 주자 > 1루 주자)
@@ -217,7 +295,7 @@ export function runAtBat(
           return {
             result:              batting.at_bat_result,
             outs_added,
-            runs_scored:         runsScored,
+            runs_scored:         runsScored + wpRunsAccum,
             next_runners:        nextRunners,
             moves,
             next_stamina:        stamina,
@@ -254,7 +332,7 @@ export function runAtBat(
             return {
               result:              'caught_stealing',
               outs_added:          1,
-              runs_scored:         0,
+              runs_scored:         wpRunsAccum,
               next_runners:        currentRunners,
               moves:               [{ runner: stealRunner, from: stealBase, to: stealBase, wasOut: true }],
               next_stamina:        stamina,
@@ -397,7 +475,7 @@ export function runAtBat(
       return {
         result:              batting.at_bat_result,
         outs_added,
-        runs_scored:         runsScored,
+        runs_scored:         runsScored + wpRunsAccum,
         next_runners:        nextRunners,
         moves,
         next_stamina:        stamina,
