@@ -7,8 +7,9 @@ import { PHYSICS_CONFIG } from './config'
 // Phase B: 첫 바운드 후 지면 구르기 (v_roll_0 산출)
 // ============================================================
 
-const G           = 9.8    // 중력 가속도 (m/s²)
-const RESTITUTION = 0.5    // 잔디 기준 탄성 계수
+const G              = 9.8    // 중력 가속도 (m/s²)
+const RESTITUTION    = 0.5    // 잔디 기준 탄성 계수
+const CONTACT_HEIGHT = 0.9    // 배트 컨택 높이 (m)
 
 // drag 계수 — EV 속도 구간별 보정 (2차 항력 선형 근사)
 function getD(ev_kmh: number): number {
@@ -63,26 +64,22 @@ export function calcBattedBallPhysics(
   const vx0 = v0 * Math.cos(theta)
   const vy0 = v0 * Math.sin(theta)
 
-  // drag 방정식
+  // drag 방정식 (h₀ = CONTACT_HEIGHT에서 출발)
   // x(t) = (vx0 / D) × (1 − e^(−Dt))
-  // y(t) = (−G×t / D) + ((D×vy0 + G) / D²) × (1 − e^(−Dt))
+  // y(t) = h₀ + (−G×t / D) + ((D×vy0 + G) / D²) × (1 − e^(−Dt))
   const xAt = (t: number) => (vx0 / D) * (1 - Math.exp(-D * t))
   const yAt = (t: number) =>
-    (-G * t / D) + ((D * vy0 + G) / (D * D)) * (1 - Math.exp(-D * t))
+    CONTACT_HEIGHT + (-G * t / D) + ((D * vy0 + G) / (D * D)) * (1 - Math.exp(-D * t))
 
-  // y(t) = 0 이진 탐색 → t_bounce
-  // popup/grounder 예외: la ≤ 0 이면 즉시 t=0.01s
-  let t_bounce = 0.01
-  if (la_deg > 0) {
-    let lo = 0, hi = 20
-    for (let i = 0; i < 50; i++) {
-      const mid = (lo + hi) / 2
-      if (yAt(mid) > 0) lo = mid
-      else               hi = mid
-      if (hi - lo < 0.001) break
-    }
-    t_bounce = (lo + hi) / 2
+  // y(t) = 0 이진 탐색 → t_bounce (h₀ > 0이므로 모든 LA에서 탐색)
+  let lo = 0, hi = la_deg > 10 ? 20 : 3  // 땅볼은 금방 착지
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2
+    if (yAt(mid) > 0) lo = mid
+    else               hi = mid
+    if (hi - lo < 0.001) break
   }
+  const t_bounce = Math.max(0.01, (lo + hi) / 2)
 
   const range_raw = xAt(t_bounce)
 
@@ -124,6 +121,34 @@ export function calcBattedBallPhysics(
     landing: toFieldCoords(range, theta_deg),
     grounder,
   }
+}
+
+// ── 특정 수평 거리에서의 공 높이 계산 ────────────────────
+
+/**
+ * 타구가 수평 dist(m) 지점을 지날 때의 높이(m).
+ * carry_factor 미적용 원시 궤적 기준 — 호출자가 dist/carry_factor로 보정해야 함.
+ * 도달 불가능(drag으로 감속)이면 0 반환.
+ */
+export function ballHeightAtDist(
+  dist:    number,
+  ev_kmh:  number,
+  la_deg:  number,
+): number {
+  const v0    = ev_kmh / 3.6
+  const theta = la_deg * (Math.PI / 180)
+  const vx0   = v0 * Math.cos(theta)
+  const vy0   = v0 * Math.sin(theta)
+  const D     = getD(ev_kmh)
+
+  // x(t) = (vx0/D)(1 - e^(-Dt)) = dist  →  t = -ln(1 - dist*D/vx0) / D
+  const ratio = dist * D / vx0
+  if (ratio >= 1) return 0  // drag으로 도달 불가
+
+  const t = -Math.log(1 - ratio) / D
+  const y = CONTACT_HEIGHT + (-G * t / D) + ((D * vy0 + G) / (D * D)) * (1 - Math.exp(-D * t))
+
+  return Math.max(0, y)
 }
 
 // ── 땅볼 경로 시간 계산 ──────────────────────────────────

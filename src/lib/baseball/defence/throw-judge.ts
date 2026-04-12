@@ -80,7 +80,7 @@ export function resolveThrow(
   // margin > 0 → 주자가 먼저 도달 (safe)
   // runner_bias: 주자 코치 도움 + 시각 판단 이점 + 클로즈 플레이 관행 보정
   const margin = t_total - t_runner
-  const p_safe = sigmoid(margin + 1.0, 0.5)
+  const p_safe = sigmoid(margin + 1.3, 0.5)
 
   const verdict = Math.random() < p_safe ? 'safe' : 'out'
 
@@ -218,7 +218,7 @@ export function resolveRelayThrow(
   const t_runner     = runner_dist / runner_speed
   const margin       = t_total - t_runner
 
-  const verdict = Math.random() < sigmoid(margin + 1.0, 0.5) ? 'safe' : 'out'
+  const verdict = Math.random() < sigmoid(margin + 1.1, 0.5) ? 'safe' : 'out'
 
   if (verdict === 'out') {
     const throw_dist    = euclidDist(relay_pos, targetPos)

@@ -1,5 +1,6 @@
 import type { Player }                                        from '../types/player'
 import type { Runners, AtBatContext, AtBatOutcome, GameEvent } from './types'
+import type { PitchResult }  from '../engine/types'
 import type { StealState } from './runner-advance'
 import { throwPitch }      from '../engine/throw-pitch'
 import { hitBall }         from '../batting/hit-ball'
@@ -36,25 +37,43 @@ function advanceStealRunner(runners: Runners, from: 1 | 2): Runners {
 }
 
 // ============================================================
-// checkWildPitch — 폭투/패스트볼 체크
-// 주자가 있을 때 투구마다 호출. WP 발생 시 주자 1베이스 진루.
+// checkWildPitch — 폭투/패스트볼 체크 (v2: ball 존 전용)
+//
+// ball 존(7×7 그리드 외곽)에 실제 도달한 투구만 대상.
+// 확률 = 기본 × 거리 스케일링 × 포수 수비 × 투수 제구
 // ============================================================
 
 function checkWildPitch(
   pitcher:  Player,
+  catcher:  Player,
   runners:  Runners,
-  isWild:   boolean,     // 투구가 ball zone에 도달했는지
+  pitch:    PitchResult,
 ): { occurred: boolean; nextRunners: Runners; runsScored: number;
      advances: Array<{ runner: Player; from: number; to: number | 'home' }> } {
+  const NO_WP = { occurred: false, nextRunners: runners, runsScored: 0, advances: [] }
+
   const hasRunners = runners.first !== null || runners.second !== null || runners.third !== null
-  if (!hasRunners) return { occurred: false, nextRunners: runners, runsScored: 0, advances: [] }
+  if (!hasRunners) return NO_WP
 
-  // WP 확률: 기본 × 제구 보정 × 존 보정
-  const control_factor = 1.2 - (pitcher.stats.ball_control / 100) * 0.8   // 0.4~1.2
-  const zone_factor    = isWild ? 2.0 : 0.5                               // ball zone 투구 → 2배
-  const p_wp = WILD_PITCH_BASE * control_factor * zone_factor
+  // ball 존 투구만 폭투 대상 (chase/edge/mid/core → 포수가 충분히 포구 가능)
+  if (pitch.zone_type !== 'ball') return NO_WP
 
-  if (Math.random() >= p_wp) return { occurred: false, nextRunners: runners, runsScored: 0, advances: [] }
+  // 스트라이크 존 중심으로부터 거리 스케일링
+  // 존 중심: x=0 (플레이트 중앙), z≈0.75m (평균 스트라이크 존 높이 중심)
+  const dx = pitch.actual_x
+  const dz = pitch.actual_z - 0.75
+  const dist = Math.sqrt(dx * dx + dz * dz)
+  const dist_factor = Math.max(1.0, dist / 0.3)  // 최소 1.0, 0.6m에서 2.0
+
+  // 포수 수비력: 좋은 포수 = 블로킹 잘함 (0.5 ~ 1.4)
+  const catcher_factor = 1.4 - (catcher.stats.defence / 100) * 0.9
+
+  // 투수 제구력: 나쁜 제구 = 더 거친 공 (0.8 ~ 1.2)
+  const control_factor = 1.2 - (pitcher.stats.ball_control / 100) * 0.4
+
+  const p_wp = WILD_PITCH_BASE * dist_factor * catcher_factor * control_factor
+
+  if (Math.random() >= p_wp) return NO_WP
 
   // WP 발생 → 모든 주자 1베이스 진루
   let runsScored = 0
@@ -161,40 +180,6 @@ export function runAtBat(
     stamina        = pitch.next_stamina
     familiarity    = pitch.next_familiarity
     recent_pitches = [...recent_pitches, { type: pitch.pitch_type, zone: pitch.actual_zone }].slice(-10)
-
-    // ②-b [투구 후] 폭투/패스트볼 체크
-    const isWildZone = pitch.zone_type === 'ball' || pitch.zone_type === 'chase'
-    const wp = checkWildPitch(pitcher, currentRunners, isWildZone)
-    if (wp.occurred) {
-      currentRunners = wp.nextRunners
-
-      events.push({
-        type: 'pitch',
-        inning,
-        isTop,
-        payload: {
-          pitch,
-          swing:      false,
-          contact:    null,
-          is_foul:    null,
-          next_count: count,  // WP는 카운트에 영향 없음 (볼/스트라이크는 별도 처리)
-        },
-      })
-      events.push({
-        type: 'wild_pitch',
-        inning,
-        isTop,
-        payload: { pitcher, runners_advanced: wp.advances },
-      })
-
-      // WP 득점 누적 (타석 종료 시 합산)
-      wpRunsAccum += wp.runsScored
-
-      // 카운트는 그대로 유지, 다음 투구로 (WP는 볼/스트라이크와 별개)
-      // 실제 MLB: WP 시 투구는 여전히 볼/스트라이크로 카운트됨
-      // 간소화: WP 투구는 카운트 미반영 (다음 투구에서 처리)
-      continue
-    }
 
     // ③ [투구 후] 도루 시도 체크
     // 선행 주자 우선 (2루 주자 > 1루 주자)
@@ -483,6 +468,20 @@ export function runAtBat(
         next_recent_pitches: recent_pitches,
         events,
       }
+    }
+
+    // ⑦ [타석 지속 중] 폭투 체크 — ball 존 투구 + 주자 있을 때만
+    // 카운트는 이미 업데이트됨 (볼/스트라이크 정상 반영)
+    const wp = checkWildPitch(pitcher, catcher, currentRunners, pitch)
+    if (wp.occurred) {
+      currentRunners = wp.nextRunners
+      wpRunsAccum += wp.runsScored
+      events.push({
+        type: 'wild_pitch',
+        inning,
+        isTop,
+        payload: { pitcher, runners_advanced: wp.advances },
+      })
     }
   }
 }

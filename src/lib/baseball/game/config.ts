@@ -18,6 +18,7 @@ export const ERROR_COEFF = 0.04
 // 송구 실책 기본 계수
 export const THROW_ERROR_COEFF = 0.03
 
-// 폭투/패스트볼 기본 확률 (주자가 있는 투구당)
-// MLB: ~0.35 WP + ~0.15 PB / 팀 / 게임 ≈ 0.005/투구(주자 있을 때)
-export const WILD_PITCH_BASE = 0.008
+// ���투/패스트볼 기본 확률 (ball 존 투구 × 주자 있을 때)
+// ball 존 투구는 전체의 ~15% → 유효 대상이 적으므로 기본값 상향
+// MLB: ~0.35 WP + ~0.15 PB / 팀 / 게임 ≈ 목표 0.5~1.5회/경기
+export const WILD_PITCH_BASE = 0.04
