@@ -19,28 +19,28 @@ import { calcCoordinateDistance } from './zone-proximity'
 
 // 존별 기본 스윙 경향 (인지된 존 기준 — "이게 스트라이크인가?")
 const ZONE_SWING: Record<ZoneType, number> = {
-  core: 0.82, mid: 0.74, edge: 0.58, chase: 0.22, ball: 0.06, dirt: 0.04,
+  core: 0.88, mid: 0.80, edge: 0.64, chase: 0.28, ball: 0.06,
 }
 
 // 예측 적중 시 스윙 의지 (존에 따라 차등 — 볼은 리스크 때문에 낮음)
 const PREDICTION_DESIRE: Record<ZoneType, number> = {
-  core: 0.78, mid: 0.76, edge: 0.72, chase: 0.55, ball: 0.35, dirt: 0.25,
+  core: 0.78, mid: 0.76, edge: 0.72, chase: 0.45, ball: 0.35,
 }
 
 // 카운트별 선택성: 높을수록 "내 공만 기다린다" (존의지 억제)
 const COUNT_SELECTIVITY: Record<string, number> = {
   '3-0': 0.65,  // 볼넷 눈앞 → 매우 선택적
-  '2-0': 0.45,  // 여유 → 선택적
-  '3-1': 0.45,
-  '1-0': 0.35,  // 약간 유리 → 선택적
-  '0-0': 0.50,  // 초구 — MLB 초구 스윙율 ~28% 맞춤
-  '1-1': 0.22,
-  '2-1': 0.22,
-  '0-1': 0.15,  // 약간 불리 → 적극적
-  '2-2': 0.08,  // 보호 모드
-  '3-2': 0.12,  // 풀카운트
-  '0-2': 0.05,  // 삼진 위기 → 거의 보호
-  '1-2': 0.05,
+  '2-0': 0.40,  // 여유 → 선택적
+  '3-1': 0.40,
+  '1-0': 0.30,  // 약간 유리 → 선택적
+  '0-0': 0.45,  // 초구 — MLB 초구 스윙율 ~28%
+  '1-1': 0.18,
+  '2-1': 0.18,
+  '0-1': 0.12,  // 약간 불리 → 적극적
+  '2-2': 0.06,  // 보호 모드
+  '3-2': 0.10,  // 풀카운트
+  '0-2': 0.04,  // 삼진 위기 → 거의 보호
+  '1-2': 0.04,
 }
 
 function calcSpeedSimilarity(predictedType: string, actualType: string): number {
@@ -115,13 +115,19 @@ export function decideSwing(
   p_swing += (contact / 100) * SWING_CONFIG.contact_swing_scale * 0.3
 
   // Eye: 볼 영역에서 스윙 억제 강화
-  if (['ball', 'dirt'].includes(perceived_zone)) {
+  if (perceived_zone === 'ball') {
     p_swing -= (eye / 100) * SWING_CONFIG.eye_take_scale
   }
 
-  // 6. 2스트라이크 보호 floor
+  // 6. 2스트라이크 보호: 인지된 존에 따라 차등 floor
+  //    스트라이크로 인식 → 반드시 스윙 (얼어붙기/판단미스는 readPitch에서 처리됨)
+  //    볼로 인식 → 낮은 floor (체이스 가능성만)
   if (count.strikes >= 2) {
-    p_swing = Math.max(p_swing, 0.25)
+    const TWO_STRIKE_FLOOR: Record<ZoneType, number> = {
+      core: 0.85, mid: 0.78, edge: 0.65,
+      chase: 0.30, ball: 0.10,
+    }
+    p_swing = Math.max(p_swing, TWO_STRIKE_FLOOR[perceived_zone])
   }
 
   return Math.random() < Math.min(Math.max(p_swing, 0.02), 0.95)

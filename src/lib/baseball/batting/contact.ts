@@ -23,6 +23,7 @@ export interface ContactResult {
 // 구종별 대략적 속도 지표 (상대값, 패스트볼 = 1.0)
 const PITCH_SPEED_INDEX: Record<string, number> = {
   fastball:  1.00,
+  twoseam:   0.98,
   sinker:    0.95,
   cutter:    0.93,
   slider:    0.82,
@@ -59,15 +60,22 @@ export function resolveContact(
   const base = intercept + (batter.stats.contact / 100) * slope
 
   const pitchData = pitcher.pitch_types.find(pt => pt.type === pitchResult.pitch_type)
+  // Step 9 — 3-0 구위 감소 시 effective_ball_power 우선 적용
+  const effBallPower = pitchResult.effective_ball_power ?? pitchData?.ball_power ?? 0
   const pitch_modifier = pitchData
-    ? 1.0 - (pitchData.ball_power + pitchData.ball_speed + pitchData.ball_break) / 300 * pitch_modifier_max
+    ? 1.0 - (effBallPower + pitchData.ball_speed + pitchData.ball_break) / 300 * pitch_modifier_max
     : 1.0
 
   const fam_val =
     familiarity[pitchResult.pitch_type]?.[String(pitchResult.actual_zone)] ?? 0
   const familiarity_bonus = 1.0 + fam_val * familiarity_bonus_max
 
-  const strike_bonus = count.strikes >= 2 ? two_strike_contact_bonus : 0
+  // 2스트라이크 보호 보너스: Contact 스탯 연동
+  // Contact 40 이하 → 0%, 80 → ~5%, 120+ → 10% (cap)
+  // 높은 컨택 타자일수록 끈질기게 파울/컨택을 만들어냄
+  const strike_bonus = count.strikes >= 2
+    ? Math.min(0.10, Math.max(0, (batter.stats.contact - 40) / 80) * 0.10)
+    : 0
 
   const contact_prob = Math.min(Math.max(base * pitch_modifier * familiarity_bonus + strike_bonus, 0), 1)
   const contact = Math.random() < contact_prob

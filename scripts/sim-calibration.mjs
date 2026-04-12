@@ -250,10 +250,24 @@ console.log('[ 투구 존별 ]')
 const cb = acc.called_balls ?? 0
 const cs = acc.called_strikes ?? 0
 console.log(`  볼: ${cb} (${(cb/acc.pitch_total*100).toFixed(1)}%)  스트라이크: ${cs} (${(cs/acc.pitch_total*100).toFixed(1)}%)  투구/PA: ${(acc.pitch_total/totalPA).toFixed(1)}`)
-for (const z of ['core','mid','edge','chase','ball','dirt']) {
+// 존별 목표 비율 (MLB 기준, PRD Phase 2 목표)
+const ZONE_TARGETS = {
+  core:  [0.08, 0.15],  // 한복판: MLB ~10%
+  mid:   [0.15, 0.22],  // 십자(2,4,6,8): MLB ~18%
+  edge:  [0.20, 0.25],  // 코너(1,3,7,9): MLB ~22%
+  chase: [0.15, 0.25],  // 유인구 chase: MLB ~18% (7×7에서 확대)
+  ball:  [0.15, 0.30],  // 순수 볼존: MLB ~26% (기존 ball+dirt 합산)
+}
+for (const z of ['core','mid','edge','chase','ball']) {
   const c = acc.zone_count?.[z] ?? 0
   const s = acc.zone_swing?.[z] ?? 0
-  console.log(`  ${z.padEnd(8)} ${(c/acc.pitch_total*100).toFixed(1)}% (${c}) | 스윙 ${c>0?(s/c*100).toFixed(0):'0'}%`)
+  const pct = c / acc.pitch_total
+  const [lo, hi] = ZONE_TARGETS[z]
+  const ok = pct >= lo && pct <= hi ? '✅' : pct < lo ? '🔵LOW' : '🔴HIGH'
+  const target = `${(lo*100).toFixed(0)}~${(hi*100).toFixed(0)}%`
+  const pctStr = (pct*100).toFixed(1) + '%'
+  const swing = c > 0 ? (s/c*100).toFixed(0) + '%' : '0%'
+  console.log(`  ${z.padEnd(6)} ${pctStr.padStart(6)} ${target.padStart(8)} ${ok.padEnd(6)} | 스윙 ${swing.padStart(4)} | ${String(c).padStart(5)}구`)
 }
 console.log()
 

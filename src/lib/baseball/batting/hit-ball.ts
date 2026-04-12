@@ -14,7 +14,7 @@ import { PHYSICS_CONFIG } from '../defence/config'
 
 // 구종별 속도 지표 (batted-ball.ts와 동일)
 const PITCH_SPEED_INDEX: Record<string, number> = {
-  fastball: 1.00, sinker: 0.95, cutter: 0.93, slider: 0.82,
+  fastball: 1.00, twoseam: 0.98, sinker: 0.95, cutter: 0.93, slider: 0.82,
   curveball: 0.72, changeup: 0.80, splitter: 0.83, forkball: 0.78,
 }
 
@@ -59,8 +59,10 @@ export function hitBall(
   const recentPitches = (state.recent_pitches ?? []) as Array<{ type: import('../types/player').PitchType }>
   const prediction = predictPitch(pitcher.pitch_types, recentPitches, count)
 
-  // ② 투구 후 읽기
-  const perception = readPitch(pitch, prediction, eye)
+  // ② 투구 후 읽기 (Step 10: 착각 존 포함)
+  const pitchDataForRead = pitcher.pitch_types.find(pt => pt.type === pitch.pitch_type)
+  const throws = pitcher.throws === 'S' ? 'R' : pitcher.throws   // 스위치 투수 fallback
+  const perception = readPitch(pitch, prediction, eye, pitchDataForRead, throws, batter)
 
   // ③ 스윙 결정
   const swing = decideSwing(batter, pitch.zone_type, count, prediction, perception, pitch.actual_x, pitch.actual_z)
@@ -94,9 +96,43 @@ export function hitBall(
     }
   }
 
-  // ⑤ EV/LA/θ 통합 생성 (v2: timing + center offset 기반)
+  // ⑤ 컨택 품질 기반 파울 사전 판정
+  // MLB: 컨택의 ~44%가 파울 (팁, 체크스윙, 빗맞음 등)
+  // timing/center offset이 클수록 파울 확률 ↑
+  const t_off = Math.abs(contactResult.timing_offset ?? 0)
+  const c_off = Math.abs(contactResult.center_offset ?? 0)
+  const foul_base = 0.17                              // 정타도 17% 파울 (팁·빗맞음)
+  const foul_timing = Math.min(0.10, t_off * 0.5)    // 타이밍 오차 → +10% max
+  const foul_center = Math.min(0.10, c_off * 0.35)   // 중심 오차 → +10% max
+  const foul_prob = Math.min(0.45, foul_base + foul_timing + foul_center)
+
+  if (Math.random() < foul_prob) {
+    // 2스트라이크 파울팁 체크
+    if (count.strikes >= 2 && Math.random() < PHYSICS_CONFIG.foul_tip_prob) {
+      return {
+        swing: true,
+        contact: true,
+        is_foul: true,
+        exit_velocity: null,
+        launch_angle: null,
+        is_foul_tip: true,
+        ...applyPitchToCount(count, 'strike', false),
+      }
+    }
+    return {
+      swing: true,
+      contact: true,
+      is_foul: true,
+      exit_velocity: null,
+      launch_angle: null,
+      ...applyPitchToCount(count, 'foul', false),
+    }
+  }
+
+  // ⑥ EV/LA/θ 통합 생성 (v2: timing + center offset 기반)
   const pitchData = pitcher.pitch_types.find(pt => pt.type === pitch.pitch_type)
-  const pitcher_power = pitchData?.ball_power ?? 50
+  // Step 9 — 3-0 구위 감소 시 effective_ball_power 우선 적용
+  const pitcher_power = pitch.effective_ball_power ?? pitchData?.ball_power ?? 50
   const speed_index = PITCH_SPEED_INDEX[pitch.pitch_type] ?? 0.85
 
   const batted = calcBattedBallV2(
@@ -109,7 +145,7 @@ export function hitBall(
   )
   const { exit_velocity, launch_angle, theta_h } = batted
 
-  // ⑥ 영역 분류 + 수비 판정
+  // ⑦ 영역 분류 + 수비 판정
   const territory = classifyTerritory(theta_h)
 
   // ── 페어 타구 ──────────────────────────────────────────

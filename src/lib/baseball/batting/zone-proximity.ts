@@ -1,66 +1,72 @@
-import type { ZoneId } from '../engine/types'
+import type { ZoneId, ZoneType } from '../engine/types'
 import { PLATE_HALF_WIDTH, ABS_MARGIN_X } from '../engine/config'
 
 // ============================================================
-// 존 경계 + 중심 좌표 계산
-// 모든 존이 동일한 셀 크기 (스트라이크 존 기준)
+// 7×7 존 경계 + 중심 좌표 계산
 // ============================================================
 
-// x축: 플레이트 폭을 3등분 → 스트라이크 존 셀 폭
-const CELL_WIDTH = PLATE_HALF_WIDTH * 2 / 3  // ≈ 0.144m
-const PH = PLATE_HALF_WIDTH  // 0.2159m (플레이트 반폭)
+const PH = PLATE_HALF_WIDTH   // 0.2159m
+const THIRD = PH / 3          // 플레이트 균등 3등분 경계 ≈ 0.072m
+const CELL_W = 2 * PH / 3     // 스트라이크 셀 폭 ≈ 0.144m
+const X_CHASE = PH + CELL_W   // chase/ball 경계 (셀 1칸분) ≈ 0.360m
 
-// ABS 경계 = 스트라이크/볼 판정 구분선
-const ABS_X = PH + ABS_MARGIN_X  // ≈ 0.468m
+// x축 7열 경계
+// col 0: ball (< -X_CHASE)
+// col 1: chase (-X_CHASE ~ -PH)
+// col 2: left strike (-PH ~ -THIRD)
+// col 3: center (-THIRD ~ +THIRD)
+// col 4: right strike (+THIRD ~ +PH)
+// col 5: chase (+PH ~ +X_CHASE)
+// col 6: ball (> +X_CHASE)
+const CHASE_WIDTH = X_CHASE - PH   // = ABS_MARGIN_X ≈ 0.2525m
+const BALL_WIDTH = CHASE_WIDTH      // ball 셀도 동일 폭 사용
 
-// x 경계 (5열, 좌→우)
-// col 1~3 (스트라이크): 플레이트 기준 3등분 (투수가 노리는 건 플레이트)
-// col 0,4 (볼): ABS 경계 바로 밖, 스트라이크 셀과 동일 폭
 const COL_BOUNDS: Array<{ min: number; max: number }> = [
-  { min: -(ABS_X + CELL_WIDTH), max: -ABS_X },  // col 0: 좌측 볼 (ABS 밖)
-  { min: -PH,          max: -PH + CELL_WIDTH },  // col 1: 좌 스트라이크 (플레이트 기준)
-  { min: -CELL_WIDTH/2, max: +CELL_WIDTH/2 },    // col 2: 중앙 스트라이크
-  { min: PH - CELL_WIDTH, max: PH },             // col 3: 우 스트라이크
-  { min: ABS_X,         max: ABS_X + CELL_WIDTH }, // col 4: 우측 볼 (ABS 밖)
+  { min: -(X_CHASE + BALL_WIDTH), max: -X_CHASE },  // col 0: 좌측 ball
+  { min: -X_CHASE,                max: -PH },        // col 1: 좌측 chase
+  { min: -PH,                     max: -THIRD },     // col 2: 좌 스트라이크
+  { min: -THIRD,                  max: +THIRD },     // col 3: 중앙 스트라이크
+  { min: +THIRD,                  max: +PH },        // col 4: 우 스트라이크
+  { min: +PH,                     max: +X_CHASE },   // col 5: 우측 chase
+  { min: +X_CHASE,                max: X_CHASE + BALL_WIDTH },  // col 6: 우측 ball
 ]
 
-// z 경계: 타자별 zone_bottom/zone_top에서 동적 계산
+// z축 7행 경계: 타자별 동적 계산
 function getRowBounds(zone_bottom: number, zone_top: number): Array<{ min: number; max: number }> {
   const h = (zone_top - zone_bottom) / 3
   return [
-    { min: zone_top,       max: zone_top + h },       // row 0: 상단 볼
-    { min: zone_top - h,   max: zone_top },            // row 1: 상단 스트라이크
-    { min: zone_top - 2*h, max: zone_top - h },        // row 2: 중단 스트라이크
-    { min: zone_bottom,    max: zone_bottom + h },     // row 3: 하단 스트라이크
-    { min: zone_bottom - h, max: zone_bottom },        // row 4: 하단 볼(dirt)
+    { min: zone_top + h,     max: zone_top + 2 * h },    // row 0: 상단 ball
+    { min: zone_top,         max: zone_top + h },         // row 1: 상단 chase
+    { min: zone_top - h,     max: zone_top },             // row 2: 상단 스트라이크
+    { min: zone_bottom + h,  max: zone_top - h },         // row 3: 중단 스트라이크
+    { min: zone_bottom,      max: zone_bottom + h },      // row 4: 하단 스트라이크
+    { min: zone_bottom - h,  max: zone_bottom },          // row 5: 하단 chase
+    { min: zone_bottom - 2 * h, max: zone_bottom - h },   // row 6: 하단 ball
   ]
 }
 
 // 존 ID → (row, col) 매핑
-// 스트라이크 존 1~9: col 1,2,3 (NOT 0,1,2)
-// 볼존: col 0(좌) / col 4(우)
 const ZONE_GRID_MAP: Record<string, [number, number]> = {
-  'B11': [0,0], 'B12': [0,1], 'B13': [0,2], 'B14': [0,3], 'B15': [0,4],
-  '1': [1,1], '2': [1,2], '3': [1,3],       // row 1 strike = col 1,2,3
-  '4': [2,1], '5': [2,2], '6': [2,3],       // row 2
-  '7': [3,1], '8': [3,2], '9': [3,3],       // row 3
-  'B21': [1,0], 'B22': [1,4],               // 좌우 볼 (row 1)
-  'B23': [2,0], 'B24': [2,4],               // (row 2)
-  'B25': [3,0], 'B26': [3,4],               // (row 3)
-  'B31': [4,0], 'B32': [4,1], 'B33': [4,2], 'B34': [4,3], 'B35': [4,4],
+  // row 0: 상단 ball
+  'Z00': [0,0], 'Z01': [0,1], 'Z02': [0,2], 'Z03': [0,3], 'Z04': [0,4], 'Z05': [0,5], 'Z06': [0,6],
+  // row 1: 상단 chase+ball
+  'Z10': [1,0], 'Z11': [1,1], 'Z12': [1,2], 'Z13': [1,3], 'Z14': [1,4], 'Z15': [1,5], 'Z16': [1,6],
+  // row 2: 좌우 + strike
+  'Z20': [2,0], 'Z21': [2,1], '1': [2,2], '2': [2,3], '3': [2,4], 'Z25': [2,5], 'Z26': [2,6],
+  // row 3
+  'Z30': [3,0], 'Z31': [3,1], '4': [3,2], '5': [3,3], '6': [3,4], 'Z35': [3,5], 'Z36': [3,6],
+  // row 4
+  'Z40': [4,0], 'Z41': [4,1], '7': [4,2], '8': [4,3], '9': [4,4], 'Z45': [4,5], 'Z46': [4,6],
+  // row 5: 하단 chase+ball
+  'Z50': [5,0], 'Z51': [5,1], 'Z52': [5,2], 'Z53': [5,3], 'Z54': [5,4], 'Z55': [5,5], 'Z56': [5,6],
+  // row 6: 하단 ball
+  'Z60': [6,0], 'Z61': [6,1], 'Z62': [6,2], 'Z63': [6,3], 'Z64': [6,4], 'Z65': [6,5], 'Z66': [6,6],
 }
 
-// 스트라이크 존 1~9는 col 0,1,2가 아니라 col 1,2,3에 매핑
 function getZoneRowCol(zone: ZoneId): [number, number] {
   const key = String(zone)
   if (ZONE_GRID_MAP[key]) return ZONE_GRID_MAP[key]
-  // 스트라이크 존 1~9: row = ceil(zone/3), col = ((zone-1)%3)+1
-  if (typeof zone === 'number' && zone >= 1 && zone <= 9) {
-    const row = Math.ceil(zone / 3)        // 1~3→1, 4~6→2, 7~9→3
-    const col = ((zone - 1) % 3) + 1       // 1,4,7→1  2,5,8→2  3,6,9→3
-    return [row, col]
-  }
-  return [2, 2] // fallback: 중앙
+  return [3, 3] // fallback: 중앙
 }
 
 /**
@@ -80,7 +86,6 @@ export function getZoneBounds(
 
 /**
  * 존 ID → 중심 좌표 (x, z).
- * 예측 근접도 계산 등에서 사용 (타자가 예측하는 "대표 지점").
  */
 export function getZoneCenter(
   zone: ZoneId,
@@ -98,19 +103,23 @@ export function getZoneCenter(
 // 존 ID → ZoneType (좌표 없이 판별)
 // ============================================================
 
-function zoneIdToType(zone: ZoneId): 'core' | 'mid' | 'edge' | 'chase' | 'ball' | 'dirt' {
+// Chase 존 집합 (스트라이크 존 1칸 인접, 대각 포함)
+const CHASE_SET = new Set<string>([
+  'Z11', 'Z12', 'Z13', 'Z14', 'Z15',
+  'Z21', 'Z25',
+  'Z31', 'Z35',
+  'Z41', 'Z45',
+  'Z51', 'Z52', 'Z53', 'Z54', 'Z55',
+])
+
+function zoneIdToType(zone: ZoneId): ZoneType {
   if (typeof zone === 'number') {
     if (zone === 5) return 'core'
     if (zone === 2 || zone === 4 || zone === 6 || zone === 8) return 'mid'
     return 'edge'  // 1, 3, 7, 9
   }
-  // 볼존
-  if (zone.startsWith('B3')) return 'dirt'  // B31~B35
-  // 코너 볼존 + 사이드 볼존 끝 = ball
-  if (zone === 'B11' || zone === 'B15') return 'ball'
-  if (zone === 'B21' || zone === 'B22' || zone === 'B25' || zone === 'B26') return 'ball'
-  // 나머지 B1x, B23, B24 = chase
-  return 'chase'
+  if (CHASE_SET.has(zone)) return 'chase'
+  return 'ball'
 }
 
 // ============================================================
@@ -133,7 +142,6 @@ function biasedUnit(toMax: boolean, strength: number): number {
 // edge:     코너 모서리 쪽 편향 (페인팅)
 // chase:    스트라이크 존 경계 쪽 편향 (유혹)
 // ball:     셀 중앙 (확실한 볼)
-// dirt:     바닥 쪽 편향 (낮은 낙차구)
 // ============================================================
 
 export function pickTargetInZone(
@@ -143,7 +151,7 @@ export function pickTargetInZone(
 ): { x: number; z: number } {
   const bounds = getZoneBounds(zone, zone_bottom, zone_top)
   const type = zoneIdToType(zone)
-  const [row] = getZoneRowCol(zone)
+  const [row, col] = getZoneRowCol(zone)
 
   const xRange = bounds.x_max - bounds.x_min
   const zRange = bounds.z_max - bounds.z_min
@@ -151,7 +159,6 @@ export function pickTargetInZone(
   switch (type) {
     case 'core':
     case 'mid': {
-      // 셀 내 균등
       return {
         x: bounds.x_min + Math.random() * xRange,
         z: bounds.z_min + Math.random() * zRange,
@@ -160,10 +167,6 @@ export function pickTargetInZone(
 
     case 'edge': {
       // 코너 모서리 쪽으로 편향 (페인팅)
-      // Zone 1: top-left → x_min, z_max
-      // Zone 3: top-right → x_max, z_max
-      // Zone 7: bottom-left → x_min, z_min
-      // Zone 9: bottom-right → x_max, z_min
       const zNum = typeof zone === 'number' ? zone : 0
       const xToMax = (zNum === 3 || zNum === 9)
       const zToMax = (zNum === 1 || zNum === 3)
@@ -175,19 +178,16 @@ export function pickTargetInZone(
 
     case 'chase': {
       // 스트라이크 존 경계 쪽으로 편향 (유혹구)
-      // 열 0 (좌측 chase): 경계가 x_max 쪽
-      // 열 4 (우측 chase): 경계가 x_min 쪽
-      // 행 0 (상단 chase): 경계가 z_min 쪽
-      // 행 4 (하단 chase, dirt이지만 fallback): 경계가 z_max 쪽
-      const [, col] = getZoneRowCol(zone)
       let tX = Math.random()
       let tZ = Math.random()
 
-      if (col === 0) tX = biasedUnit(true, 0.6)   // x_max 쪽 (존 가까이)
-      else if (col === 4) tX = biasedUnit(false, 0.6) // x_min 쪽
-      // 중간 열은 균등
+      // x 방향: 존 쪽으로 편향
+      if (col <= 1) tX = biasedUnit(true, 0.6)       // x_max 쪽 (존 가까이)
+      else if (col >= 5) tX = biasedUnit(false, 0.6)  // x_min 쪽
 
-      if (row === 0) tZ = biasedUnit(false, 0.6)  // z_min 쪽 (존 가까이)
+      // z 방향: 존 쪽으로 편향
+      if (row <= 1) tZ = biasedUnit(false, 0.6)       // z_min 쪽 (존 가까이)
+      else if (row >= 5) tZ = biasedUnit(true, 0.6)    // z_max 쪽
 
       return {
         x: bounds.x_min + tX * xRange,
@@ -197,18 +197,9 @@ export function pickTargetInZone(
 
     case 'ball': {
       // 셀 중앙 (확실한 볼 — 애매하지 않음)
-      // 약간의 변동만 허용
       return {
         x: bounds.x_min + (0.3 + Math.random() * 0.4) * xRange,
         z: bounds.z_min + (0.3 + Math.random() * 0.4) * zRange,
-      }
-    }
-
-    case 'dirt': {
-      // 바닥 쪽 편향 (낙차구는 낮게)
-      return {
-        x: bounds.x_min + Math.random() * xRange,
-        z: bounds.z_min + biasedUnit(false, 0.5) * zRange,  // z_min 쪽
       }
     }
   }

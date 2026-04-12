@@ -1,6 +1,7 @@
 import type { PitchType } from '../types/player'
 import type { GamePitchState } from './types'
-import { PITCH_SELECT_CONFIG } from './config'
+import type { ApproachResult } from './pitcher-ai'
+import { PITCH_SELECT_CONFIG, PITCH_SPEED_TIER } from './config'
 
 // ============================================================
 // Weighted random selection utility
@@ -17,13 +18,14 @@ function weightedRandom<T>(items: T[], weights: number[]): T {
 }
 
 // ============================================================
-// M2: 구종 선택
+// M2: 구종 선택 (Step 5 — approach pitch_tier_bias 통합)
 // ============================================================
 
 export function selectPitchType(
   pitcher: GamePitchState['pitcher'],
   recentPitches: GamePitchState['recent_pitches'],
-  situation: Pick<GamePitchState, 'count' | 'is_scoring_position'>
+  situation: Pick<GamePitchState, 'count' | 'is_scoring_position'>,
+  approach?: ApproachResult,
 ): PitchType {
   const { k, N, boost } = PITCH_SELECT_CONFIG
 
@@ -65,7 +67,15 @@ export function selectPitchType(
     const baseWeight = (pt.ball_power + pt.ball_break + pt.ball_speed) / totalBaseWeight
     const penalty = 1 / (1 + k * (recentCount[pt.type] ?? 0))
     const crisisBoost = isCrisis && pt.type === bestPitchType ? boost : 1.0
-    return baseWeight * penalty * crisisBoost
+
+    // Step 5 — approach 구종 계열 선호도
+    let tierBias = 1.0
+    if (approach) {
+      const tier = PITCH_SPEED_TIER[pt.type]
+      tierBias = approach.pitch_tier_bias[tier]
+    }
+
+    return baseWeight * penalty * crisisBoost * tierBias
   })
 
   const pitchTypeList = pitcher.pitch_types.map(pt => pt.type)

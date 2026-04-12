@@ -1,4 +1,24 @@
+import type { PitchType } from '../types/player'
 import type { ZoneType } from '../engine/types'
+
+// ============================================================
+// Step 10 — 구종별 착각(Deception) 오프셋
+// 릴리스 시 공이 보이는 위치와 실제 도달 위치의 차이.
+// apparent = actual + base_offset × (ball_break / 100)
+// RHP 기준. LHP는 dx 부호 반전.
+// ============================================================
+
+export const DECEPTION_OFFSET: Record<PitchType, { dx: number; dz: number }> = {
+  fastball:  { dx:  0,     dz:  0    },  // 착각 없음
+  twoseam:   { dx: +0.02,  dz: +0.02 },  // 런(-x) 반대 → 바깥쪽 착각 + 싱크 반대 → 높게 착각
+  sinker:    { dx: +0.04,  dz: +0.05 },  // 런(-x) 반대 → 바깥쪽 착각 + 싱크 반대 → 높게 착각
+  cutter:    { dx: -0.03,  dz: +0.01 },  // 컷(+x) 반대 → 몸쪽 착각 + 약간 높게
+  slider:    { dx: -0.08,  dz: +0.05 },  // 횡변화(+x) 반대 → 몸쪽 착각 + 드롭 반대 → 높게
+  curveball: { dx: -0.03,  dz: +0.10 },  // 글러브(+x) 반대 → 몸쪽 착각 + 큰 드롭 반대 → 훨씬 높게
+  changeup:  { dx: +0.03,  dz: +0.06 },  // 페이드(-x) 반대 → 바깥쪽 착각 + 드롭 반대 → 높게
+  splitter:  { dx:  0,     dz: +0.09 },  // 거의 수직 급락 → 높게 착각
+  forkball:  { dx:  0,     dz: +0.10 },  // 수직 급락 → 높게 착각
+}
 
 // ============================================================
 // Swing Decision
@@ -11,9 +31,8 @@ export const SWING_CONFIG = {
     core:  0.78,    // 한복판 — 가장 강하게 스윙
     mid:   0.70,    // 십자 — 치기 좋음
     edge:  0.55,    // 코너 — 보통
-    chase: 0.22,
+    chase: 0.25,    // 7×7: chase 규율 강화 → BB%/K% 개선 (MLB chase ~29%)
     ball:  0.07,
-    dirt:  0.07,
   } satisfies Record<ZoneType, number>,
   count_modifier: {
     '0-2': +0.10,   // 타자 수세 → 공격적 스윙
@@ -47,6 +66,7 @@ export const SWING_CONFIG = {
   // 구종 속도 계열 분류
   pitch_speed_tier: {
     fastball:  'fast',
+    twoseam:   'fast',
     sinker:    'fast',
     cutter:    'fast',
     slider:    'breaking',
@@ -79,18 +99,17 @@ export const CONTACT_CONFIG = {
   // MLB 컨택률: 스트라이크 존 ~80%, 체이스 ~55%
   // 헛스윙 과다 문제 해결: core/edge intercept 상향, pitch_modifier_max 인하
   base_contact: {
-    core:  { intercept: 0.70, slope: 0.30 },  // 0.70 ~ 1.00 (한복판 — 가장 높음)
-    mid:   { intercept: 0.62, slope: 0.30 },  // 0.62 ~ 0.92 (십자)
-    edge:  { intercept: 0.52, slope: 0.28 },  // 0.52 ~ 0.80 (코너)
-    chase: { intercept: 0.32, slope: 0.23 },  // 0.32 ~ 0.55
+    core:  { intercept: 0.78, slope: 0.22 },  // 0.78 ~ 1.00 (한복판)
+    mid:   { intercept: 0.72, slope: 0.23 },  // 0.72 ~ 0.95 (십자)
+    edge:  { intercept: 0.62, slope: 0.22 },  // 0.62 ~ 0.84 (코너)
+    chase: { intercept: 0.48, slope: 0.20 },  // 0.48 ~ 0.68 (컨택율 ~78% 목표)
     ball:  { intercept: 0.18, slope: 0.18 },  // 0.18 ~ 0.36
-    dirt:  { intercept: 0.15, slope: 0.18 },  // 0.15 ~ 0.33
   } satisfies Record<ZoneType, { intercept: number; slope: number }>,
-  pitch_modifier_max: 0.18,      // 구종 난이도 최대 페널티 (0.30→0.18 인하: 헛스윙 과다 방지)
+  pitch_modifier_max: 0.10,      // 구종 난이도 최대 페널티 (0.18→0.10 인하: 컨택율 72%+ 목표)
   familiarity_bonus_max: 0.15,   // familiarity 최대 보너스 +15%
   // 2-스트라이크 컨택 보너스: 타자가 배트를 짧게 잡고 플레이트를 보호하는 현실 반영
   // 이 보너스로 2스트라이크 헛스윙 감소 → K% 하향 → MLB 수준에 근접
-  two_strike_contact_bonus: 0.20,
+  two_strike_contact_bonus: 0.05,  // 기본값 (실제 적용: contact 스탯 연동)
 
   // v2 컨택 오프셋 계수 (BATTED_BALL_CONFIG.v2에서도 참조)
   v2: {
@@ -144,8 +163,8 @@ export const BATTED_BALL_CONFIG = {
 
     // 방향각 (θ) 계수
     timing_to_theta_k:      150,    // timing_offset → θ 변환 계수
-    center_instability_k:   15,     // center_offset → θ 노이즈 추가 계수
-    theta_base_noise_std:   10,     // θ 기본 노이즈 (°) — 배트 각도 자연 분산 (프로 타자 기준)
+    center_instability_k:   25,     // center_offset → θ 노이즈 추가 계수 (15→25: 빗맞음→파울 증가)
+    theta_base_noise_std:   18,     // θ 기본 노이즈 (°) — 파울율 MLB ~17% 목표 (10→18)
 
     // 컨택 오프셋 계수
     timing_noise_std_base:  0.08,   // timing_offset 기본 노이즈 σ

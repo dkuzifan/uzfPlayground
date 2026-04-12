@@ -26,8 +26,8 @@ import { PHYSICS_CONFIG } from '../defence/config'
  */
 export function fenceDistance(
   theta_deg:    number,
-  fence_cf      = 122,
-  fence_corner  = 97,
+  fence_cf      = 126,
+  fence_corner  = 100,
 ): number {
   const clampedTheta = Math.min(Math.abs(theta_deg), PHYSICS_CONFIG.FAIR_ANGLE)
   return fence_cf - (fence_cf - fence_corner) * (clampedTheta / PHYSICS_CONFIG.FAIR_ANGLE)

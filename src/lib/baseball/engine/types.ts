@@ -4,15 +4,22 @@ import type { PitchType, Player } from '../types/player'
 // Zone Types
 // ============================================================
 
-export type ZoneType = 'core' | 'mid' | 'edge' | 'chase' | 'ball' | 'dirt'
+export type ZoneType = 'core' | 'mid' | 'edge' | 'chase' | 'ball'
 
-// 5×5 그리드 존 ID (Section 10-1, 우타자 기준)
-// 1~9: 스트라이크 존 (3×3), B1x: 위 볼, B2x: 좌우 볼, B3x: 아래/dirt
+// 7×7 그리드 존 ID (우타자 기준)
+// 1~9: 스트라이크 존 (3×3, rows 2-4 × cols 2-4)
+// Z{row}{col}: 볼존 (chase + ball)
+//   chase (16): 스트라이크 존 1칸 인접 (대각 포함)
+//   ball  (24): 2칸 이상 떨어진 외곽
 export type ZoneId =
   | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
-  | 'B11' | 'B12' | 'B13' | 'B14' | 'B15'
-  | 'B21' | 'B22' | 'B23' | 'B24' | 'B25' | 'B26'
-  | 'B31' | 'B32' | 'B33' | 'B34' | 'B35'
+  | 'Z00' | 'Z01' | 'Z02' | 'Z03' | 'Z04' | 'Z05' | 'Z06'
+  | 'Z10' | 'Z11' | 'Z12' | 'Z13' | 'Z14' | 'Z15' | 'Z16'
+  | 'Z20' | 'Z21' | 'Z25' | 'Z26'
+  | 'Z30' | 'Z31' | 'Z35' | 'Z36'
+  | 'Z40' | 'Z41' | 'Z45' | 'Z46'
+  | 'Z50' | 'Z51' | 'Z52' | 'Z53' | 'Z54' | 'Z55' | 'Z56'
+  | 'Z60' | 'Z61' | 'Z62' | 'Z63' | 'Z64' | 'Z65' | 'Z66'
 
 // ============================================================
 // Familiarity
@@ -44,11 +51,14 @@ export interface PitchResult {
   actual_x: number          // 실제 도달 x 좌표 (m, 홈플레이트 중심 기준)
   actual_z: number          // 실제 도달 z 좌표 (m, 지면 기준)
   actual_zone: ZoneId       // 실제 도달 존
-  zone_type: ZoneType       // core / edge / chase / ball / dirt
+  zone_type: ZoneType       // core / mid / edge / chase / ball
   is_strike: boolean
   is_hbp: boolean           // 사구 여부
   delivery_time: number     // 투구 홈까지 이동 시간 (s) — 타격·도루 시스템용
   needs_relief: boolean     // 강판 필요 여부
   next_stamina: number      // 투구 후 스태미나 (호출 측이 상태 업데이트)
   next_familiarity: FamiliarityMap
+  // Step 9 — 3-0 구위 트레이드오프로 감소된 실효 ball_power.
+  // 미지정이면 pitchData.ball_power 그대로 사용.
+  effective_ball_power?: number
 }

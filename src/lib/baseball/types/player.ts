@@ -16,7 +16,8 @@ export type Position =
   | 'UTIL' // 유틸리티
 
 export type PitchType =
-  | 'fastball'
+  | 'fastball'   // 4-seam
+  | 'twoseam'    // 2-seam (싱커와 구분 — 약한 무브먼트)
   | 'sinker'
   | 'cutter'
   | 'slider'

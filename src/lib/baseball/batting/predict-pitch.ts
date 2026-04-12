@@ -123,12 +123,11 @@ function predictZone(count: { balls: number; strikes: number }): ZoneType {
  */
 function predictZoneId(zoneType: ZoneType): ZoneId {
   const ZONE_IDS_BY_TYPE: Record<ZoneType, ZoneId[]> = {
-    core:  [5],                 // 한복판
-    mid:   [2, 4, 6, 8],        // 십자
-    edge:  [1, 3, 7, 9],        // 코너
-    chase: ['B12', 'B13', 'B14', 'B21', 'B22', 'B23', 'B24', 'B25', 'B26'],
-    ball:  ['B11', 'B15', 'B31', 'B32', 'B33', 'B34', 'B35'],
-    dirt:  ['B31', 'B32', 'B33', 'B34', 'B35'],
+    core:  [5],
+    mid:   [2, 4, 6, 8],
+    edge:  [1, 3, 7, 9],
+    chase: ['Z11', 'Z12', 'Z13', 'Z14', 'Z15', 'Z21', 'Z25', 'Z31', 'Z35', 'Z41', 'Z45', 'Z51', 'Z52', 'Z53', 'Z54', 'Z55'],
+    ball:  ['Z00', 'Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z10', 'Z16', 'Z20', 'Z26', 'Z30', 'Z36', 'Z40', 'Z46', 'Z50', 'Z56', 'Z60', 'Z61', 'Z62', 'Z63', 'Z64', 'Z65', 'Z66'],
   }
   const candidates = ZONE_IDS_BY_TYPE[zoneType]
   return candidates[Math.floor(Math.random() * candidates.length)]

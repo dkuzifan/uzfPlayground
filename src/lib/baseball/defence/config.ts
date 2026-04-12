@@ -19,7 +19,7 @@ export const PHYSICS_CONFIG = {
    * - MLB 평균 외야수: 6.7 m/s, 상위권: 7.5 m/s
    */
   outfielder_speed_min: 5.0,
-  outfielder_speed_max: 7.5,
+  outfielder_speed_max: 7.2,
 
   // ── 4구간 포구 모델 ──────────────────────────────────────
   /** 여유 도달 경계 (초) — 이 이상이면 루틴 플레이 */

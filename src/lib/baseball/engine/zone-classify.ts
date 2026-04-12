@@ -1,36 +1,53 @@
 import type { Player } from '../types/player'
 import type { ZoneId, ZoneType } from './types'
-import { PLATE_HALF_WIDTH, ABS_MARGIN_X, ABS_MARGIN_Z } from './config'
+import { PLATE_HALF_WIDTH } from './config'
 
 // ============================================================
-// 5×5 그리드 좌표 범위 정의
+// 7×7 그리드 좌표 범위 정의
 //
 // X축: 홈플레이트 중심 기준 (좌 = -, 우 = +), 우타자 뷰
-//   열1(좌): x < -PLATE_HALF_WIDTH
-//   열2:     -PLATE_HALF_WIDTH ≤ x < -PLATE_HALF_WIDTH/3
-//   열3(중): |x| < PLATE_HALF_WIDTH/3
-//   열4:     PLATE_HALF_WIDTH/3 ≤ x < PLATE_HALF_WIDTH
-//   열5(우): x ≥ PLATE_HALF_WIDTH
+//   col 0 (ball):   x < -(PH + CELL_W)
+//   col 1 (chase):  -(PH + CELL_W) ≤ x < -PH
+//   col 2~4 (strike): 플레이트 3등분
+//   col 5 (chase):  PH < x ≤ PH + CELL_W
+//   col 6 (ball):   x > PH + CELL_W
 //
-// Z축: 지면 기준 (m), batter.zone_bottom ~ batter.zone_top = 스트라이크 존
-//   행1(상): z > zone_top
-//   행2:     zone_top ≥ z > zone_top - (zone_height/3)
-//   행3:     ...
-//   행4:     ...
-//   행5(하): z ≤ zone_bottom
+// Z축: 지면 기준 (m), batter.zone_bottom ~ batter.zone_top
+//   row 0 (ball):   z > zone_top + h
+//   row 1 (chase):  zone_top < z ≤ zone_top + h
+//   row 2~4 (strike): 존 3등분
+//   row 5 (chase):  zone_bottom - h ≤ z < zone_bottom
+//   row 6 (ball):   z < zone_bottom - h
+//
+// 스트라이크 판정: 투구 좌표가 플레이트 × 스트라이크 존 내부일 때만 strike
+//   ±PH × (zone_bottom ~ zone_top)
 // ============================================================
 
-// 5×5 존 ID 배치 (행1~5 × 열1~5)
-// 행1 = 상단 볼존, 행2~4 = 스트라이크 존 3행, 행5 = 하단 볼존
-// 열1, 열5 = 좌우 볼존, 열2~4 = 스트라이크 존 3열
+const PH = PLATE_HALF_WIDTH
+const THIRD = PH / 3         // 플레이트 균등 3등분 경계 (= PH/3 ≈ 0.072m)
+const CELL_W = 2 * PH / 3    // 스트라이크 셀 폭 ≈ 0.144m
+const X_CHASE = PH + CELL_W  // chase/ball 경계 (스트라이크 셀 1칸분)
+
+// 7×7 존 ID 배치 (row 0~6 × col 0~6)
 const ZONE_GRID: ZoneId[][] = [
-  //  col1    col2    col3    col4    col5
-  ['B11',  'B12',  'B13',  'B14',  'B15'],  // row1: 상단 볼
-  ['B21',     1,      2,      3,   'B22'],  // row2: 상단 스트라이크
-  ['B23',     4,      5,      6,   'B24'],  // row3: 중단 스트라이크
-  ['B25',     7,      8,      9,   'B26'],  // row4: 하단 스트라이크
-  ['B31',  'B32',  'B33',  'B34',  'B35'],  // row5: 하단 볼(dirt)
+  //  col0    col1    col2   col3   col4    col5    col6
+  ['Z00', 'Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06'],  // row0: 상단 ball
+  ['Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15', 'Z16'],  // row1: 상단 chase+ball
+  ['Z20', 'Z21',     1,     2,     3, 'Z25', 'Z26'],  // row2: 상단 스트라이크
+  ['Z30', 'Z31',     4,     5,     6, 'Z35', 'Z36'],  // row3: 중단 스트라이크
+  ['Z40', 'Z41',     7,     8,     9, 'Z45', 'Z46'],  // row4: 하단 스트라이크
+  ['Z50', 'Z51', 'Z52', 'Z53', 'Z54', 'Z55', 'Z56'],  // row5: 하단 chase+ball
+  ['Z60', 'Z61', 'Z62', 'Z63', 'Z64', 'Z65', 'Z66'],  // row6: 하단 ball
 ]
+
+// Chase 존 집합 (스트라이크 존 1칸 인접, 대각 포함)
+const CHASE_SET = new Set<ZoneId>([
+  'Z11', 'Z12', 'Z13', 'Z14', 'Z15',
+  'Z21', 'Z25',
+  'Z31', 'Z35',
+  'Z41', 'Z45',
+  'Z51', 'Z52', 'Z53', 'Z54', 'Z55',
+])
 
 // ZoneId → ZoneType 매핑
 function getZoneType(zone: ZoneId): ZoneType {
@@ -40,16 +57,12 @@ function getZoneType(zone: ZoneId): ZoneType {
     if (zone === 2 || zone === 4 || zone === 6 || zone === 8) return 'mid'
     return 'edge'  // 1, 3, 7, 9
   }
-  // 볼 존
-  if (zone.startsWith('B3')) return 'dirt'  // 하단 볼 (바운드 가능)
-  // B1x (상단 볼): 상단 코너(B11,B15) = ball, 나머지 = chase
-  // B2x (좌우 볼): 좌우 끝(B21,B22,B25,B26) = ball (스트라이크 존 옆 열), 나머지(B23,B24) = chase
-  if (zone === 'B11' || zone === 'B15' || zone === 'B21' || zone === 'B22' || zone === 'B25' || zone === 'B26') return 'ball'
-  return 'chase'
+  if (CHASE_SET.has(zone)) return 'chase'
+  return 'ball'
 }
 
 // ============================================================
-// M6: ABS 존 판정
+// 7×7 존 판정
 // ============================================================
 
 export function classifyZone(
@@ -60,59 +73,51 @@ export function classifyZone(
   const { zone_bottom, zone_top } = batter
 
   const zoneHeight = zone_top - zone_bottom
-  const rowHeight  = zoneHeight / 3
+  const h = zoneHeight / 3  // 스트라이크 셀 높이
 
-  // ABS 확장 경계
-  const strikeXMin = -(PLATE_HALF_WIDTH + ABS_MARGIN_X)
-  const strikeXMax =  (PLATE_HALF_WIDTH + ABS_MARGIN_X)
-  const strikeZMin = zone_bottom - ABS_MARGIN_Z
-  const strikeZMax = zone_top    + ABS_MARGIN_Z
-
+  // 스트라이크 판정: 좌표가 플레이트 × 존 내부일 때만
   const is_strike =
-    actual_x >= strikeXMin && actual_x <= strikeXMax &&
-    actual_z >= strikeZMin && actual_z <= strikeZMax
+    actual_x >= -PH && actual_x <= PH &&
+    actual_z >= zone_bottom && actual_z <= zone_top
 
-  // 행 결정 (0~4)
+  // 행 결정 (0~6)
   let row: number
-  if (actual_z > zone_top + ABS_MARGIN_Z) {
-    row = 0  // 상단 볼
-  } else if (actual_z > zone_bottom + rowHeight * 2) {
-    row = 1  // 상단 스트라이크
-  } else if (actual_z > zone_bottom + rowHeight) {
-    row = 2  // 중단 스트라이크
-  } else if (actual_z >= zone_bottom - ABS_MARGIN_Z) {
-    row = 3  // 하단 스트라이크
+  if (actual_z > zone_top + h) {
+    row = 0        // 상단 ball
+  } else if (actual_z > zone_top) {
+    row = 1        // 상단 chase
+  } else if (actual_z > zone_top - h) {
+    row = 2        // 상단 스트라이크
+  } else if (actual_z > zone_bottom + h) {
+    row = 3        // 중단 스트라이크
+  } else if (actual_z >= zone_bottom) {
+    row = 4        // 하단 스트라이크
+  } else if (actual_z >= zone_bottom - h) {
+    row = 5        // 하단 chase
   } else {
-    row = 4  // 하단 볼 (dirt)
+    row = 6        // 하단 ball
   }
 
-  // 열 결정 (0~4)
-  const third = PLATE_HALF_WIDTH / 1.5  // ≈ 홈플레이트 폭 3등분
+  // 열 결정 (0~6)
   let col: number
-  if (actual_x < -(PLATE_HALF_WIDTH + ABS_MARGIN_X)) {
-    col = 0  // 좌측 볼
-  } else if (actual_x < -third) {
-    col = 1
-  } else if (actual_x <= third) {
-    col = 2
-  } else if (actual_x <= PLATE_HALF_WIDTH + ABS_MARGIN_X) {
-    col = 3
+  if (actual_x < -X_CHASE) {
+    col = 0        // 좌측 ball
+  } else if (actual_x < -PH) {
+    col = 1        // 좌측 chase
+  } else if (actual_x < -THIRD) {
+    col = 2        // 좌 스트라이크
+  } else if (actual_x <= THIRD) {
+    col = 3        // 중앙 스트라이크
+  } else if (actual_x <= PH) {
+    col = 4        // 우 스트라이크
+  } else if (actual_x <= X_CHASE) {
+    col = 5        // 우측 chase
   } else {
-    col = 4  // 우측 볼
+    col = 6        // 우측 ball
   }
 
   const zone_id = ZONE_GRID[row][col]
-  let zone_type = getZoneType(zone_id)
-
-  // 거리 기반 ball 재분류: 존 경계에서 많이 벗어난 투구 → chase → ball 승격
-  // chase로 분류된 투구 중 존 경계에서 0.15m(약 6인치) 이상 벗어나면 ball
-  if (zone_type === 'chase') {
-    const x_excess = Math.max(0, Math.abs(actual_x) - strikeXMax)
-    const z_excess_hi = Math.max(0, actual_z - strikeZMax)
-    const z_excess_lo = Math.max(0, strikeZMin - actual_z)
-    const total_excess = Math.max(x_excess, z_excess_hi, z_excess_lo)
-    if (total_excess > 0.15) zone_type = 'ball'
-  }
+  const zone_type = getZoneType(zone_id)
 
   return { zone_id, zone_type, is_strike }
 }

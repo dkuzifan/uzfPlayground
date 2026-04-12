@@ -39,6 +39,7 @@ function posKo(position: Position | undefined): string {
 
 const PITCH_TYPE_KO: Record<PitchType, string> = {
   fastball:  '포심패스트볼',
+  twoseam:   '투심패스트볼',
   sinker:    '싱커',
   cutter:    '커터',
   slider:    '슬라이더',
