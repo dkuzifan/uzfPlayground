@@ -20,7 +20,7 @@ interface TeamState {
 }
 
 function makeBatterStats(player: Player): BatterGameStats {
-  return { player, AB: 0, H: 0, '2B': 0, '3B': 0, HR: 0, BB: 0, SO: 0, RBI: 0, SB: 0, CS: 0, SF: 0 }
+  return { player, AB: 0, H: 0, '2B': 0, '3B': 0, HR: 0, BB: 0, SO: 0, RBI: 0, SB: 0, CS: 0, SF: 0, SH: 0 }
 }
 
 function makePitcherStats(player: Player): PitcherGameStats {
@@ -121,9 +121,15 @@ export function calcGameStats(
             pendingBatter = { state: offState, id: batter.id }
             break
           case 'out':
-            b.AB++
+            // 희생번트 성공: AB 제외 + SH 카운트
+            if ((event.payload as { is_sacrifice_bunt?: boolean }).is_sacrifice_bunt) {
+              b.SH++
+              pendingBatter = { state: offState, id: batter.id }  // 주자 진루 → RBI 가능
+            } else {
+              b.AB++
+              pendingBatter = null
+            }
             p.outs++
-            pendingBatter = null
             break
           case 'strikeout':
             b.AB++; b.SO++

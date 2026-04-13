@@ -1,7 +1,7 @@
 import type { Player }     from '../types/player'
 import type { PitchResult } from '../engine/types'
 import type { BattingState, BattingResult } from './types'
-import { decideBunt }      from './bunt-stub'
+import { decideBunt, resolveBunt } from './bunt'
 import { decideSwing }     from './swing-decision'
 import { resolveContact }  from './contact'
 import { calcBattedBallV2 }  from './batted-ball'
@@ -49,10 +49,10 @@ export function hitBall(
     }
   }
 
-  // 1. 번트 결정 (stub)
+  // 1. 번트 결정
   const bunt = decideBunt(batter, count, runners, { outs, inning })
-  if (bunt.attempt) {
-    return undefined as never
+  if (bunt.attempt && bunt.intent) {
+    return resolveBunt(state, pitch, defenceLineup, bunt.intent)
   }
 
   // ① 투구 전 예측
@@ -151,6 +151,18 @@ export function hitBall(
   // ── 페어 타구 ──────────────────────────────────────────
   if (territory === 'fair') {
     const hitDetail = resolveHitResult(exit_velocity, launch_angle, batter, defenceLineup ?? [], theta_h)
+
+    // 인필드 플라이 룰: 주자 1·2루(만루 포함) + 0~1아웃 + 내야 팝업/플라이(라인드라이브 제외)
+    // → 타자 자동 아웃, 포구 실패(에러)해도 out 처리, 포스 해제되어 주자 홀드
+    const ifrRunners  = runners.first && runners.second  // 1·2루 또는 만루
+    const ifrOuts     = outs < 2
+    const ifrBallType = hitDetail.ball_type === 'popup' || hitDetail.ball_type === 'fly'
+    const is_infield_fly = ifrRunners && ifrOuts && ifrBallType && hitDetail.is_infield === true
+
+    if (is_infield_fly && hitDetail.result !== 'out') {
+      hitDetail.result = 'out'
+    }
+
     return {
       swing: true,
       contact: true,
@@ -161,6 +173,7 @@ export function hitBall(
       hit_physics:   hitDetail,
       next_count: count,
       at_bat_over: true,
+      is_infield_fly: is_infield_fly || undefined,
     }
   }
 

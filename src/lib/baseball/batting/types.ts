@@ -55,4 +55,8 @@ export interface BattingResult {
   is_foul_tip?: boolean           // 파울팁 삼진 (2S + 파울팁 → 삼진 처리)
   foul_fly_error?: boolean        // 파울 플라이 수비 에러 (파울 처리, 오버레이 표시)
   foul_error_fielder?: { name: string; position_1: string }  // 에러 발생 수비수
+  is_infield_fly?: boolean        // 인필드 플라이 룰 발동 (타자 자동 아웃, 에러여도 out 처리)
+  is_bunt?: boolean               // 번트 시도
+  bunt_intent?: 'sacrifice' | 'hit'  // 번트 의도 (희생 / 기습)
+  is_sacrifice_bunt?: boolean     // 희생번트 성공 (타자 아웃 + 의도 sacrifice) — AB 제외 대상
 }

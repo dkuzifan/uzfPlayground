@@ -6,6 +6,7 @@ import { shouldAutoRelieve } from '../engine/stamina'
 import { runAtBat }          from './at-bat'
 import { findCatcher }       from './util'
 import { applyShift }        from '../defence/shift'
+import { calcSacrificeBuntLikelihood, applyCornersIn } from '../defence/pre-pitch-positioning'
 
 // ============================================================
 // runHalfInning
@@ -72,6 +73,26 @@ export function runHalfInning(
     )
     events.push({ type: 'shift', inning, isTop, payload: shiftEvent as unknown as Record<string, unknown> })
 
+    // 희생번트 대비 corners-in — applyShift 위에 chain
+    const runnersForLikelihood = {
+      first:  runners.first  !== null,
+      second: runners.second !== null,
+      third:  runners.third  !== null,
+    }
+    const scoreDiff = (isTop ? scoreAway : scoreHome) - (isTop ? scoreHome : scoreAway)
+    const likelihood = calcSacrificeBuntLikelihood(
+      batter, runnersForLikelihood, outs, { balls: 0, strikes: 0 }, inning, scoreDiff,
+    )
+    const { lineup: positionedLineup, event: cornersInEvent } = applyCornersIn(shiftedLineup, likelihood)
+    if (cornersInEvent) {
+      events.push({
+        type: 'corners_in',
+        inning,
+        isTop,
+        payload: cornersInEvent as unknown as Record<string, unknown>,
+      })
+    }
+
     const outcome = runAtBat(currentPitcher, batter, {
       outs,
       runners,
@@ -83,7 +104,7 @@ export function runHalfInning(
       catcher,
       battingScore: isTop ? scoreAway : scoreHome,
       defenseScore: isTop ? scoreHome : scoreAway,
-    }, shiftedLineup)
+    }, positionedLineup)
 
     events.push(...outcome.events)
 

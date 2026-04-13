@@ -72,6 +72,7 @@ export type GameEventType =
   | 'fielding_error'   // { fielder: Player; batter: Player }
   | 'throwing_error'   // { thrower: Player; runner: Player; to: BaseKey; extra_base: BaseKey }
   | 'shift'            // { direction: 'left'|'right'; pull_tendency: number; shifted_positions: Array<{position,from,to}> }
+  | 'corners_in'       // { likelihood: number; advanced: Array<{position: '1B'|'3B', from_y, to_y}> } — 희생번트 대비 1B/3B 전진
   | 'runner_note'      // { text: string; is_batter: boolean } — 주목할 만한 진루 메모 (PBP 표시용)
   | 'foul_fly_error'   // { fielder: { name, position_1 }; batter: Player } — 파울 플라이 에러 (오버레이)
   | 'wild_pitch'       // { pitcher: Player; runners_advanced: Array<{runner,from,to}> }

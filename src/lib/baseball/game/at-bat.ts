@@ -240,6 +240,10 @@ export function runAtBat(
               range:     batting.hit_physics?.range,
               is_foul_fly: batting.is_foul === true && batting.at_bat_result === 'out',
               is_foul_tip: batting.is_foul_tip,
+              is_infield_fly: batting.is_infield_fly,
+              is_bunt: batting.is_bunt,
+              bunt_intent: batting.bunt_intent,
+              is_sacrifice_bunt: batting.is_sacrifice_bunt,
             },
           })
           if (batting.at_bat_result === 'reach_on_error' && batting.hit_physics) {
@@ -426,6 +430,10 @@ export function runAtBat(
           range:     batting.hit_physics?.range,
           is_foul_fly: batting.is_foul === true && batting.at_bat_result === 'out',
           is_foul_tip: batting.is_foul_tip,
+          is_infield_fly: batting.is_infield_fly,
+          is_bunt: batting.is_bunt,
+          bunt_intent: batting.bunt_intent,
+          is_sacrifice_bunt: batting.is_sacrifice_bunt,
         },
       })
       if (batting.at_bat_result === 'reach_on_error' && batting.hit_physics) {

@@ -17,6 +17,7 @@ export interface BatterGameStats {
   SB:  number   // 도루 성공
   CS:  number   // 도루 실패
   SF:  number   // 희생플라이
+  SH:  number   // 희생번트
 }
 
 // ============================================================

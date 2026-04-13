@@ -143,6 +143,36 @@ export function atBatResultToText(ev: GameEvent): { title: string; sub?: string 
     return { title: '아웃', sub }
   }
 
+  // ── 인필드 플라이 아웃 ──────────────────────────────────────
+  if (p.result === 'out' && (p as { is_infield_fly?: boolean }).is_infield_fly) {
+    const sub = pName ? `${pName} 인필드 플라이 아웃` : '인필드 플라이 아웃'
+    return { title: '아웃', sub }
+  }
+
+  // ── 번트 ────────────────────────────────────────────────────
+  const pb = p as { is_bunt?: boolean; bunt_intent?: 'sacrifice' | 'hit'; is_sacrifice_bunt?: boolean }
+  if (pb.is_bunt) {
+    const prefix = pb.bunt_intent === 'hit' ? '기습번트' : '희생번트'
+    if (p.result === 'out') {
+      if (pb.is_sacrifice_bunt) {
+        return { title: '아웃', sub: pName ? `${pName} ${prefix} 성공` : `${prefix} 성공` }
+      }
+      return { title: '아웃', sub: pName ? `${pName} ${prefix} 아웃` : `${prefix} 아웃` }
+    }
+    if (p.result === 'single') {
+      return { title: '안타', sub: pName ? `${pName} ${prefix} 내야안타` : `${prefix} 내야안타` }
+    }
+    if (p.result === 'double_play') {
+      return { title: '병살', sub: `${prefix} 병살` }
+    }
+    if (p.result === 'fielders_choice') {
+      return { title: '야수선택', sub: `${prefix} 야수선택` }
+    }
+    if (p.result === 'reach_on_error') {
+      return { title: '실책', sub: `${prefix} 실책` }
+    }
+  }
+
   // ── 파울팁 삼진 ──────────────────────────────────────────
   if (p.result === 'strikeout' && (p as { is_foul_tip?: boolean }).is_foul_tip) {
     return { title: '삼진 아웃', sub: '파울팁 삼진' }
